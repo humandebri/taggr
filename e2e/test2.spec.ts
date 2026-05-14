@@ -198,6 +198,18 @@ test.describe("Regular users flow", () => {
         await waitForUILoading(page);
 
         // Make sure we're in the realm
+        await expect(page.getByTestId("realm-rail")).toBeVisible();
+        await expect(page.getByTestId("realm-rail-WONDERLAND")).toBeVisible();
+        await expect(page.getByTestId("realm-rail-WONDERLAND")).toHaveClass(
+            /active_realm_icon/,
+        );
+        await page.goto("/#/home");
+        await waitForUILoading(page);
+        await page.getByTestId("realm-rail-WONDERLAND").click();
+        await expect(page).toHaveURL(/#\/realm\/WONDERLAND/);
+        await expect(page.getByTestId("realm-rail-WONDERLAND")).toHaveClass(
+            /active_realm_icon/,
+        );
         await page.getByTestId("realm-burger-button").click();
         await expect(page.getByRole("button", { name: "LEAVE" })).toBeVisible();
 

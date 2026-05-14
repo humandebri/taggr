@@ -6,6 +6,7 @@ import {
     showPopUp,
     signOut,
     getCanonicalDomain,
+    isIOSApp,
     onCanonicalDomain,
 } from "./common";
 import { HASH_ITERATIONS, hash } from "./common";
@@ -48,8 +49,26 @@ export const authMethods = [
                 location.href = location.href.replace(".raw", "");
                 return null;
             }
+            let finished = false;
+            const timeout = window.setTimeout(() => {
+                if (!finished && isIOSApp()) {
+                    showPopUp(
+                        "error",
+                        "Internet Identity did not return to TAGGR. Please close the Identity window and try again.",
+                    );
+                }
+            }, 20000);
             window.authClient.login({
-                onSuccess: () => finalize(signUp),
+                onSuccess: () => {
+                    finished = true;
+                    window.clearTimeout(timeout);
+                    finalize(signUp);
+                },
+                onError: (error) => {
+                    finished = true;
+                    window.clearTimeout(timeout);
+                    showPopUp("error", `Internet Identity failed: ${error}`);
+                },
                 identityProvider: II_URL,
                 maxTimeToLive: BigInt(30 * 24 * 3600000000000),
                 derivationOrigin: window.location.origin,

@@ -3,6 +3,7 @@ members = [
     "src/backend",
     "src/bucket",
 ]
+exclude = ["src-tauri"]
 
 [profile.release]
 lto = true

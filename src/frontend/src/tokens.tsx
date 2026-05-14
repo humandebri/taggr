@@ -4,6 +4,8 @@ import {
     CopyToClipboard,
     HeadBar,
     hoursTillNext,
+    IOSReadOnlyTokenNotice,
+    isIOSApp,
     Loading,
     MoreButton,
     NotFound,
@@ -57,6 +59,7 @@ export const Tokens = () => {
     return (
         <>
             <HeadBar title="TOKENS" shareLink="tokens" />
+            <IOSReadOnlyTokenNotice />
             <div className="spaced">
                 <div className="dynamic_table vertically_spaced">
                     <div className="db_cell">
@@ -237,7 +240,8 @@ const AuctionCard = ({}) => {
                 highest bids. The next sale is in{" "}
                 <code>{distributionCountdown}</code> hours.
             </p>
-            {window.user && (
+            {window.user && isIOSApp() && <IOSReadOnlyTokenNotice />}
+            {window.user && !isIOSApp() && (
                 <div className="stands_out padded_rounded vertically_spaced">
                     To participate in the auction, create a bid here.
                     <div className="column_container top_spaced">
@@ -480,7 +484,7 @@ export const TransactionView = ({ id }: { id: number }) => {
     const [tx, setTransaction] = React.useState({} as Transaction);
     React.useEffect(() => {
         window.api.query("transaction", id).then((result: any) => {
-            if ("Err" in result) {
+            if (!result || "Err" in result) {
                 setStatus(-1);
                 return;
             }

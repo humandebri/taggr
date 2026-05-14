@@ -10,6 +10,7 @@ import {
     signOut,
     showPopUp,
     ButtonWithLoading,
+    isIOSApp,
 } from "./common";
 
 type ICPInvoice = {
@@ -76,29 +77,43 @@ export const Welcome = () => {
                             by another {name} user. Ask around on socials for an
                             invite or keep reading to get on board faster.
                         </p>
-                        <p>
-                            To mint credits, you need to transfer a small amount
-                            of ICP to an account controlled by the {name}{" "}
-                            canister. You get <code>1000</code> credits for as
-                            little as <code>~{USD_PER_XDR} USD</code>{" "}
-                            (corresponds to 1{" "}
-                            <a href="https://en.wikipedia.org/wiki/Special_drawing_rights">
-                                XDR
-                            </a>
-                            ). These credits are enough to create{" "}
-                            <code>{1000 / post_cost}</code> text posts or{" "}
-                            <code>{1000 / blob_cost}</code> posts with images
-                            that will be stored on-chain without any expiration
-                            date.
-                        </p>
-                        <p>
-                            Before you mint credits, make sure you understand{" "}
-                            <a href="#/whitepaper">
-                                how {window.backendCache.config.name} works
-                            </a>
-                            !
-                        </p>
-                        {!invoice && !loadingInvoice && (
+                        {!isIOSApp() && (
+                            <>
+                                <p>
+                                    To mint credits, you need to transfer a
+                                    small amount of ICP to an account controlled
+                                    by the {name} canister. You get{" "}
+                                    <code>1000</code> credits for as little as{" "}
+                                    <code>~{USD_PER_XDR} USD</code> (corresponds
+                                    to 1{" "}
+                                    <a href="https://en.wikipedia.org/wiki/Special_drawing_rights">
+                                        XDR
+                                    </a>
+                                    ). These credits are enough to create{" "}
+                                    <code>{1000 / post_cost}</code> text posts
+                                    or <code>{1000 / blob_cost}</code> posts
+                                    with images that will be stored on-chain
+                                    without any expiration date.
+                                </p>
+                                <p>
+                                    Before you mint credits, make sure you
+                                    understand{" "}
+                                    <a href="#/whitepaper">
+                                        how {window.backendCache.config.name}{" "}
+                                        works
+                                    </a>
+                                    !
+                                </p>
+                            </>
+                        )}
+                        {isIOSApp() && (
+                            <p>
+                                ICP credit minting is unavailable in the iOS
+                                app. Use an invite or the web app to activate a
+                                new account.
+                            </p>
+                        )}
+                        {!invoice && !loadingInvoice && !isIOSApp() && (
                             <p>Ready to mint? Continue below!</p>
                         )}
                     </div>
@@ -113,7 +128,7 @@ export const Welcome = () => {
                 )}
                 {!loadingInvoice && (
                     <>
-                        {!invoice && (
+                        {!invoice && !isIOSApp() && (
                             <div className="column_container vertically_spaced">
                                 <ButtonWithLoading
                                     classNameArg="active bottom_spaced"
@@ -123,6 +138,7 @@ export const Welcome = () => {
                                 {logOutButton}
                             </div>
                         )}
+                        {!invoice && isIOSApp() && logOutButton}
                         {invoice && (
                             <>
                                 {invoice.paid && (

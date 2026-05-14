@@ -1,5 +1,5 @@
 // @ts-ignore
-import template from "./style.css";
+import template from "!!raw-loader!./style.css";
 import { currentRealm } from "./common";
 import { Realm, Theme } from "./types";
 

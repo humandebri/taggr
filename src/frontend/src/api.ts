@@ -9,7 +9,6 @@ import {
 } from "@dfinity/agent";
 import { bufFromBufLike, IDL, JsonValue } from "@dfinity/candid";
 import { CANISTER_ID } from "./env";
-import { ICP_DEFAULT_FEE, ICP_LEDGER_ID } from "./common";
 import {
     IcrcLedgerCanister,
     IcrcTransferError,
@@ -18,6 +17,11 @@ import {
 } from "@dfinity/ledger-icrc";
 import { Value } from "@dfinity/ledger-icrc/dist/candid/icrc_ledger";
 import { Icrc1Canister, PostId } from "./types";
+
+const ICP_LEDGER = "ryjl3-tyaaa-aaaaa-aaaba-cai";
+const ICP_LEDGER_ID = Principal.fromText(ICP_LEDGER);
+const ICP_DEFAULT_FEE = 10000;
+const BACKEND_CANISTER_ID = CANISTER_ID || "aaaaa-aa";
 
 export type Backend = {
     query: <T>(
@@ -114,11 +118,11 @@ export const ApiGenerator = (
     mainnetMode: boolean,
     identity?: Identity,
 ): Backend => {
-    const defaultPrincipal = Principal.fromText(CANISTER_ID);
+    const defaultPrincipal = Principal.fromText(BACKEND_CANISTER_ID);
     const options: HttpAgentOptions = { identity };
     if (mainnetMode) options.host = `https://${CANISTER_ID}.ic0.app`;
     const agent = new HttpAgent(options);
-    if (!mainnetMode)
+    if (!mainnetMode && CANISTER_ID)
         agent.fetchRootKey().catch((err) => {
             console.warn(
                 "Unable to fetch root key. Check to ensure that your local replica is running",
@@ -141,7 +145,7 @@ export const ApiGenerator = (
     };
 
     const query_raw = async (
-        canisterId = CANISTER_ID,
+        canisterId = BACKEND_CANISTER_ID,
         methodName: string,
         arg = new ArrayBuffer(0),
     ): Promise<ArrayBuffer | null> => {

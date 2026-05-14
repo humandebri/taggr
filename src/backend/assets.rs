@@ -4,8 +4,11 @@ use crate::{
     id,
     metadata::set_index_metadata,
 };
+#[cfg(not(test))]
 use base64::{engine::general_purpose, Engine as _};
-use ic_certified_map::{labeled, labeled_hash, AsHashTree, Hash, RbTree};
+#[cfg(not(test))]
+use ic_certified_map::labeled;
+use ic_certified_map::{labeled_hash, AsHashTree, Hash, RbTree};
 use serde_bytes::ByteBuf;
 use sha2::{Digest, Sha256};
 use std::collections::HashMap;
@@ -15,6 +18,9 @@ pub type Headers = Vec<(String, String)>;
 const LABEL: &[u8] = b"http_assets";
 static mut ASSET_HASHES: Option<RbTree<Vec<u8>, Hash>> = None;
 static mut ASSETS: Option<HashMap<String, (Headers, Vec<u8>)>> = None;
+
+#[cfg(test)]
+pub(crate) static ASSET_TEST_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
 fn asset_hashes<'a>() -> &'a mut RbTree<Vec<u8>, Hash> {
     #[allow(static_mut_refs)]
@@ -93,6 +99,15 @@ pub fn load(domains: &HashMap<String, DomainConfig>) {
     );
 
     add_asset(
+        &[
+            "/.well-known/apple-app-site-association",
+            "/apple-app-site-association",
+        ],
+        vec![("Content-Type".into(), "application/json".into())],
+        include_bytes!("../../src/frontend/assets/.well-known/apple-app-site-association").to_vec(),
+    );
+
+    add_asset(
         &["/.well-known/ii-alternative-origins"],
         vec![("Content-Type".into(), "application/json".into())],
         format!(
@@ -153,7 +168,7 @@ fn add_asset(paths: &[&str], headers: Headers, bytes: Vec<u8>) {
 
 pub fn asset_certified(path: &str) -> Option<(Headers, ByteBuf)> {
     let (mut headers, bytes) = asset(path)?;
-    headers.push(certificate_header(path));
+    add_certificate_header(path, &mut headers);
     Some((headers, bytes))
 }
 
@@ -178,6 +193,18 @@ pub fn export_token_supply(total_supply: u128) {
     certify();
 }
 
+#[cfg(not(test))]
+fn add_certificate_header(path: &str, headers: &mut Headers) {
+    headers.push(certificate_header(path));
+}
+
+#[cfg(test)]
+fn add_certificate_header(_path: &str, _headers: &mut Headers) {
+    // Unit tests run outside IC query context, so no data certificate exists.
+    // Tests still exercise the certified asset lookup path and no-upgrade behavior.
+}
+
+#[cfg(not(test))]
 fn certificate_header(path: &str) -> (String, String) {
     let certificate = ic_cdk::api::data_certificate().expect("no certificate");
     let witness = asset_hashes().witness(path.as_bytes());
@@ -194,4 +221,56 @@ fn certificate_header(path: &str) -> (String, String) {
             general_purpose::STANDARD.encode(serializer.into_inner())
         ),
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn serves_aasa_from_well_known_and_root_paths() {
+        let _guard = ASSET_TEST_LOCK.lock().expect("asset test lock poisoned");
+        let domains = HashMap::from([("taggr.test".into(), DomainConfig::default())]);
+        load(&domains);
+
+        let (well_known_headers, well_known_body) =
+            asset("/.well-known/apple-app-site-association").expect("missing well-known AASA");
+        let (root_headers, root_body) =
+            asset("/apple-app-site-association").expect("missing root AASA");
+
+        assert_eq!(well_known_body, root_body);
+        assert!(well_known_headers
+            .iter()
+            .any(|(name, value)| name == "Content-Type" && value == "application/json"));
+        assert_eq!(well_known_headers, root_headers);
+        let aasa: serde_json::Value =
+            serde_json::from_slice(well_known_body.as_ref()).expect("AASA should be valid JSON");
+        let details = aasa["applinks"]["details"]
+            .as_array()
+            .expect("AASA applinks.details should be an array");
+        assert!(details.iter().any(|detail| detail["appIDs"]
+            .as_array()
+            .expect("AASA detail appIDs should be an array")
+            .iter()
+            .any(|app_id| app_id == "AKN976G7AK.network.taggr.ios")));
+        let components = details[0]["components"]
+            .as_array()
+            .expect("AASA detail components should be an array");
+        for path in [
+            "/post/*",
+            "/user/*",
+            "/realm/*",
+            "/transaction/*",
+            "/transactions",
+            "/transactions/*",
+            "/tokens",
+            "/tokens/*",
+        ] {
+            assert!(
+                components.iter().any(|component| component["/"] == path),
+                "missing AASA component for {}",
+                path
+            );
+        }
+    }
 }

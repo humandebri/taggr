@@ -4,7 +4,9 @@ import {
     ButtonWithLoading,
     HeadBar,
     ICP_LEDGER_ID,
+    IOSReadOnlyTokenNotice,
     hex,
+    isIOSApp,
     showPopUp,
     onCanonicalDomain,
     UnavailableOnCustomDomains,
@@ -116,6 +118,10 @@ export const Settings = ({ invite }: { invite?: string }) => {
             .split("\n")
             .map((v) => v.trim())
             .filter((id) => id.length > 0);
+        const nextSettings = { ...settings };
+        if (isIOSApp()) nextSettings.icrcWallet = "false";
+        const nextMode =
+            isIOSApp() || (registrationFlow && invite) ? "Credits" : mode;
         const responses = await Promise.all([
             window.api.call<any>(
                 "update_user",
@@ -124,11 +130,10 @@ export const Settings = ({ invite }: { invite?: string }) => {
                 principal_ids,
                 userFilter,
                 governance == "true",
-                // For new and invited users, set the mode to "Credits"
-                registrationFlow && invite ? "Credits" : mode,
+                nextMode,
                 showPostsInRealms == "true",
             ),
-            window.api.call<any>("update_user_settings", settings),
+            window.api.call<any>("update_user_settings", nextSettings),
         ]);
         for (let i in responses) {
             const response = responses[i];
@@ -154,7 +159,7 @@ export const Settings = ({ invite }: { invite?: string }) => {
 
     return (
         <>
-            <HeadBar title="SETTINGS" shareLink="setting" />
+            <HeadBar title="SETTINGS" shareLink="settings" />
             <div className="spaced column_container">
                 <div className="bottom_half_spaced">
                     User name <span className="accent">[required]</span>
@@ -177,22 +182,46 @@ export const Settings = ({ invite }: { invite?: string }) => {
                 />
                 {user && (
                     <>
-                        <div className="bottom_half_spaced">Usage mode</div>
-                        <select
-                            data-testid="mode-selector"
-                            value={mode}
-                            className="bottom_spaced"
-                            onChange={(event) => setMode(event.target.value)}
-                        >
-                            <option value="Credits">
-                                Convert rewards to credits automatically
-                            </option>
-                            <option value="Rewards">Receive ICP rewards</option>
-                            <option value="Mining">
-                                Mine {window.backendCache.config.token_symbol}{" "}
-                                tokens
-                            </option>
-                        </select>
+                        {isIOSApp() ? (
+                            <>
+                                <IOSReadOnlyTokenNotice />
+                                <div className="bottom_half_spaced">
+                                    Usage mode
+                                </div>
+                                <code className="bottom_spaced">
+                                    Convert rewards to credits automatically
+                                </code>
+                            </>
+                        ) : (
+                            <>
+                                <div className="bottom_half_spaced">
+                                    Usage mode
+                                </div>
+                                <select
+                                    data-testid="mode-selector"
+                                    value={mode}
+                                    className="bottom_spaced"
+                                    onChange={(event) =>
+                                        setMode(event.target.value)
+                                    }
+                                >
+                                    <option value="Credits">
+                                        Convert rewards to credits automatically
+                                    </option>
+                                    <option value="Rewards">
+                                        Receive ICP rewards
+                                    </option>
+                                    <option value="Mining">
+                                        Mine{" "}
+                                        {
+                                            window.backendCache.config
+                                                .token_symbol
+                                        }{" "}
+                                        tokens
+                                    </option>
+                                </select>
+                            </>
+                        )}
                         <div className="bottom_half_spaced">
                             Participate in governance
                         </div>
@@ -264,20 +293,24 @@ export const Settings = ({ invite }: { invite?: string }) => {
                 </select>
                 {user && (
                     <>
-                        <div className="bottom_half_spaced">
-                            Enable ICRC tokens in the wallet
-                        </div>
-                        <select
-                            data-testid="ic-wallet-select"
-                            value={settings.icrcWallet || "false"}
-                            className="bottom_spaced"
-                            onChange={(event) =>
-                                setSetting("icrcWallet", event)
-                            }
-                        >
-                            <option value="true">YES</option>
-                            <option value="false">NO</option>
-                        </select>
+                        {!isIOSApp() && (
+                            <>
+                                <div className="bottom_half_spaced">
+                                    Enable ICRC tokens in the wallet
+                                </div>
+                                <select
+                                    data-testid="ic-wallet-select"
+                                    value={settings.icrcWallet || "false"}
+                                    className="bottom_spaced"
+                                    onChange={(event) =>
+                                        setSetting("icrcWallet", event)
+                                    }
+                                >
+                                    <option value="true">YES</option>
+                                    <option value="false">NO</option>
+                                </select>
+                            </>
+                        )}
                         <div className="bottom_half_spaced">
                             Override realm color themes
                         </div>

@@ -1,0 +1,25 @@
+[package]
+name = "taggr-ios"
+version = "0.1.0"
+description = "TAGGR iOS shell"
+edition = "2021"
+license = "GPL-3.0-only"
+
+[lib]
+name = "taggr_ios"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2.6.1", features = [] }
+
+[dependencies]
+serde_json = "1.0.145"
+tauri = { version = "2.11.1", features = [] }
+tauri-plugin-deep-link = "2.4.9"
+tauri-plugin-opener = "2.5.4"
+url = "2.5.7"
+
+[target.'cfg(target_os = "ios")'.dependencies]
+objc2-foundation = { version = "0.3.2", default-features = false, features = ["NSArray", "NSObject", "NSString", "NSURL"] }
+objc2-ui-kit = { version = "0.3.2", default-features = false, features = ["UIApplication", "UIActivity", "UIActivityViewController", "UIPopoverPresentationController", "UIPresentationController", "UIResponder", "UIView", "UIViewController", "UIWindow", "block2"] }
+objc2-web-kit = { version = "0.3.0", default-features = false, features = ["WKWebView"] }

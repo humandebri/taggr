@@ -7,6 +7,7 @@ import {
     getTokens,
     Loading,
     IconToggleButton,
+    isIOSApp,
     showPopUp,
     noiseControlBanner,
 } from "./common";
@@ -30,6 +31,10 @@ import { ProposalMask, ProposalType, validateProposal } from "./proposals";
 
 const MAX_IMG_SIZE = 16777216;
 const MAX_SUGGESTED_TAGS = 5;
+const IOS_PROPOSAL_TYPES = [
+    ProposalType.Release,
+    ProposalType.AddRealmController,
+];
 
 export const Form = ({
     postId,
@@ -660,7 +665,10 @@ export const Form = ({
                                         )
                                     }
                                 >
-                                    {Object.values(ProposalType).map((id) => (
+                                    {(isIOSApp()
+                                        ? IOS_PROPOSAL_TYPES
+                                        : Object.values(ProposalType)
+                                    ).map((id) => (
                                         <option key={id} value={id}>
                                             {id}
                                         </option>

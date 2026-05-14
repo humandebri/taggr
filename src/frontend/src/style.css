@@ -726,6 +726,120 @@ article img {
     padding: 0.5em;
 }
 
+.with_realm_rail {
+    padding-left: calc(3% + 4.5rem);
+}
+
+.realm_rail {
+    position: fixed;
+    z-index: 900;
+    top: 4.25rem;
+    bottom: 1rem;
+    left: max(0.75rem, calc((100vw - 1200px) / 2 - 4.25rem));
+    width: 3.5rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.45rem;
+    padding: 0.45rem 0.35rem;
+    background: $light_background;
+    border-left: 2px solid $dark_background;
+    border-radius: 8px;
+}
+
+.realm_rail_realms {
+    display: flex;
+    flex: 1;
+    min-height: 0;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.45rem;
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+.realm_rail_separator {
+    width: 2rem;
+    border-top: 2px solid $dark_background;
+}
+
+.realm_icon_button {
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    padding: 0;
+    margin: 0;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    color: $text;
+    background: $dark_background;
+    transition:
+        border-radius 0.12s,
+        filter 0.12s;
+}
+
+.realm_icon_button:hover,
+.active_realm_icon {
+    border-radius: 14px;
+    filter: brightness(120%);
+}
+
+.active_realm_icon {
+    outline: 2px solid $accent;
+    outline-offset: 2px;
+}
+
+.realm_rail_link {
+    text-decoration: none;
+}
+
+.realm_icon_image,
+.realm_icon_initials {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    object-fit: cover;
+    font-size: small;
+    font-weight: bold;
+}
+
+.realm_server_header {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.realm_server_identity {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    gap: 1rem;
+}
+
+.realm_server_title {
+    margin: 0;
+    overflow-wrap: anywhere;
+}
+
+.realm_server_actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    justify-content: flex-end;
+}
+
+.realm_server_info {
+    display: grid;
+    gap: 1rem;
+    grid-template-columns: minmax(0, 2fr) minmax(240px, 1fr);
+}
+
 .reply_tag,
 .realm_tag {
     cursor: pointer;
@@ -1105,6 +1219,52 @@ label svg {
     body {
         padding-left: 0;
         padding-right: 0;
+    }
+
+    body.with_realm_rail {
+        padding-left: 0;
+        padding-bottom: 4.75rem;
+    }
+
+    .realm_rail {
+        top: auto;
+        right: 0;
+        bottom: 0;
+        left: 0;
+        width: auto;
+        height: 4.25rem;
+        flex-direction: row;
+        overflow-x: auto;
+        overflow-y: hidden;
+        border-left: none;
+        border-top: 2px solid $dark_background;
+        border-radius: 0;
+    }
+
+    .realm_rail_realms {
+        flex: 1;
+        flex-direction: row;
+        overflow: visible;
+    }
+
+    .realm_rail_separator {
+        width: 0;
+        height: 2rem;
+        border-top: none;
+        border-left: 2px solid $dark_background;
+    }
+
+    .realm_server_header {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    .realm_server_actions {
+        justify-content: flex-start;
+    }
+
+    .realm_server_info {
+        display: block;
     }
 
     table.dashboard_logs {

@@ -12,6 +12,8 @@ import {
     parseNumber,
     tokens,
     ICP_DEFAULT_FEE,
+    IOSReadOnlyTokenNotice,
+    isIOSApp,
     showPopUp,
     onCanonicalDomain,
     UnavailableOnCustomDomains,
@@ -41,10 +43,12 @@ export const Wallet = () => {
     return (
         <div className="spaced">
             <hr />
+            <IOSReadOnlyTokenNotice />
             {user.cycles <= 200 && (
                 <div className="banner bottom_spaced">
-                    You are low on credits! Please transfer some ICP to your
-                    account displayed below and press the MINT button.
+                    {isIOSApp()
+                        ? "You are low on credits. Credit minting is unavailable in the iOS app."
+                        : "You are low on credits! Please transfer some ICP to your account displayed below and press the MINT button."}
                 </div>
             )}
             <div className="column_container">
@@ -78,7 +82,7 @@ export const Wallet = () => {
             <hr />
             <div className="vcentered">
                 <h2 className="max_width_col">ICP</h2>
-                {Number(user.treasury_e8s) > 0 && (
+                {Number(user.treasury_e8s) > 0 && !isIOSApp() && (
                     <ButtonWithLoading
                         label="WITHDRAW REWARDS"
                         onClick={async () => {
@@ -90,68 +94,70 @@ export const Wallet = () => {
                         }}
                     />
                 )}
-                <ButtonWithLoading
-                    label="SEND"
-                    testId="icp-transfer-button"
-                    onClick={async () => {
-                        try {
-                            const recipient =
-                                prompt(
-                                    "Enter the recipient principal or ICP account address",
-                                )?.trim() || "";
-                            if (!recipient) return;
-                            if (recipient.length == 64) {
-                                const amount = parseNumber(
+                {!isIOSApp() && (
+                    <ButtonWithLoading
+                        label="SEND"
+                        testId="icp-transfer-button"
+                        onClick={async () => {
+                            try {
+                                const recipient =
                                     prompt(
-                                        `Enter the amount (fee: ${tokens(
-                                            ICP_DEFAULT_FEE,
-                                            8,
-                                        )} ICP)`,
-                                    )?.trim() || "",
-                                    8,
-                                );
-                                if (
-                                    !amount ||
-                                    !confirm(
-                                        `You are transferring\n\n${tokens(
-                                            amount,
-                                            8,
-                                        )} ICP\n\nto\n\n${recipient}`,
-                                    )
-                                )
-                                    return;
-                                let response: any =
-                                    await window.api.icp_transfer(
-                                        recipient,
-                                        amount,
+                                        "Enter the recipient principal or ICP account address",
+                                    )?.trim() || "";
+                                if (!recipient) return;
+                                if (recipient.length == 64) {
+                                    const amount = parseNumber(
+                                        prompt(
+                                            `Enter the amount (fee: ${tokens(
+                                                ICP_DEFAULT_FEE,
+                                                8,
+                                            )} ICP)`,
+                                        )?.trim() || "",
+                                        8,
                                     );
-                                if ("Err" in response) {
-                                    console.error(response);
-                                    showPopUp("error", "Transfer failed");
+                                    if (
+                                        !amount ||
+                                        !confirm(
+                                            `You are transferring\n\n${tokens(
+                                                amount,
+                                                8,
+                                            )} ICP\n\nto\n\n${recipient}`,
+                                        )
+                                    )
+                                        return;
+                                    let response: any =
+                                        await window.api.icp_transfer(
+                                            recipient,
+                                            amount,
+                                        );
+                                    if ("Err" in response) {
+                                        console.error(response);
+                                        showPopUp("error", "Transfer failed");
+                                    }
+                                    await window.reloadUser();
+                                    setUser(window.user);
+                                    return;
                                 }
+                                const response = await icrcTransfer(
+                                    ICP_LEDGER_ID,
+                                    "ICP",
+                                    8,
+                                    ICP_DEFAULT_FEE,
+                                    recipient,
+                                );
+                                if (Number.isNaN(Number(response)))
+                                    showPopUp(
+                                        "error",
+                                        `Transfer failed: ${response}`,
+                                    );
                                 await window.reloadUser();
                                 setUser(window.user);
-                                return;
+                            } catch (e) {
+                                showPopUp("error", `${e}`, 5);
                             }
-                            const response = await icrcTransfer(
-                                ICP_LEDGER_ID,
-                                "ICP",
-                                8,
-                                ICP_DEFAULT_FEE,
-                                recipient,
-                            );
-                            if (Number.isNaN(Number(response)))
-                                showPopUp(
-                                    "error",
-                                    `Transfer failed: ${response}`,
-                                );
-                            await window.reloadUser();
-                            setUser(window.user);
-                        } catch (e) {
-                            showPopUp("error", `${e}`, 5);
-                        }
-                    }}
-                />
+                        }}
+                    />
+                )}
             </div>
             <div className="vcentered">
                 <div className="max_width_col">Wallet</div>
@@ -175,68 +181,71 @@ export const Wallet = () => {
             <hr />
             <div className="vcentered">
                 <h2 className="max_width_col">Credits</h2>
-                <ButtonWithLoading
-                    label="MINT"
-                    onClick={async () => {
-                        const future_invoice = window.api.call<any>(
-                            "mint_credits_with_icp",
-                            0,
-                        );
-                        const maxKilos =
-                            window.backendCache.config.max_credits_mint_kilos;
-                        const kilo_credits = parseInt(
-                            prompt(
-                                "Enter the number of 1000s of credits to mint " +
-                                    `(max: ${maxKilos})`,
-                                "1",
-                            ) || "0",
-                        );
-                        if (Number(kilo_credits) > maxKilos) {
-                            showPopUp(
-                                "error",
-                                `You can't mint more than ${
-                                    1000 * maxKilos
-                                } credits at once.`,
+                {!isIOSApp() && (
+                    <ButtonWithLoading
+                        label="MINT"
+                        onClick={async () => {
+                            const future_invoice = window.api.call<any>(
+                                "mint_credits_with_icp",
+                                0,
                             );
-                            return;
-                        }
-                        if (!kilo_credits || isNaN(kilo_credits)) {
-                            return;
-                        }
-                        const invoice_result = await future_invoice;
-                        if ("Err" in invoice_result) {
-                            showPopUp("error", invoice_result.Err);
-                            return;
-                        }
-                        const { account, e8s } = invoice_result.Ok;
-                        const userSubaccount = hex(account);
-                        const amount = Number(e8s) * kilo_credits;
-                        const response: any = await window.api.icp_transfer(
-                            userSubaccount,
-                            amount,
-                        );
-                        if ("Err" in response) {
-                            showPopUp(
-                                "error",
-                                `Couldn't transfer ICP for minting. Make sure you have at least ${tokens(
-                                    amount + ICP_DEFAULT_FEE,
-                                    8,
-                                )} ICP on your wallet and try again.`,
-                                7,
+                            const maxKilos =
+                                window.backendCache.config
+                                    .max_credits_mint_kilos;
+                            const kilo_credits = parseInt(
+                                prompt(
+                                    "Enter the number of 1000s of credits to mint " +
+                                        `(max: ${maxKilos})`,
+                                    "1",
+                                ) || "0",
                             );
-                        }
-                        const result: any = await mintCredits(kilo_credits);
-                        if ("Err" in result) {
-                            showPopUp("error", result.Err);
-                            return;
-                        }
-                        const invoice = result.Ok;
-                        if (invoice.paid) {
-                            await window.reloadUser();
-                            setUser(window.user);
-                        }
-                    }}
-                />
+                            if (Number(kilo_credits) > maxKilos) {
+                                showPopUp(
+                                    "error",
+                                    `You can't mint more than ${
+                                        1000 * maxKilos
+                                    } credits at once.`,
+                                );
+                                return;
+                            }
+                            if (!kilo_credits || isNaN(kilo_credits)) {
+                                return;
+                            }
+                            const invoice_result = await future_invoice;
+                            if ("Err" in invoice_result) {
+                                showPopUp("error", invoice_result.Err);
+                                return;
+                            }
+                            const { account, e8s } = invoice_result.Ok;
+                            const userSubaccount = hex(account);
+                            const amount = Number(e8s) * kilo_credits;
+                            const response: any = await window.api.icp_transfer(
+                                userSubaccount,
+                                amount,
+                            );
+                            if ("Err" in response) {
+                                showPopUp(
+                                    "error",
+                                    `Couldn't transfer ICP for minting. Make sure you have at least ${tokens(
+                                        amount + ICP_DEFAULT_FEE,
+                                        8,
+                                    )} ICP on your wallet and try again.`,
+                                    7,
+                                );
+                            }
+                            const result: any = await mintCredits(kilo_credits);
+                            if ("Err" in result) {
+                                showPopUp("error", result.Err);
+                                return;
+                            }
+                            const invoice = result.Ok;
+                            if (invoice.paid) {
+                                await window.reloadUser();
+                                setUser(window.user);
+                            }
+                        }}
+                    />
+                )}
             </div>
             <div className="vcentered">
                 <div className="max_width_col">Available</div>
@@ -247,24 +256,26 @@ export const Wallet = () => {
             <hr />
             <div className="vcentered">
                 <h2 className="max_width_col">{token_symbol}</h2>
-                {!user.cold_wallet && coldWalletFunctionalityAvailable && (
-                    <ButtonWithLoading
-                        onClick={async () => {
-                            const actor = await getActor();
-                            const response = await actor.link_cold_wallet(
-                                window.user.id,
-                            );
-                            if (response && "Err" in response) {
-                                showPopUp("error", response.Err);
-                                return;
-                            }
-                            await window.reloadUser();
-                            setUser(window.user);
-                        }}
-                        label="LINK COLD WALLET"
-                    />
-                )}
-                {user.cold_wallet && (
+                {!user.cold_wallet &&
+                    coldWalletFunctionalityAvailable &&
+                    !isIOSApp() && (
+                        <ButtonWithLoading
+                            onClick={async () => {
+                                const actor = await getActor();
+                                const response = await actor.link_cold_wallet(
+                                    window.user.id,
+                                );
+                                if (response && "Err" in response) {
+                                    showPopUp("error", response.Err);
+                                    return;
+                                }
+                                await window.reloadUser();
+                                setUser(window.user);
+                            }}
+                            label="LINK COLD WALLET"
+                        />
+                    )}
+                {user.cold_wallet && !isIOSApp() && (
                     <ButtonWithLoading
                         onClick={async () => {
                             if (
@@ -287,22 +298,24 @@ export const Wallet = () => {
                         label="UNLINK COLD WALLET"
                     />
                 )}
-                <ButtonWithLoading
-                    label="SEND"
-                    testId="tokens-transfer-button"
-                    onClick={async () => {
-                        const response = await icrcTransfer(
-                            Principal.fromText(CANISTER_ID),
-                            token_symbol,
-                            token_decimals,
-                            transaction_fee,
-                        );
-                        if (Number.isNaN(Number(response)))
-                            showPopUp("error", response as string);
-                        await window.reloadUser();
-                        setUser(window.user);
-                    }}
-                />
+                {!isIOSApp() && (
+                    <ButtonWithLoading
+                        label="SEND"
+                        testId="tokens-transfer-button"
+                        onClick={async () => {
+                            const response = await icrcTransfer(
+                                Principal.fromText(CANISTER_ID),
+                                token_symbol,
+                                token_decimals,
+                                transaction_fee,
+                            );
+                            if (Number.isNaN(Number(response)))
+                                showPopUp("error", response as string);
+                            await window.reloadUser();
+                            setUser(window.user);
+                        }}
+                    />
+                )}
             </div>
             <div className="row_container vcentered">
                 <div className="max_width_col">Wallet </div>
@@ -325,7 +338,7 @@ export const Wallet = () => {
                     </a>
                 </div>
             )}
-            {user.settings.icrcWallet == "true" && (
+            {user.settings.icrcWallet == "true" && !isIOSApp() && (
                 <>
                     <hr />
                     <Icrc1TokensWallet />

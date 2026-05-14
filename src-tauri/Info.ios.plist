@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>WKAppBoundDomains</key>
+	<array>
+		<string>6qfxa-ryaaa-aaaai-qbhsq-cai.icp0.io</string>
+		<string>6qfxa-ryaaa-aaaai-qbhsq-cai.ic0.app</string>
+		<string>6qfxa-ryaaa-aaaai-qbhsq-cai.raw.ic0.app</string>
+		<string>id.ai</string>
+		<string>identity.internetcomputer.org</string>
+		<string>identity.ic0.app</string>
+	</array>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>network.taggr.ios</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>taggr</string>
+			</array>
+		</dict>
+	</array>
+</dict>
+</plist>

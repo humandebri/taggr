@@ -1,4 +1,5 @@
 import * as React from "react";
+import { invoke } from "@tauri-apps/api/core";
 // @ts-ignore
 import DiffMatchPatch from "diff-match-patch";
 import {
@@ -33,6 +34,8 @@ import { MAINNET_MODE } from "./env";
 export const RAD_ID = "rad:z4TNAuSLgfxXUr8sYpYowk6mcx33B";
 
 export const REPO = `https://radicle.network/nodes/seed.radicle.garden/${RAD_ID}`;
+
+export const TAGGR_CANONICAL_DOMAIN = "6qfxa-ryaaa-aaaai-qbhsq-cai.icp0.io";
 
 export const USD_PER_XDR = 1.37;
 
@@ -219,6 +222,43 @@ export const Unauthorized = () => (
 
 export const bigScreen = () => window.innerWidth >= 1024;
 
+export const isIOSApp = () =>
+    /\bTAGGR-iOS\b/.test(navigator.userAgent) ||
+    window.__TAGGR_IOS_APP__ === true;
+
+export const IOSReadOnlyTokenNotice = () =>
+    isIOSApp() ? (
+        <div className="banner bottom_spaced">
+            Token, ICP, wallet, minting, and exchange actions are read-only in
+            the iOS app.
+        </div>
+    ) : null;
+
+export const toIOSUniversalLinkPath = (url: string) => {
+    const parsed = new URL(url, location.origin + "/");
+    const canonicalHost = getCanonicalDomain();
+    if (parsed.host != location.host && parsed.host != canonicalHost) {
+        return url;
+    }
+
+    const route = parsed.hash.startsWith("#/")
+        ? parsed.hash.slice(2)
+        : parsed.pathname.replace(/^\/+/, "");
+    const firstSegment = route.split("/").find((part) => part.length > 0);
+    if (!firstSegment) return url;
+
+    const supported = [
+        "post",
+        "user",
+        "realm",
+        "transaction",
+        "transactions",
+        "tokens",
+    ].includes(firstSegment);
+
+    return supported ? `/${route}` : url;
+};
+
 export const HeadBar = ({
     title,
     shareLink,
@@ -328,16 +368,42 @@ export const ShareButton = ({
     styleArg?: any;
     text?: boolean;
 }) => {
-    const fullUlr = `https://${location.host}/${url}`;
+    const path = url.startsWith("http")
+        ? url
+        : url.startsWith("#/")
+          ? url
+          : `#/${url.replace(/^\/+/, "")}`;
+    const shareOrigin = isIOSApp()
+        ? `https://${getCanonicalDomain()}`
+        : location.origin;
+    const sharePath = isIOSApp() ? toIOSUniversalLinkPath(path) : path;
+    const fullUrl = new URL(sharePath, shareOrigin + "/").href;
     if (styleArg) styleArg.fill = styleArg.color;
     return (
         <button
-            title={`Share link to ${fullUlr}`}
+            title={`Share link to ${fullUrl}`}
             className={`medium_text ${classNameArg}`}
             style={styleArg}
             onClick={async (_) => {
-                await navigator.clipboard.writeText(fullUlr);
-                showPopUp("info", `Link copied to clipboard: ${fullUlr}`);
+                if (isIOSApp()) {
+                    try {
+                        await invoke("share_url", { url: fullUrl });
+                        return;
+                    } catch (error) {
+                        console.warn("Native iOS share failed", error);
+                    }
+                }
+
+                if (navigator.share) {
+                    await navigator.share({
+                        title: document.title || "TAGGR",
+                        url: fullUrl,
+                    });
+                    return;
+                }
+
+                await navigator.clipboard.writeText(fullUrl);
+                showPopUp("info", `Link copied to clipboard: ${fullUrl}`);
             }}
         >
             {text ? "SHARE" : <Share styleArg={styleArg} />}
@@ -1299,7 +1365,9 @@ export const UnavailableOnCustomDomains = ({
 );
 
 export const getCanonicalDomain = () =>
-    `${window.backendCache.stats.canister_id}.icp0.io`;
+    window.backendCache.stats?.canister_id
+        ? `${window.backendCache.stats.canister_id}.icp0.io`
+        : TAGGR_CANONICAL_DOMAIN;
 
 export const onCanonicalDomain = () =>
     !MAINNET_MODE || domain() == getCanonicalDomain();

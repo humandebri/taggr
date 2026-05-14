@@ -1,0 +1,48 @@
+{
+    "$schema": "https://schema.tauri.app/config/2",
+    "productName": "TAGGR",
+    "version": "0.1.0",
+    "identifier": "network.taggr.ios",
+    "build": {
+        "devUrl": "https://6qfxa-ryaaa-aaaai-qbhsq-cai.icp0.io",
+        "frontendDist": "https://6qfxa-ryaaa-aaaai-qbhsq-cai.icp0.io"
+    },
+    "app": {
+        "withGlobalTauri": false,
+        "windows": []
+    },
+    "bundle": {
+        "active": true,
+        "targets": "all",
+        "icon": ["resources/app-mark.png"],
+        "iOS": {
+            "minimumSystemVersion": "17.0",
+            "bundleVersion": "1",
+            "developmentTeam": "AKN976G7AK",
+            "infoPlist": "Info.ios.plist"
+        }
+    },
+    "plugins": {
+        "deep-link": {
+            "mobile": [
+                {
+                    "scheme": ["https"],
+                    "host": "6qfxa-ryaaa-aaaai-qbhsq-cai.icp0.io",
+                    "pathPrefix": [
+                        "/post",
+                        "/user",
+                        "/realm",
+                        "/transaction",
+                        "/transactions",
+                        "/tokens"
+                    ],
+                    "appLink": true
+                },
+                {
+                    "scheme": ["taggr"],
+                    "appLink": false
+                }
+            ]
+        }
+    }
+}

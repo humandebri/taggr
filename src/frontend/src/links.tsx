@@ -1,26 +1,46 @@
-import { HeadBar, REPO } from "./common";
+import { HeadBar, isIOSApp, REPO } from "./common";
 
 export const LinksPage = ({}) => {
     const { token_symbol, staging, staging2 } = window.backendCache.config;
     return (
         <div className="spaced">
             <HeadBar title="LINKS" shareLink="links" />
-            <h2>Price Listings</h2>
+            {!isIOSApp() && (
+                <>
+                    <h2>Price Listings</h2>
+                    <ul>
+                        <li>
+                            <a href="https://www.coingecko.com/en/coins/taggr">
+                                CoinGecko
+                            </a>
+                        </li>
+                        <li>
+                            <a href="https://icpcoins.com/#/token/TAGGR">
+                                ICPCoins
+                            </a>
+                        </li>
+                    </ul>
+                    <h2>{token_symbol} Trading</h2>
+                    <ul>
+                        <li>
+                            <a href="https://app.icpswap.com/info-swap/token/details/6qfxa-ryaaa-aaaai-qbhsq-cai">
+                                ICPSwap exchange
+                            </a>
+                        </li>
+                    </ul>
+                </>
+            )}
+            <h2>Support and privacy</h2>
             <ul>
                 <li>
-                    <a href="https://www.coingecko.com/en/coins/taggr">
-                        CoinGecko
-                    </a>
+                    <a href="#/privacy">Privacy policy</a>
                 </li>
                 <li>
-                    <a href="https://icpcoins.com/#/token/TAGGR">ICPCoins</a>
+                    <a href={`#/realm/HELP`}>HELP Realm</a>
                 </li>
-            </ul>
-            <h2>{token_symbol} Trading</h2>
-            <ul>
                 <li>
-                    <a href="https://app.icpswap.com/info-swap/token/details/6qfxa-ryaaa-aaaai-qbhsq-cai">
-                        ICPSwap exchange
+                    <a href="https://oc.app/community/zbg63-qqaaa-aaaar-atika-cai">
+                        OpenChat Community
                     </a>
                 </li>
             </ul>
@@ -33,16 +53,8 @@ export const LinksPage = ({}) => {
                     (helpful for newbies)
                 </li>
                 <li>
-                    <a href={`#/realm/HELP`}>HELP Realm</a>
-                </li>
-                <li>
                     <a href="#/feed/@mntyetti+finn">Explanatory material</a> by{" "}
                     <a href="#/user/MntYetti">MntYetti</a>
-                </li>
-                <li>
-                    <a href="https://oc.app/community/zbg63-qqaaa-aaaar-atika-cai">
-                        OpenChat Community
-                    </a>
                 </li>
             </ul>
             <h2>Development</h2>
@@ -51,14 +63,20 @@ export const LinksPage = ({}) => {
                     <a href={REPO}>Source code repository on Radicle</a>{" "}
                     (maintained by <a href="#/user/0">X</a>)
                 </li>
-                <li>
-                    <a href={`https://${staging}`}>Staging environment</a>{" "}
-                    (maintained by <a href="#/user/0">X</a>)
-                </li>
-                <li>
-                    <a href={`https://${staging2}`}>Staging environment 2</a>{" "}
-                    (maintained by <a href="#/user/935">aligatorr</a>)
-                </li>
+                {staging && (
+                    <li>
+                        <a href={`https://${staging}`}>Staging environment</a>{" "}
+                        (maintained by <a href="#/user/0">X</a>)
+                    </li>
+                )}
+                {staging2 && (
+                    <li>
+                        <a href={`https://${staging2}`}>
+                            Staging environment 2
+                        </a>{" "}
+                        (maintained by <a href="#/user/935">aligatorr</a>)
+                    </li>
+                )}
             </ul>
         </div>
     );

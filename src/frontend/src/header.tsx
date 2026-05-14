@@ -3,23 +3,14 @@ import {
     BurgerButton,
     currentRealm,
     IconToggleButton,
-    RealmList,
     signOut,
     bigScreen,
     DropDown,
     getCanonicalDomain,
 } from "./common";
-import {
-    Bell,
-    Gear,
-    Journal,
-    Logout,
-    Realm,
-    Save,
-    Ticket,
-    User,
-} from "./icons";
+import { Bell, Gear, Journal, Logout, Save, Ticket, User } from "./icons";
 import { RealmHeader } from "./realms";
+import { RealmRail } from "./realm_rail";
 import { MAINNET_MODE, STAGING_MODE } from "./env";
 import { User as UserType } from "./types";
 import { Wallet } from "./wallet";
@@ -41,7 +32,6 @@ export const Header = ({
 
     const user = window.user;
     const [showUserSection, toggleUserSection] = React.useState(false);
-    const [showRealms, toggleRealms] = React.useState(false);
     const [showLinks, toggleLinks] = React.useState(false);
     const [messages, setMessages] = React.useState(0);
     const [offset, setOffset] = React.useState(0);
@@ -65,7 +55,6 @@ export const Header = ({
     }, []);
     React.useEffect(() => {
         toggleUserSection(false);
-        toggleRealms(false);
         toggleLinks(false);
     }, [route]);
     React.useEffect(refreshMessageCounter, [user]);
@@ -82,6 +71,7 @@ export const Header = ({
                     {window.backendCache.config.name.toUpperCase()}!
                 </div>
             )}
+            {!style && <RealmRail route={route} />}
             <header className="spaced top_half_spaced vcentered">
                 {!["/", "#/", "", "#/inbox"].includes(location.hash) && (
                     <span
@@ -117,24 +107,10 @@ export const Header = ({
                                     </>
                                 }
                             />
-                            {user.realms.length > 0 && !window.monoRealm && (
-                                <IconToggleButton
-                                    pressed={showRealms}
-                                    onClick={(event) => {
-                                        toggleRealms(!showRealms);
-                                        toggleUserSection(false);
-                                        toggleLinks(false);
-                                        setOffset(getOffset(event));
-                                    }}
-                                    icon={<Realm />}
-                                    testId="toggle-realms"
-                                />
-                            )}
                             <IconToggleButton
                                 pressed={showUserSection}
                                 onClick={(event) => {
                                     toggleUserSection(!showUserSection);
-                                    toggleRealms(false);
                                     toggleLinks(false);
                                     setOffset(getOffset(event));
                                 }}
@@ -145,7 +121,6 @@ export const Header = ({
                                 <BurgerButton
                                     pressed={showLinks}
                                     onClick={(event) => {
-                                        toggleRealms(false);
                                         toggleUserSection(false);
                                         toggleLinks(!showLinks);
                                         setOffset(getOffset(event));
@@ -184,9 +159,6 @@ export const Header = ({
             <DropDown offset={offset}>
                 {showUserSection && <UserSection user={user} />}
                 {showLinks && <Links />}
-                {showRealms && (
-                    <RealmList classNameArg="centered" ids={user.realms} />
-                )}
             </DropDown>
             {realm && <RealmHeader name={realm} heartbeat={location.href} />}
         </>

@@ -16,6 +16,7 @@ import {
     onCanonicalDomain,
     UnavailableOnCustomDomains,
     TabBar,
+    isIOSApp,
 } from "./common";
 import * as React from "react";
 import { HourGlass } from "./icons";
@@ -25,7 +26,7 @@ import { UserLink, UserList } from "./user_resolve";
 import { Form } from "./form";
 import { newPostCallback } from "./new";
 
-const REPO_COMMIT = `${REPO}/commits`;
+const repoCommitUrl = () => `${REPO}/commits`;
 
 let timer: any = null;
 
@@ -439,7 +440,7 @@ export const ProposalView = ({
                             <span>CODE LINKS:</span>
                             <a
                                 className="breakable left_half_spaced"
-                                href={`${REPO_COMMIT}/${proposal.payload.Release.commit}`}
+                                href={`${repoCommitUrl()}/${proposal.payload.Release.commit}`}
                             >
                                 GIT COMMIT
                             </a>
@@ -649,6 +650,15 @@ function hexToBytes(hex: string) {
 }
 
 export const validateProposal = async (proposal: Payload) => {
+    if (
+        isIOSApp() &&
+        ("ICPTransfer" in proposal ||
+            "Funding" in proposal ||
+            "Rewards" in proposal)
+    ) {
+        return "token and ICP transfer proposals are read-only in the iOS app";
+    }
+
     // Release proposals contain a binary and need a special handling
     if ("Release" in proposal) {
         if (!proposal.Release.commit || proposal.Release.binary.length == 0) {

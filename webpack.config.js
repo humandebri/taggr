@@ -37,6 +37,7 @@ function initCanisterEnv() {
     }
 
     const canisterConfig = NETWORK === "local" ? localCanisters : prodCanisters;
+    if (!canisterConfig) return {};
 
     return Object.entries(canisterConfig).reduce((prev, current) => {
         const [_canisterName, canisterDetails] = current;
@@ -76,6 +77,13 @@ module.exports = {
     },
     resolve: {
         extensions: [".js", ".ts", ".jsx", ".tsx"],
+        alias: {
+            "@": path.resolve(__dirname, "src", "frontend", "src"),
+            react: "preact/compat",
+            "react-dom": "preact/compat",
+            "react-dom/client": "preact/compat/client",
+            "react/jsx-runtime": "preact/jsx-runtime",
+        },
         fallback: {
             buffer: require.resolve("buffer/"),
         },
@@ -107,7 +115,11 @@ module.exports = {
                 loader: "ts-loader",
                 exclude: [/node_modules/],
             },
-            { test: /\.(md|css|svg)/i, use: "raw-loader" },
+            {
+                test: /\.css$/i,
+                use: ["style-loader", "css-loader", "postcss-loader"],
+            },
+            { test: /\.(md|svg)/i, use: "raw-loader" },
         ],
     },
     plugins: [

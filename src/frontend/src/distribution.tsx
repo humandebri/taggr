@@ -1,5 +1,11 @@
 import * as React from "react";
-import { ButtonWithLoading, HeadBar, showPopUp, TabBar } from "./common";
+import {
+    ButtonWithLoading,
+    HeadBar,
+    isIOSApp,
+    showPopUp,
+    TabBar,
+} from "./common";
 import { Summary } from "./types";
 import { Content } from "./content";
 
@@ -23,7 +29,8 @@ export const Distribution = () => {
                 title="DISTRIBUTION"
                 shareLink="distribution"
                 content={
-                    window.user?.stalwart && (
+                    window.user?.stalwart &&
+                    !isIOSApp() && (
                         <ButtonWithLoading
                             label="VOTE FOR DELAY"
                             onClick={async () =>

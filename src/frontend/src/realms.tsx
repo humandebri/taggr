@@ -8,6 +8,7 @@ import {
     Loading,
     RealmSpan,
     setTitle,
+    ShareButton,
     ToggleButton,
     foregroundColor,
     showPopUp,
@@ -15,6 +16,7 @@ import {
 } from "./common";
 import { Content } from "./content";
 import { Close } from "./icons";
+import { RealmIcon } from "./realm_rail";
 import { getTheme, setRealmUI } from "./theme";
 import { Realm, Theme, UserFilter } from "./types";
 import {
@@ -576,134 +578,128 @@ export const RealmHeader = ({
     };
     const user = window.user;
     return (
-        <div className="top_spaced">
-            <HeadBar
-                title={
-                    <div
-                        className="vcentered max_width_col clickable"
-                        onClick={() => (location.href = `#/realm/${name}`)}
-                    >
-                        {realm && realm.logo && (
-                            <img
-                                alt="Logo"
-                                className="right_half_spaced"
-                                style={{ maxWidth: "40px" }}
-                                src={`data:image/png;base64, ${realm.logo}`}
-                            />
-                        )}
-                        {name}
+        <div className="realm_server_home top_spaced">
+            <div className="realm_server_header stands_out">
+                <div className="realm_server_identity">
+                    <RealmIcon
+                        active={true}
+                        name={name}
+                        realm={realm}
+                        size={64}
+                    />
+                    <div className="max_width_col">
+                        <h2 className="realm_server_title">{name}</h2>
+                        <div className="small_text inactive">
+                            <code>{realm.num_posts}</code> posts ·{" "}
+                            <code>{realm.num_members}</code> members
+                        </div>
                     </div>
-                }
-                shareLink={`realm/${name.toLowerCase()}`}
-                shareTitle={`Realm ${name} on ${window.backendCache.config.name}`}
-                styleArg={colors}
-                content={
-                    <>
-                        {!window.monoRealm && (
-                            <ButtonWithLoading
-                                styleArg={colors}
-                                testId="realm-close-button"
-                                onClick={async () => {
-                                    window.realm = "";
-                                    location.href = "/#/home";
-                                }}
-                                label={
-                                    <Close styleArg={{ fill: colors.color }} />
-                                }
-                            />
-                        )}
-                        <BurgerButton
-                            styleArg={colors}
-                            onClick={() => toggleInfo(!showInfo)}
-                            pressed={showInfo}
-                            testId="realm-burger-button"
-                        />
-                    </>
-                }
-            />
-            {showInfo && (
-                <div className="stands_out">
-                    <Content value={realm.description} />
-                    Post eviction penalty: <code>{realm.cleanup_penalty}</code>
-                    <hr />
-                    <Restrictions realm={realm} />
-                    <code>{realm.num_posts}</code> posts,{" "}
-                    <code>{realm.num_members}</code> members, controlled by:{" "}
-                    {realm.controllers.length == 0 ? (
-                        "no one"
-                    ) : (
-                        <UserList ids={realm.controllers} />
+                </div>
+                <div className="realm_server_actions">
+                    {user && realm.controllers.includes(user.id) && (
+                        <button
+                            className="medium_text"
+                            onClick={() => {
+                                location.href = `/#/realm/${name}/edit`;
+                                toggleInfo(false);
+                            }}
+                        >
+                            EDIT
+                        </button>
                     )}
                     {user && (
-                        <div className="row_container top_spaced flex_ended">
-                            {realm.controllers.includes(user.id) && (
-                                <button
-                                    className="medium_text right_half_spaced"
-                                    onClick={() => {
-                                        location.href = `/#/realm/${name}/edit`;
-                                        toggleInfo(false);
-                                    }}
-                                >
-                                    EDIT
-                                </button>
-                            )}
-                            <ToggleButton
-                                offLabel="MUTE"
-                                onLabel="UNMUTE"
-                                classNameArg="right_half_spaced"
-                                currState={() =>
-                                    user.filters.realms.includes(name)
-                                }
-                                toggler={() =>
-                                    window.api
-                                        .call("toggle_filter", "realm", name)
-                                        .then(window.reloadUser)
-                                }
-                            />
-                            {!user.realms.includes(name) && (
-                                <ButtonWithLoading
-                                    label="JOIN"
-                                    classNameArg="active"
-                                    onClick={async () => {
-                                        if (
-                                            !confirm(
-                                                `By joining the realm ${name} you confirm that you understand its description ` +
-                                                    `and agree with all terms and conditions mentioned there. ` +
-                                                    `Any rule violation can lead to a moderation by stalwarts or ` +
-                                                    `to realm controllers moving the post out of the realm which incurs ` +
-                                                    `a penalty of ${realm.cleanup_penalty} credits and reward points.`,
-                                            )
-                                        )
-                                            return;
-                                        await window.api
-                                            .call(
-                                                "toggle_realm_membership",
-                                                name,
-                                            )
-                                            .then(window.reloadUser)
-                                            .then(loadRealm);
-                                        location.href = `#/realm/${name}`;
-                                    }}
-                                />
-                            )}
-                            {user.realms.includes(name) && (
-                                <ButtonWithLoading
-                                    classNameArg="active"
-                                    label="LEAVE"
-                                    onClick={async () => {
-                                        await window.api
-                                            .call(
-                                                "toggle_realm_membership",
-                                                name,
-                                            )
-                                            .then(window.reloadUser)
-                                            .then(loadRealm);
-                                        location.href = `#/home`;
-                                    }}
-                                />
+                        <ToggleButton
+                            offLabel="MUTE"
+                            onLabel="UNMUTE"
+                            currState={() => user.filters.realms.includes(name)}
+                            toggler={() =>
+                                window.api
+                                    .call("toggle_filter", "realm", name)
+                                    .then(window.reloadUser)
+                            }
+                        />
+                    )}
+                    {user && !user.realms.includes(name) && (
+                        <ButtonWithLoading
+                            label="JOIN"
+                            classNameArg="active"
+                            onClick={async () => {
+                                if (
+                                    !confirm(
+                                        `By joining the realm ${name} you confirm that you understand its description ` +
+                                            `and agree with all terms and conditions mentioned there. ` +
+                                            `Any rule violation can lead to a moderation by stalwarts or ` +
+                                            `to realm controllers moving the post out of the realm which incurs ` +
+                                            `a penalty of ${realm.cleanup_penalty} credits and reward points.`,
+                                    )
+                                )
+                                    return;
+                                await window.api
+                                    .call("toggle_realm_membership", name)
+                                    .then(window.reloadUser)
+                                    .then(loadRealm);
+                                location.href = `#/realm/${name}`;
+                            }}
+                        />
+                    )}
+                    {user && user.realms.includes(name) && (
+                        <ButtonWithLoading
+                            classNameArg="active"
+                            label="LEAVE"
+                            onClick={async () => {
+                                await window.api
+                                    .call("toggle_realm_membership", name)
+                                    .then(window.reloadUser)
+                                    .then(loadRealm);
+                                location.href = `#/home`;
+                            }}
+                        />
+                    )}
+                    <ShareButton
+                        url={`realm/${name.toLowerCase()}`}
+                        styleArg={colors}
+                    />
+                    <BurgerButton
+                        styleArg={colors}
+                        onClick={() => toggleInfo(!showInfo)}
+                        pressed={showInfo}
+                        testId="realm-burger-button"
+                    />
+                    {!window.monoRealm && (
+                        <ButtonWithLoading
+                            styleArg={colors}
+                            testId="realm-close-button"
+                            onClick={async () => {
+                                window.realm = "";
+                                location.href = "/#/home";
+                            }}
+                            label={<Close styleArg={{ fill: colors.color }} />}
+                        />
+                    )}
+                </div>
+            </div>
+            {showInfo && (
+                <div className="realm_server_info stands_out">
+                    <div>
+                        <h3>Description</h3>
+                        <Content value={realm.description} />
+                    </div>
+                    <div>
+                        <h3>Server Rules</h3>
+                        <div>
+                            Post eviction penalty:{" "}
+                            <code>{realm.cleanup_penalty}</code>
+                        </div>
+                        <Restrictions realm={realm} />
+                        <div>
+                            Controlled by:{" "}
+                            {realm.controllers.length == 0 ? (
+                                "no one"
+                            ) : (
+                                <UserList ids={realm.controllers} />
                             )}
                         </div>
-                    )}
+                    </div>
                 </div>
             )}
         </div>

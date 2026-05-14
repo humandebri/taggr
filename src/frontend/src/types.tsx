@@ -442,6 +442,7 @@ export interface TokenInfo {
 
 declare global {
     interface Window {
+        __TAGGR_IOS_APP__?: boolean;
         ic: any;
         authClient: AuthClient;
         stackRoot: Root;
