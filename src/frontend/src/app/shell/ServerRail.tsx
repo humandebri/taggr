@@ -7,7 +7,9 @@ import { Button } from "@/app/ui/button";
 import { cn } from "@/app/lib/cn";
 
 const activeRealmName = () =>
-    route.value.name === "realm" ? route.value.params[0]?.toUpperCase() || "" : "";
+    route.value.name === "realm"
+        ? route.value.params[0]?.toUpperCase() || ""
+        : "";
 
 export const ServerRail = () => {
     if (!user.value || monoRealm.value) return null;
@@ -15,7 +17,7 @@ export const ServerRail = () => {
     return (
         <nav
             data-testid="realm-rail"
-            className="fixed bottom-0 left-0 right-0 z-30 flex h-16 items-center gap-3 overflow-x-auto border-t border-[hsl(var(--border))] bg-[#111214] px-3 md:bottom-auto md:right-auto md:top-0 md:h-screen md:w-20 md:flex-col md:overflow-y-auto md:border-r md:border-t-0 md:py-4"
+            className="mobile-realm-rail fixed bottom-0 left-0 right-0 z-30 flex items-center gap-3 overflow-x-auto border-t border-[hsl(var(--border))] bg-[#111214]/95 px-3 backdrop-blur md:bottom-auto md:right-auto md:top-0 md:w-20 md:flex-col md:overflow-y-auto md:border-r md:border-t-0 md:py-4"
         >
             <Button
                 aria-label="Home"
@@ -32,10 +34,16 @@ export const ServerRail = () => {
                 {joinedRealms.value.map(({ name, realm }) => (
                     <button
                         key={name}
-                        className={cn("rounded-2xl outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--ring))]")}
+                        className={cn(
+                            "rounded-2xl outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--ring))]",
+                        )}
                         onClick={() => navigate(`realm/${name}`)}
                     >
-                        <RealmIcon name={name} realm={realm} active={current === name} />
+                        <RealmIcon
+                            name={name}
+                            realm={realm}
+                            active={current === name}
+                        />
                     </button>
                 ))}
             </div>
@@ -55,7 +63,7 @@ export const ServerRail = () => {
                     title="Create realm"
                     size="icon"
                     variant="secondary"
-                    className="rounded-2xl"
+                    className="hidden rounded-2xl md:inline-flex"
                     onClick={() => navigate("realms/create")}
                 >
                     <Plus className="h-5 w-5" />

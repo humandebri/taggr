@@ -57,7 +57,11 @@ const Screen = () => {
     if (current.name === "post") return <PostPage />;
     if (current.name === "settings") return <SettingsPage />;
     if (current.name === "user") return <ProfilePage />;
-    if (["inbox", "tokens", "dashboard", "stats", "whitepaper"].includes(current.name)) {
+    if (
+        ["inbox", "tokens", "dashboard", "stats", "whitepaper"].includes(
+            current.name,
+        )
+    ) {
         return <LegacyRoute />;
     }
     return <FeedView />;
@@ -73,7 +77,11 @@ export const App = () => (
         ) : (
             <>
                 <ServerRail />
-                <div className={user.value ? "pb-16 md:pb-0 md:pl-20" : ""}>
+                <div
+                    className={
+                        user.value ? "app-content-with-rail md:pl-20" : ""
+                    }
+                >
                     <TopBar />
                     <Screen />
                 </div>

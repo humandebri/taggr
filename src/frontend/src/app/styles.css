@@ -1,8 +1,10 @@
 @import "tailwindcss";
 
 @theme {
-    --font-sans: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-    --font-mono: "SFMono-Regular", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    --font-sans: Inter, ui-sans-serif, system-ui, -apple-system,
+        BlinkMacSystemFont, "Segoe UI", sans-serif;
+    --font-mono: "SFMono-Regular", ui-monospace, SFMono-Regular, Menlo, Monaco,
+        Consolas, monospace;
 }
 
 :root {
@@ -68,6 +70,37 @@ textarea {
 
 #stack {
     min-height: 100vh;
+}
+
+.app-content-with-rail {
+    padding-bottom: calc(4rem + env(safe-area-inset-bottom));
+}
+
+.mobile-realm-rail {
+    height: calc(4rem + env(safe-area-inset-bottom));
+    padding-bottom: env(safe-area-inset-bottom);
+}
+
+.topbar-post-button {
+    padding-left: 0.625rem;
+    padding-right: 0.625rem;
+}
+
+@media (max-width: 379px) {
+    .topbar-post-label {
+        display: none;
+    }
+}
+
+@media (min-width: 768px) {
+    .app-content-with-rail {
+        padding-bottom: 0;
+    }
+
+    .mobile-realm-rail {
+        height: 100vh;
+        padding-bottom: 1rem;
+    }
 }
 
 #preview {
