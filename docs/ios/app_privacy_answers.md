@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Draft App Store Connect privacy answers for the Tauri iOS app.
+Draft App Store Connect privacy answers for the SwiftUI iOS app.
 
 Use this as a submission worksheet, not as a legal sign-off. Recheck against the
 live App Store Connect form before publishing.
@@ -31,15 +31,15 @@ live App Store Connect form before publishing.
 
 ## Third-Party SDKs
 
--   Tauri shell: native wrapper only.
--   Internet Identity: authentication service opened through TAGGR web flow.
+-   SwiftUI native app: no third-party native SDKs added for analytics or ads.
+-   Internet Identity: authentication service opened through a dedicated WKWebView.
 -   No analytics SDK.
 -   No advertising SDK.
 -   No push notification SDK in MVP.
 
 ## Data Types To Review In App Store Connect
 
-Declare data collected by the app or through the TAGGR WebView if it is stored
+Declare data collected by the app or through TAGGR backend calls if it is stored
 off-device beyond real-time request handling.
 
 -   User Content:

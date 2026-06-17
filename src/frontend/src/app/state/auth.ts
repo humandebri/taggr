@@ -1,4 +1,7 @@
-import { AuthClient } from "@dfinity/auth-client";
+import {
+    AuthClient,
+    type AuthClientCreateOptions,
+} from "@dfinity/auth-client";
 import { Ed25519KeyIdentity } from "@dfinity/identity";
 import { signal } from "@preact/signals";
 import { ApiGenerator, Backend } from "@/api";
@@ -8,7 +11,6 @@ import { domain } from "@/app/lib/domain";
 import { hash } from "@/app/lib/crypto";
 import { navigate } from "@/app/state/route";
 import { booting, showToast } from "@/app/state/ui";
-import { internetIdentityTimeoutMs, isIOSApp } from "@/platform/ios/webview";
 import { defaultConfig, defaultStats } from "@/app/state/defaults";
 
 export type BackendCache = {
@@ -31,6 +33,24 @@ export const lastVisit = signal<BigInt>(BigInt(0));
 const refreshRateMs = 10 * 60 * 1000;
 const staleActivityMs = 10 * 60 * 1000;
 let lastSavedUpgrade: number | null = null;
+let lastInternetIdentityError: { message: string; timestamp: number } | null = null;
+
+const errorText = (error: unknown) =>
+    error instanceof Error ? error.message : String(error);
+
+const reportInternetIdentityError = (message: string) => {
+    const now = Date.now();
+    if (
+        lastInternetIdentityError &&
+        lastInternetIdentityError.message === message &&
+        now - lastInternetIdentityError.timestamp < 1000
+    ) {
+        return;
+    }
+    lastInternetIdentityError = { message, timestamp: now };
+    console.error(`[TAGGR II] ${message}`);
+    showToast("error", `Internet Identity failed: ${message}`, 8);
+};
 
 const microSecsSince = (timestamp: BigInt) =>
     Number(new Date()) - Number(timestamp) / 1000000;
@@ -80,9 +100,10 @@ export const requireApi = () => {
 };
 
 export const instantiateApi = async () => {
-    const client = await AuthClient.create({
+    const createOptions: AuthClientCreateOptions = {
         idleOptions: { disableIdle: true },
-    });
+    };
+    const client = await AuthClient.create(createOptions);
     authClient.value = client;
     window.authClient = client;
 
@@ -219,22 +240,20 @@ export const loginWithInternetIdentity = async (
     inviteCode = "",
 ) => {
     const client = authClient.value;
-    if (!client) return;
+    if (!client) {
+        showToast("error", "Authentication is still loading. Try again in a moment.", 4);
+        return;
+    }
     let finished = false;
     const timeout = window.setTimeout(() => {
-        if (!finished && isIOSApp()) {
-            showToast(
-                "error",
-                "Internet Identity did not return to TAGGR. Close Identity and retry.",
-                6,
-            );
+        if (!finished) {
+            reportInternetIdentityError("timeout waiting for Internet Identity response");
         }
-    }, internetIdentityTimeoutMs);
+    }, 20000);
 
-    await client.login({
+    const loginOptions: Parameters<AuthClient["login"]>[0] = {
         identityProvider: II_URL,
         maxTimeToLive: BigInt(30 * 24 * 3600000000000),
-        derivationOrigin: window.location.origin,
         onSuccess: async () => {
             finished = true;
             window.clearTimeout(timeout);
@@ -245,9 +264,17 @@ export const loginWithInternetIdentity = async (
         onError: (error) => {
             finished = true;
             window.clearTimeout(timeout);
-            showToast("error", `Internet Identity failed: ${error}`);
+            reportInternetIdentityError(errorText(error));
         },
-    });
+    };
+
+    try {
+        await client.login(loginOptions);
+    } catch (error) {
+        finished = true;
+        window.clearTimeout(timeout);
+        reportInternetIdentityError(errorText(error));
+    }
 };
 
 export const signOut = async () => {

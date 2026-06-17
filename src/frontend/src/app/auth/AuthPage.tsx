@@ -1,5 +1,6 @@
 import { Infinity, KeyRound, Ticket } from "lucide-react";
 import {
+    authClient,
     loginWithInternetIdentity,
     loginWithSeed,
     principalId,
@@ -35,8 +36,9 @@ export const AuthPage = ({
 }: {
     signUp?: boolean;
     inviteCode?: string;
-}) => (
-    <section className="mx-auto flex min-h-[calc(100vh-3.5rem)] w-full max-w-md items-center p-4">
+}) => {
+    return (
+        <section className="mx-auto flex min-h-[calc(100vh-3.5rem)] w-full max-w-md items-center p-4">
         <Card className="w-full space-y-5 rounded-md p-5">
             <div>
                 <h2 className="text-xl font-semibold">{signUp ? "Sign-up" : "Sign-in"}</h2>
@@ -91,7 +93,11 @@ export const AuthPage = ({
                             <Ticket className="h-4 w-4" /> Invite
                         </Button>
                     )}
-                    <Button className="w-full justify-start" onClick={() => loginWithInternetIdentity(signUp, inviteCode)}>
+                    <Button
+                        className="w-full justify-start"
+                        disabled={!authClient.value}
+                        onClick={() => loginWithInternetIdentity(signUp, inviteCode)}
+                    >
                         <Infinity className="h-4 w-4" /> Internet Identity
                     </Button>
                     <Button variant="secondary" className="w-full justify-start" onClick={() => (selected.value = "seed")}>
@@ -100,5 +106,6 @@ export const AuthPage = ({
                 </div>
             )}
         </Card>
-    </section>
-);
+        </section>
+    );
+};

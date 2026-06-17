@@ -3,7 +3,7 @@
 ## Purpose
 
 Capture real simulator and physical-device evidence for the acceptance criteria
-in `docs/ios/tauri_requirements.md`.
+in `docs/ios/swift_requirements.md`.
 
 `npm run ios:completion` intentionally fails until each status below is changed
 from `TODO` to `PASS` after verification on an actual iOS runtime.
@@ -13,7 +13,7 @@ from `TODO` to `PASS` after verification on an actual iOS runtime.
 -   Xcode version: TODO
 -   Simulator device and iOS version: TODO
 -   Physical device and iOS version: TODO
--   Build command: `npm run ios:preflight -- --build`
+-   Build command: `npm run ios:preflight`
 -   App version/build: TODO
 -   Git revision or diff ID: TODO
 -   Production canister deployment: TODO
@@ -24,7 +24,7 @@ from `TODO` to `PASS` after verification on an actual iOS runtime.
 
 -   Simulator launch: TODO
 -   Physical device launch: TODO
--   Production URL load: TODO
+-   Production canister API load: TODO
 -   Internet Identity continuity: TODO
 -   Internal navigation: TODO
 -   External navigation: TODO
@@ -123,7 +123,7 @@ evidence. It records early responsive checks before full Xcode is available.
 -   Browser session: `playwright-cli -s=taggr-ios`
 -   URL: `http://127.0.0.1:4173/#/links` and
     `http://127.0.0.1:4173/#/privacy`
--   iOS condition: `window.__TAGGR_IOS_APP__ = true` init script
+-   iOS condition: Swift native App Store policy with crypto execution disabled
 -   Evidence:
     -   Links page hides price listings, exchange links, and trading links in
         iOS mode.
@@ -131,7 +131,7 @@ evidence. It records early responsive checks before full Xcode is available.
     -   Links page share URL uses
         `https://6qfxa-ryaaa-aaaai-qbhsq-cai.icp0.io/#/links`.
     -   Privacy page opens from Links and exposes moderation/support, Internet
-        Identity, iOS WebView data, and token/wallet disclosure text.
+        Identity, iOS app data, and token/wallet disclosure text.
     -   Privacy page share URL uses
         `https://6qfxa-ryaaa-aaaai-qbhsq-cai.icp0.io/#/privacy`.
 

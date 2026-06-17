@@ -1,0 +1,22 @@
+// src/image-gallery/src/env.ts
+// Defines build-time TAGGR targets so the gallery can query the main canister
+// while remaining deployable as a separate static site.
+
+declare const process: {
+    env: {
+        CANISTER_ID?: string;
+        DFX_NETWORK?: string;
+        TAGGR_DOMAIN?: string;
+    };
+};
+
+export const STAGING_MODE =
+    process.env.DFX_NETWORK == "staging" ||
+    process.env.DFX_NETWORK == "staging2";
+
+export const MAINNET_MODE = STAGING_MODE || process.env.DFX_NETWORK == "ic";
+
+export const CANISTER_ID = process.env.CANISTER_ID || "";
+
+export const TAGGR_DOMAIN = process.env.TAGGR_DOMAIN || "taggr.link";
+

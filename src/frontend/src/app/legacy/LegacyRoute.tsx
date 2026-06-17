@@ -15,6 +15,7 @@ import { Journal } from "@/journal";
 import { LinksPage } from "@/links";
 import { PostSubmissionForm } from "@/new";
 import { PostFeed } from "@/post_feed";
+import { Privacy } from "@/privacy";
 import { Proposals } from "@/proposals";
 import { RealmForm } from "@/realms";
 import { Search } from "@/search";
@@ -36,6 +37,7 @@ const legacyRouteNames = [
     "invites",
     "journal",
     "links",
+    "privacy",
     "proposals",
     "reposts",
     "search",
@@ -92,6 +94,7 @@ export const LegacyRoute = () => {
     if (current.name === "invites") return <Invites />;
     if (current.name === "journal") return <Journal handle={param} />;
     if (current.name === "links") return <LinksPage />;
+    if (current.name === "privacy") return <Privacy />;
     if (current.name === "proposals") return <Proposals />;
     if (current.name === "realm" && current.params[1] === "edit") {
         return <RealmForm existingName={param.toUpperCase()} />;

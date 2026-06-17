@@ -1,0 +1,217 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		010001000000000000000001 /* TAGGRApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 010000000000000000000001 /* TAGGRApp.swift */; };
+		010001000000000000000002 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 010000000000000000000002 /* AppState.swift */; };
+		01000100000000000000001A /* TaggrRuntimeConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01000000000000000000001A /* TaggrRuntimeConfig.swift */; };
+		010001000000000000000003 /* TaggrModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 010000000000000000000003 /* TaggrModels.swift */; };
+		010001000000000000000004 /* TaggrAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 010000000000000000000004 /* TaggrAPI.swift */; };
+		010001000000000000000005 /* CandidEncoder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 010000000000000000000005 /* CandidEncoder.swift */; };
+		010001000000000000000006 /* CBOREncoder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 010000000000000000000006 /* CBOREncoder.swift */; };
+		010001000000000000000012 /* ICPrimitives.swift in Sources */ = {isa = PBXBuildFile; fileRef = 010000000000000000000012 /* ICPrimitives.swift */; };
+		010001000000000000000013 /* TaggrCertificateVerifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = 010000000000000000000013 /* TaggrCertificateVerifier.swift */; };
+		010001000000000000000016 /* TaggrBLSVerifier.c in Sources */ = {isa = PBXBuildFile; fileRef = 010000000000000000000016 /* TaggrBLSVerifier.c */; };
+		010001000000000000000018 /* server.c in Sources */ = {isa = PBXBuildFile; fileRef = 010000000000000000000018 /* server.c */; };
+		010001000000000000000019 /* assembly.S in Sources */ = {isa = PBXBuildFile; fileRef = 010000000000000000000019 /* assembly.S */; };
+		010001000000000000000007 /* TaggrIdentity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 010000000000000000000007 /* TaggrIdentity.swift */; };
+		010001000000000000000008 /* IdentityWebView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 010000000000000000000008 /* IdentityWebView.swift */; };
+		010001000000000000000009 /* TaggrNavigation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 010000000000000000000009 /* TaggrNavigation.swift */; };
+		01000100000000000000000A /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01000000000000000000000A /* RootView.swift */; };
+		01000100000000000000000B /* FeedViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01000000000000000000000B /* FeedViews.swift */; };
+		01000100000000000000000C /* AuthSettingsViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01000000000000000000000C /* AuthSettingsViews.swift */; };
+		01000100000000000000000D /* TaggrTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01000000000000000000000D /* TaggrTests.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		010002000000000000000001 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 010003000000000000000001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 010004000000000000000001;
+			remoteInfo = TAGGR;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		010000000000000000000001 /* TAGGRApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TAGGRApp.swift; sourceTree = "<group>"; };
+		010000000000000000000002 /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
+		01000000000000000000001A /* TaggrRuntimeConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaggrRuntimeConfig.swift; sourceTree = "<group>"; };
+		010000000000000000000003 /* TaggrModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaggrModels.swift; sourceTree = "<group>"; };
+		010000000000000000000004 /* TaggrAPI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaggrAPI.swift; sourceTree = "<group>"; };
+		010000000000000000000005 /* CandidEncoder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CandidEncoder.swift; sourceTree = "<group>"; };
+		010000000000000000000006 /* CBOREncoder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CBOREncoder.swift; sourceTree = "<group>"; };
+		010000000000000000000012 /* ICPrimitives.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ICPrimitives.swift; sourceTree = "<group>"; };
+		010000000000000000000013 /* TaggrCertificateVerifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaggrCertificateVerifier.swift; sourceTree = "<group>"; };
+		010000000000000000000014 /* TAGGR-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "TAGGR-Bridging-Header.h"; sourceTree = "<group>"; };
+		010000000000000000000015 /* TaggrBLSVerifier.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TaggrBLSVerifier.h; sourceTree = "<group>"; };
+		010000000000000000000016 /* TaggrBLSVerifier.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = TaggrBLSVerifier.c; sourceTree = "<group>"; };
+		010000000000000000000018 /* server.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = blst/src/server.c; sourceTree = "<group>"; };
+		010000000000000000000019 /* assembly.S */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.asm; path = blst/build/assembly.S; sourceTree = "<group>"; };
+		010000000000000000000007 /* TaggrIdentity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaggrIdentity.swift; sourceTree = "<group>"; };
+		010000000000000000000008 /* IdentityWebView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IdentityWebView.swift; sourceTree = "<group>"; };
+		010000000000000000000009 /* TaggrNavigation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaggrNavigation.swift; sourceTree = "<group>"; };
+		01000000000000000000000A /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
+		01000000000000000000000B /* FeedViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeedViews.swift; sourceTree = "<group>"; };
+		01000000000000000000000C /* AuthSettingsViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthSettingsViews.swift; sourceTree = "<group>"; };
+		01000000000000000000000D /* TaggrTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaggrTests.swift; sourceTree = "<group>"; };
+		01000000000000000000000E /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		01000000000000000000000F /* TAGGR.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = TAGGR.entitlements; sourceTree = "<group>"; };
+		010000000000000000000010 /* TAGGR.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = TAGGR.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		010000000000000000000011 /* TAGGRTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = TAGGRTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		010005000000000000000001 /* Frameworks */ = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+		010005000000000000000002 /* Frameworks */ = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		010006000000000000000001 = {
+			isa = PBXGroup;
+			children = (
+				010006000000000000000002 /* TAGGR */,
+				010006000000000000000003 /* TAGGRTests */,
+				01000600000000000000000A /* ThirdParty */,
+				010006000000000000000004 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		010006000000000000000002 /* TAGGR */ = {
+			isa = PBXGroup;
+			children = (
+				010000000000000000000001 /* TAGGRApp.swift */,
+				010000000000000000000002 /* AppState.swift */,
+				01000000000000000000001A /* TaggrRuntimeConfig.swift */,
+				01000000000000000000000E /* Info.plist */,
+				01000000000000000000000F /* TAGGR.entitlements */,
+				010006000000000000000005 /* TaggrModels */,
+				010006000000000000000006 /* TaggrAPI */,
+				010006000000000000000007 /* TaggrIdentity */,
+				010006000000000000000008 /* TaggrNavigation */,
+				010006000000000000000009 /* Views */,
+			);
+			path = TAGGR;
+			sourceTree = "<group>";
+		};
+		010006000000000000000003 /* TAGGRTests */ = {
+			isa = PBXGroup;
+			children = (
+				01000000000000000000000D /* TaggrTests.swift */,
+			);
+			path = TAGGRTests;
+			sourceTree = "<group>";
+		};
+		010006000000000000000004 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				010000000000000000000010 /* TAGGR.app */,
+				010000000000000000000011 /* TAGGRTests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		010006000000000000000005 /* TaggrModels */ = {isa = PBXGroup; children = (010000000000000000000003 /* TaggrModels.swift */,); path = TaggrModels; sourceTree = "<group>"; };
+		010006000000000000000006 /* TaggrAPI */ = {isa = PBXGroup; children = (010000000000000000000004 /* TaggrAPI.swift */,010000000000000000000005 /* CandidEncoder.swift */,010000000000000000000006 /* CBOREncoder.swift */,010000000000000000000012 /* ICPrimitives.swift */,010000000000000000000013 /* TaggrCertificateVerifier.swift */,010000000000000000000014 /* TAGGR-Bridging-Header.h */,010000000000000000000015 /* TaggrBLSVerifier.h */,010000000000000000000016 /* TaggrBLSVerifier.c */,); path = TaggrAPI; sourceTree = "<group>"; };
+		010006000000000000000007 /* TaggrIdentity */ = {isa = PBXGroup; children = (010000000000000000000007 /* TaggrIdentity.swift */,010000000000000000000008 /* IdentityWebView.swift */,); path = TaggrIdentity; sourceTree = "<group>"; };
+		010006000000000000000008 /* TaggrNavigation */ = {isa = PBXGroup; children = (010000000000000000000009 /* TaggrNavigation.swift */,); path = TaggrNavigation; sourceTree = "<group>"; };
+		010006000000000000000009 /* Views */ = {isa = PBXGroup; children = (01000000000000000000000A /* RootView.swift */,01000000000000000000000B /* FeedViews.swift */,01000000000000000000000C /* AuthSettingsViews.swift */,); path = Views; sourceTree = "<group>"; };
+		01000600000000000000000A /* ThirdParty */ = {isa = PBXGroup; children = (010000000000000000000018 /* server.c */,010000000000000000000019 /* assembly.S */,); path = ThirdParty; sourceTree = "<group>"; };
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		010004000000000000000001 /* TAGGR */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 01000A000000000000000003 /* Build configuration list for PBXNativeTarget "TAGGR" */;
+			buildPhases = (010007000000000000000001 /* Sources */,010005000000000000000001 /* Frameworks */,010008000000000000000001 /* Resources */,);
+			buildRules = ();
+			dependencies = ();
+			name = TAGGR;
+			productName = TAGGR;
+			productReference = 010000000000000000000010 /* TAGGR.app */;
+			productType = "com.apple.product-type.application";
+		};
+		010004000000000000000002 /* TAGGRTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 01000A000000000000000004 /* Build configuration list for PBXNativeTarget "TAGGRTests" */;
+			buildPhases = (010007000000000000000002 /* Sources */,010005000000000000000002 /* Frameworks */,010008000000000000000002 /* Resources */,);
+			buildRules = ();
+			dependencies = (010009000000000000000001 /* PBXTargetDependency */,);
+			name = TAGGRTests;
+			productName = TAGGRTests;
+			productReference = 010000000000000000000011 /* TAGGRTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		010003000000000000000001 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 2650;
+				LastUpgradeCheck = 2650;
+				TargetAttributes = {
+					010004000000000000000001 = {CreatedOnToolsVersion = 26.5;};
+					010004000000000000000002 = {CreatedOnToolsVersion = 26.5; TestTargetID = 010004000000000000000001;};
+				};
+			};
+			buildConfigurationList = 01000A000000000000000001 /* Build configuration list for PBXProject "TAGGR" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (en, Base,);
+			mainGroup = 010006000000000000000001;
+			productRefGroup = 010006000000000000000004 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (010004000000000000000001 /* TAGGR */,010004000000000000000002 /* TAGGRTests */,);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		010008000000000000000001 /* Resources */ = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+		010008000000000000000002 /* Resources */ = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		010007000000000000000001 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (010001000000000000000001,010001000000000000000002,01000100000000000000001A,010001000000000000000003,010001000000000000000004,010001000000000000000005,010001000000000000000006,010001000000000000000012,010001000000000000000013,010001000000000000000016,010001000000000000000018,010001000000000000000019,010001000000000000000007,010001000000000000000008,010001000000000000000009,01000100000000000000000A,01000100000000000000000B,01000100000000000000000C,);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		010007000000000000000002 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (01000100000000000000000D,);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		010009000000000000000001 /* PBXTargetDependency */ = {isa = PBXTargetDependency; target = 010004000000000000000001 /* TAGGR */; targetProxy = 010002000000000000000001 /* PBXContainerItemProxy */; };
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		01000B000000000000000001 /* Debug */ = {isa = XCBuildConfiguration; buildSettings = {ALWAYS_SEARCH_USER_PATHS = NO; CLANG_ANALYZER_NONNULL = YES; CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE; CLANG_CXX_LANGUAGE_STANDARD = "gnu++20"; CLANG_ENABLE_MODULES = YES; CLANG_ENABLE_OBJC_ARC = YES; CLANG_ENABLE_OBJC_WEAK = YES; CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES; CLANG_WARN_BOOL_CONVERSION = YES; CLANG_WARN_COMMA = YES; CLANG_WARN_CONSTANT_CONVERSION = YES; CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES; CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR; CLANG_WARN_DOCUMENTATION_COMMENTS = YES; CLANG_WARN_EMPTY_BODY = YES; CLANG_WARN_ENUM_CONVERSION = YES; CLANG_WARN_INFINITE_RECURSION = YES; CLANG_WARN_INT_CONVERSION = YES; CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES; CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES; CLANG_WARN_OBJC_LITERAL_CONVERSION = YES; CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR; CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES; CLANG_WARN_RANGE_LOOP_ANALYSIS = YES; CLANG_WARN_STRICT_PROTOTYPES = YES; CLANG_WARN_SUSPICIOUS_MOVE = YES; CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE; CLANG_WARN_UNREACHABLE_CODE = YES; CLANG_WARN__DUPLICATE_METHOD_MATCH = YES; COPY_PHASE_STRIP = NO; DEBUG_INFORMATION_FORMAT = dwarf; ENABLE_STRICT_OBJC_MSGSEND = YES; ENABLE_TESTABILITY = YES; GCC_C_LANGUAGE_STANDARD = gnu17; GCC_DYNAMIC_NO_PIC = NO; GCC_NO_COMMON_BLOCKS = YES; GCC_OPTIMIZATION_LEVEL = 0; GCC_PREPROCESSOR_DEFINITIONS = ("DEBUG=1","$(inherited)",); GCC_WARN_64_TO_32_BIT_CONVERSION = YES; GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR; GCC_WARN_UNDECLARED_SELECTOR = YES; GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE; GCC_WARN_UNUSED_FUNCTION = YES; GCC_WARN_UNUSED_VARIABLE = YES; IPHONEOS_DEPLOYMENT_TARGET = 17.0; SDKROOT = iphoneos; SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG; SWIFT_OPTIMIZATION_LEVEL = "-Onone"; }; name = Debug; };
+		01000B000000000000000002 /* Release */ = {isa = XCBuildConfiguration; buildSettings = {ALWAYS_SEARCH_USER_PATHS = NO; CLANG_ANALYZER_NONNULL = YES; CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE; CLANG_CXX_LANGUAGE_STANDARD = "gnu++20"; CLANG_ENABLE_MODULES = YES; CLANG_ENABLE_OBJC_ARC = YES; CLANG_ENABLE_OBJC_WEAK = YES; CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES; CLANG_WARN_BOOL_CONVERSION = YES; CLANG_WARN_COMMA = YES; CLANG_WARN_CONSTANT_CONVERSION = YES; CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES; CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR; CLANG_WARN_DOCUMENTATION_COMMENTS = YES; CLANG_WARN_EMPTY_BODY = YES; CLANG_WARN_ENUM_CONVERSION = YES; CLANG_WARN_INFINITE_RECURSION = YES; CLANG_WARN_INT_CONVERSION = YES; CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES; CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES; CLANG_WARN_OBJC_LITERAL_CONVERSION = YES; CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR; CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES; CLANG_WARN_RANGE_LOOP_ANALYSIS = YES; CLANG_WARN_STRICT_PROTOTYPES = YES; CLANG_WARN_SUSPICIOUS_MOVE = YES; CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE; CLANG_WARN_UNREACHABLE_CODE = YES; CLANG_WARN__DUPLICATE_METHOD_MATCH = YES; COPY_PHASE_STRIP = NO; DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym"; ENABLE_NS_ASSERTIONS = NO; ENABLE_STRICT_OBJC_MSGSEND = YES; GCC_C_LANGUAGE_STANDARD = gnu17; GCC_NO_COMMON_BLOCKS = YES; GCC_WARN_64_TO_32_BIT_CONVERSION = YES; GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR; GCC_WARN_UNDECLARED_SELECTOR = YES; GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE; GCC_WARN_UNUSED_FUNCTION = YES; GCC_WARN_UNUSED_VARIABLE = YES; IPHONEOS_DEPLOYMENT_TARGET = 17.0; SDKROOT = iphoneos; SWIFT_COMPILATION_MODE = wholemodule; VALIDATE_PRODUCT = YES; }; name = Release; };
+		01000B000000000000000003 /* Debug */ = {isa = XCBuildConfiguration; buildSettings = {ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor; CODE_SIGN_ENTITLEMENTS = TAGGR/TAGGR.entitlements; CODE_SIGN_STYLE = Automatic; CURRENT_PROJECT_VERSION = 1; DEVELOPMENT_TEAM = AKN976G7AK; GCC_PREPROCESSOR_DEFINITIONS = ("$(inherited)","__BLST_PORTABLE__=1",); GENERATE_INFOPLIST_FILE = NO; HEADER_SEARCH_PATHS = ("$(inherited)","ThirdParty/blst/bindings","ThirdParty/blst/src",); INFOPLIST_FILE = TAGGR/Info.plist; LD_RUNPATH_SEARCH_PATHS = ("$(inherited)","@executable_path/Frameworks",); MARKETING_VERSION = 0.1.0; PRODUCT_BUNDLE_IDENTIFIER = network.taggr.ios; PRODUCT_NAME = "$(TARGET_NAME)"; SWIFT_EMIT_LOC_STRINGS = YES; SWIFT_OBJC_BRIDGING_HEADER = "TAGGR/TaggrAPI/TAGGR-Bridging-Header.h"; SWIFT_VERSION = 5.0; TARGETED_DEVICE_FAMILY = 1; }; name = Debug; };
+		01000B000000000000000004 /* Release */ = {isa = XCBuildConfiguration; buildSettings = {ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor; CODE_SIGN_ENTITLEMENTS = TAGGR/TAGGR.entitlements; CODE_SIGN_STYLE = Automatic; CURRENT_PROJECT_VERSION = 1; DEVELOPMENT_TEAM = AKN976G7AK; GCC_PREPROCESSOR_DEFINITIONS = ("$(inherited)","__BLST_PORTABLE__=1",); GENERATE_INFOPLIST_FILE = NO; HEADER_SEARCH_PATHS = ("$(inherited)","ThirdParty/blst/bindings","ThirdParty/blst/src",); INFOPLIST_FILE = TAGGR/Info.plist; LD_RUNPATH_SEARCH_PATHS = ("$(inherited)","@executable_path/Frameworks",); MARKETING_VERSION = 0.1.0; PRODUCT_BUNDLE_IDENTIFIER = network.taggr.ios; PRODUCT_NAME = "$(TARGET_NAME)"; SWIFT_EMIT_LOC_STRINGS = YES; SWIFT_OBJC_BRIDGING_HEADER = "TAGGR/TaggrAPI/TAGGR-Bridging-Header.h"; SWIFT_VERSION = 5.0; TARGETED_DEVICE_FAMILY = 1; }; name = Release; };
+		01000B000000000000000005 /* Debug */ = {isa = XCBuildConfiguration; buildSettings = {BUNDLE_LOADER = "$(TEST_HOST)"; CODE_SIGN_STYLE = Automatic; CURRENT_PROJECT_VERSION = 1; DEVELOPMENT_TEAM = AKN976G7AK; GENERATE_INFOPLIST_FILE = YES; IPHONEOS_DEPLOYMENT_TARGET = 17.0; MARKETING_VERSION = 0.1.0; PRODUCT_BUNDLE_IDENTIFIER = network.taggr.ios.tests; PRODUCT_NAME = "$(TARGET_NAME)"; SWIFT_VERSION = 5.0; TARGETED_DEVICE_FAMILY = 1; TEST_HOST = "$(BUILT_PRODUCTS_DIR)/TAGGR.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/TAGGR"; }; name = Debug; };
+		01000B000000000000000006 /* Release */ = {isa = XCBuildConfiguration; buildSettings = {BUNDLE_LOADER = "$(TEST_HOST)"; CODE_SIGN_STYLE = Automatic; CURRENT_PROJECT_VERSION = 1; DEVELOPMENT_TEAM = AKN976G7AK; GENERATE_INFOPLIST_FILE = YES; IPHONEOS_DEPLOYMENT_TARGET = 17.0; MARKETING_VERSION = 0.1.0; PRODUCT_BUNDLE_IDENTIFIER = network.taggr.ios.tests; PRODUCT_NAME = "$(TARGET_NAME)"; SWIFT_VERSION = 5.0; TARGETED_DEVICE_FAMILY = 1; TEST_HOST = "$(BUILT_PRODUCTS_DIR)/TAGGR.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/TAGGR"; }; name = Release; };
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		01000A000000000000000001 /* Build configuration list for PBXProject "TAGGR" */ = {isa = XCConfigurationList; buildConfigurations = (01000B000000000000000001 /* Debug */,01000B000000000000000002 /* Release */,); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
+		01000A000000000000000003 /* Build configuration list for PBXNativeTarget "TAGGR" */ = {isa = XCConfigurationList; buildConfigurations = (01000B000000000000000003 /* Debug */,01000B000000000000000004 /* Release */,); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
+		01000A000000000000000004 /* Build configuration list for PBXNativeTarget "TAGGRTests" */ = {isa = XCConfigurationList; buildConfigurations = (01000B000000000000000005 /* Debug */,01000B000000000000000006 /* Release */,); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
+/* End XCConfigurationList section */
+	};
+	rootObject = 010003000000000000000001 /* Project object */;
+}

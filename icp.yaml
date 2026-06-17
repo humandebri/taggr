@@ -1,0 +1,44 @@
+networks:
+  - name: local
+    mode: managed
+    gateway:
+      bind: 127.0.0.1
+      port: 8001
+
+canisters:
+  - name: internet_identity_frontend
+    build:
+      steps:
+        - type: script
+          commands:
+            - mkdir -p .icp/cache/internet-identity
+            - curl -L --fail -o .icp/cache/internet-identity/internet_identity_frontend.wasm.gz https://github.com/dfinity/internet-identity/releases/download/release-2026-06-12/internet_identity_frontend.wasm.gz
+            - gzip -dc .icp/cache/internet-identity/internet_identity_frontend.wasm.gz > "$ICP_WASM_OUTPUT_PATH"
+
+  - name: internet_identity
+    build:
+      steps:
+        - type: script
+          commands:
+            - mkdir -p .icp/cache/internet-identity
+            - curl -L --fail -o .icp/cache/internet-identity/internet_identity_dev.wasm.gz https://github.com/dfinity/internet-identity/releases/download/release-2026-06-12/internet_identity_dev.wasm.gz
+            - gzip -dc .icp/cache/internet-identity/internet_identity_dev.wasm.gz > "$ICP_WASM_OUTPUT_PATH"
+    init_args: |
+      (opt record {
+        captcha_config = opt record {
+          max_unsolved_captchas = 50:nat64;
+          captcha_trigger = variant { Static = variant { CaptchaDisabled } };
+        };
+        related_origins = opt vec { "https://id.ai"; "https://identity.ic0.app" };
+        new_flow_origins = opt vec { "https://id.ai" };
+        dummy_auth = opt opt record { prompt_for_index = true };
+      })
+
+  - name: taggr
+    build:
+      steps:
+        - type: script
+          commands:
+            - FEATURES=dev ./build.sh bucket taggr
+            - gzip -dc target/wasm32-unknown-unknown/release/taggr.wasm.gz > "$ICP_WASM_OUTPUT_PATH"
+            - ic-wasm "$ICP_WASM_OUTPUT_PATH" -o "$ICP_WASM_OUTPUT_PATH" metadata candid:service -f src/backend/taggr.did -v public --keep-name-section

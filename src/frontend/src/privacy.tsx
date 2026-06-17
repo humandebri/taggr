@@ -13,15 +13,14 @@ export const Privacy = () => (
         </p>
         <h2>iOS app data</h2>
         <p>
-            The iOS app loads the same production TAGGR frontend as the website
-            in a Tauri WKWebView. The MVP iOS app adds no analytics SDK,
-            advertising SDK, push notification token collection, or separate
-            native account database.
+            The iOS app uses native SwiftUI screens and the same production
+            TAGGR canister APIs as the website. The MVP iOS app uses no analytics SDK,
+            advertising SDK, push notification token collection,
+            or separate native account database.
         </p>
         <p>
-            Authentication uses Internet Identity or the existing TAGGR web
-            authentication methods. Session state is stored by the WebView data
-            store on the device.
+            Authentication uses Internet Identity. Session state is stored in
+            the device keychain.
         </p>
         <h2>Third-party services</h2>
         <p>

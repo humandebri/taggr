@@ -2,8 +2,8 @@
 
 ## Purpose
 
-Execute the remaining non-local gates for the Tauri iOS app in
-`docs/ios/tauri_requirements.md`.
+Execute the remaining non-local gates for the SwiftUI iOS app in
+`docs/ios/swift_requirements.md`.
 
 Run this only after the implementation changes are reviewed and ready to deploy.
 
@@ -26,7 +26,7 @@ sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
 Then run:
 
 ```sh
-npm run ios:preflight -- --build
+npm run ios:preflight
 ```
 
 ## 2. Fill App Review Data

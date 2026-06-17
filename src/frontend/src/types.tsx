@@ -1,6 +1,6 @@
 import { Backend } from "./api";
 import { Root } from "react-dom/client";
-import { AuthClient } from "@dfinity/auth-client";
+import type { AuthClient } from "@dfinity/auth-client";
 
 export type PostId = number;
 export type UserId = number;
@@ -442,7 +442,6 @@ export interface TokenInfo {
 
 declare global {
     interface Window {
-        __TAGGR_IOS_APP__?: boolean;
         ic: any;
         authClient: AuthClient;
         stackRoot: Root;

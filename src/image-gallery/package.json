@@ -1,0 +1,27 @@
+{
+    "name": "taggr-image-gallery",
+    "version": "0.1.0",
+    "private": true,
+    "description": "Public TAGGR image gallery",
+    "scripts": {
+        "build": "webpack --config webpack.config.js --mode production",
+        "start": "webpack serve --config webpack.config.js --mode development",
+        "typecheck": "tsc --noEmit --project tsconfig.json"
+    },
+    "dependencies": {
+        "@dfinity/agent": "2.4.1",
+        "react": "19.0.0",
+        "react-dom": "19.0.0"
+    },
+    "devDependencies": {
+        "@types/react-dom": "19.0.0",
+        "copy-webpack-plugin": "^14.0.0",
+        "html-webpack-plugin": "5.5.3",
+        "terser-webpack-plugin": "^5.3.10",
+        "ts-loader": "9.5.0",
+        "typescript": "5.8.3",
+        "webpack": "^5.106.2",
+        "webpack-cli": "5.1.4",
+        "webpack-dev-server": "^5.1.0"
+    }
+}

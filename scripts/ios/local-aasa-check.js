@@ -16,7 +16,9 @@ const REQUIRED_COMPONENTS = [
 const MAX_AASA_BYTES = 128 * 1024;
 const AASA_FILES = [
     "src/frontend/assets/.well-known/apple-app-site-association",
+    "src/frontend/assets/apple-app-site-association",
     "dist/frontend/.well-known/apple-app-site-association",
+    "dist/frontend/apple-app-site-association",
 ];
 
 const fail = (message) => {

@@ -18,7 +18,7 @@
         and post menus.
 -   Submission placeholder to fill before upload:
     -   Demo account: App Review should use the invite code flow below.
-    -   Invite code: `<invite code>`
+    -   Invite code: APPREVIEW-TODO-PRODUCTION-INVITE
     -   Notes contact: `Links > HELP Realm` and `Links > OpenChat Community`
 
 Accepted replacement format:
@@ -32,9 +32,8 @@ Accepted replacement format:
 ## Suggested Review Notes
 
 TAGGR is a decentralized social network with user-generated content. The iOS app
-is a Tauri v2 client for the existing TAGGR production service and loads
-`https://6qfxa-ryaaa-aaaai-qbhsq-cai.icp0.io` in WKWebView to preserve Internet
-Identity account continuity.
+is a SwiftUI native client for the existing TAGGR production service. It uses a
+dedicated WKWebView only for Internet Identity authorization.
 
 Moderation controls are available from post and profile menus after sign-in:
 users can report posts/users and block users. Public support and privacy links
@@ -59,8 +58,8 @@ TAGGR is a social network with user-generated content.
 Privacy policy route: `#/privacy`
 
 The MVP iOS app adds no analytics SDK, advertising SDK, or push notification
-token collection. It loads the production TAGGR web frontend in a Tauri
-WKWebView and uses the same Internet Identity and canister APIs as the website.
+token collection. It uses native SwiftUI screens, Internet Identity, and the
+same production canister APIs as the website.
 
 ## Token And Crypto Policy
 
@@ -107,5 +106,5 @@ team ID. Use this shape:
 ## Build Notes
 
 -   Full Xcode is required. Command Line Tools alone does not provide `simctl`.
--   Required Rust iOS targets are installed by `tauri ios init`.
--   CocoaPods and XcodeGen are required for generated iOS project builds.
+-   No Rust iOS targets, CocoaPods, XcodeGen, or Tauri CLI are required.
+-   The Xcode project is `ios/TAGGR/TAGGR.xcodeproj`.

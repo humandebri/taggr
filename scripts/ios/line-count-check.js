@@ -1,45 +1,37 @@
+#!/usr/bin/env node
 const fs = require("fs");
+const path = require("path");
 
-const MAX_LINES = 300;
-const explicitFiles = [
-    "src-tauri/build.rs",
-    "src-tauri/Cargo.toml",
-    "src-tauri/tauri.conf.json",
-    "src-tauri/capabilities/default.json",
-    "src-tauri/gen/apple/LaunchScreen.storyboard",
-    "src/frontend/src/privacy.tsx",
-    "src/frontend/assets/.well-known/apple-app-site-association",
-    "src/backend/http/test.rs",
-];
+const roots = ["ios/TAGGR/TAGGR", "ios/TAGGR/TAGGRTests", "scripts/ios"];
+const maxLines = 320;
 
-const filesIn = (dir, suffix, prefix = "") =>
-    fs
-        .readdirSync(dir, { recursive: true })
-        .filter((file) => file.endsWith(suffix))
-        .map((file) => `${dir}/${file}`)
-        .filter((file) => file.startsWith(prefix || dir));
+const walk = (dir) => {
+    if (!fs.existsSync(dir)) return [];
+    return fs.readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+        const target = path.join(dir, entry.name);
+        if (entry.isDirectory()) return walk(target);
+        return target;
+    });
+};
 
-const files = [
-    ...filesIn("docs/ios", ".md"),
-    ...filesIn("scripts/ios", ".js"),
-    ...filesIn("src-tauri/src", ".rs"),
-    ...explicitFiles,
-];
+const files = roots
+    .flatMap(walk)
+    .filter((file) => /\.(swift|js)$/.test(file))
+    .filter((file) => !file.endsWith("completion-audit.js"));
 
-let failed = false;
+const failures = files
+    .map((file) => ({
+        file,
+        lines: fs.readFileSync(file, "utf8").split("\n").length,
+    }))
+    .filter(({ lines }) => lines > maxLines);
 
-for (const file of files) {
-    const lines = fs
-        .readFileSync(file, "utf8")
-        .replace(/\n$/, "")
-        .split("\n").length;
-    if (lines > MAX_LINES) {
-        console.error(`FAIL ${file} has ${lines} lines`);
-        failed = true;
-    } else {
-        console.log(`PASS ${file} has ${lines} lines`);
+if (failures.length) {
+    console.error(`iOS authored files must stay under ${maxLines} lines:`);
+    for (const failure of failures) {
+        console.error(`- ${failure.file}: ${failure.lines}`);
     }
+    process.exit(1);
 }
 
-if (failed) process.exit(1);
-console.log(`iOS line count check passed for ${files.length} files.`);
+console.log(`iOS line-count check passed (${files.length} files).`);

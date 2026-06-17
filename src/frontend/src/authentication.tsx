@@ -6,12 +6,12 @@ import {
     showPopUp,
     signOut,
     getCanonicalDomain,
-    isIOSApp,
     onCanonicalDomain,
 } from "./common";
 import { HASH_ITERATIONS, hash } from "./common";
 import { Infinity, Incognito, Ticket } from "./icons";
 import { II_URL } from "./env";
+import type { AuthClientLoginOptions } from "@dfinity/auth-client";
 import { Ed25519KeyIdentity } from "@dfinity/identity";
 import { DELEGATION_PRINCIPAL } from "./delegation";
 import { instantiateApi } from ".";
@@ -49,30 +49,22 @@ export const authMethods = [
                 location.href = location.href.replace(".raw", "");
                 return null;
             }
-            let finished = false;
-            const timeout = window.setTimeout(() => {
-                if (!finished && isIOSApp()) {
-                    showPopUp(
-                        "error",
-                        "Internet Identity did not return to TAGGR. Please close the Identity window and try again.",
-                    );
-                }
-            }, 20000);
-            window.authClient.login({
-                onSuccess: () => {
-                    finished = true;
-                    window.clearTimeout(timeout);
-                    finalize(signUp);
-                },
-                onError: (error) => {
-                    finished = true;
-                    window.clearTimeout(timeout);
-                    showPopUp("error", `Internet Identity failed: ${error}`);
-                },
-                identityProvider: II_URL,
-                maxTimeToLive: BigInt(30 * 24 * 3600000000000),
-                derivationOrigin: window.location.origin,
-            });
+            try {
+                await window.authClient.login({
+                    onSuccess: () => {
+                        finalize(signUp);
+                    },
+                    onError: (error: Parameters<NonNullable<AuthClientLoginOptions["onError"]>>[0]) => {
+                        const text = String(error);
+                        showPopUp("error", `Internet Identity failed: ${text}`);
+                    },
+                    identityProvider: II_URL,
+                    maxTimeToLive: BigInt(30 * 24 * 3600000000000),
+                });
+            } catch (error) {
+                const text = error instanceof Error ? error.message : String(error);
+                showPopUp("error", `Internet Identity failed: ${text}`);
+            }
             return null;
         },
     },

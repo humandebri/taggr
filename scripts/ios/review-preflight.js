@@ -14,7 +14,7 @@ const requiredFiles = [
     reviewDoc,
     runbookDoc,
     "docs/ios/app_privacy_answers.md",
-    "docs/ios/tauri_requirements.md",
+    "docs/ios/swift_requirements.md",
     "src/frontend/src/privacy.tsx",
     "src/frontend/src/links.tsx",
     "src/frontend/assets/.well-known/apple-app-site-association",
@@ -56,8 +56,8 @@ for (const text of requiredReviewText) {
 }
 
 const linksChecks = [
-    ["src/frontend/src/index.tsx", 'handler == "links"'],
-    ["src/frontend/src/index.tsx", 'handler == "privacy"'],
+    ["src/frontend/src/app/legacy/LegacyRoute.tsx", 'current.name === "links"'],
+    ["src/frontend/src/app/legacy/LegacyRoute.tsx", 'current.name === "privacy"'],
     ["src/frontend/src/landing.tsx", 'href="/#/links"'],
     ["src/frontend/src/links.tsx", 'href="#/privacy"'],
     ["src/frontend/src/links.tsx", "#/realm/HELP"],

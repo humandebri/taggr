@@ -1,5 +1,4 @@
 import * as React from "react";
-import { invoke } from "@tauri-apps/api/core";
 // @ts-ignore
 import DiffMatchPatch from "diff-match-patch";
 import {
@@ -223,8 +222,7 @@ export const Unauthorized = () => (
 export const bigScreen = () => window.innerWidth >= 1024;
 
 export const isIOSApp = () =>
-    /\bTAGGR-iOS\b/.test(navigator.userAgent) ||
-    window.__TAGGR_IOS_APP__ === true;
+    false;
 
 export const IOSReadOnlyTokenNotice = () =>
     isIOSApp() ? (
@@ -385,15 +383,6 @@ export const ShareButton = ({
             className={`medium_text ${classNameArg}`}
             style={styleArg}
             onClick={async (_) => {
-                if (isIOSApp()) {
-                    try {
-                        await invoke("share_url", { url: fullUrl });
-                        return;
-                    } catch (error) {
-                        console.warn("Native iOS share failed", error);
-                    }
-                }
-
                 if (navigator.share) {
                     await navigator.share({
                         title: document.title || "TAGGR",
