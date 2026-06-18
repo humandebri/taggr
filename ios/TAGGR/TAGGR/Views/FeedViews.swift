@@ -83,7 +83,7 @@ struct FeedView: View {
             }
         }
         .fullScreenCover(isPresented: $showingComposer) {
-            ComposePostView(isPresented: $showingComposer)
+            ComposePostView(isPresented: $showingComposer, selectedMode: selectedMode)
                 .environmentObject(state)
         }
     }
@@ -173,6 +173,7 @@ private struct ChannelPill: View {
 private struct ComposePostView: View {
     @EnvironmentObject private var state: TaggrAppState
     @Binding var isPresented: Bool
+    let selectedMode: TaggrFeedMode
     @State private var text = ""
     @State private var selectedPhoto: PhotosPickerItem?
     @State private var draftImage: TaggrDraftImage?
@@ -287,13 +288,18 @@ private struct ComposePostView: View {
         let image = draftImage
         isSubmitting = true
         Task {
-            await state.submitPost(text: body, image: image)
+            await state.submitPost(text: body, realm: targetRealm, image: image, reloadMode: selectedMode)
             isSubmitting = false
             if state.errorMessage == nil {
                 clearDraft()
                 isPresented = false
             }
         }
+    }
+
+    private var targetRealm: String? {
+        guard case .realm(let name) = selectedMode else { return nil }
+        return name
     }
 
     @MainActor

@@ -115,7 +115,7 @@ final class TaggrAppState: ObservableObject {
         }
     }
 
-    func submitPost(text: String, parent: Int? = nil, realm: String? = nil, image: TaggrDraftImage? = nil) async {
+    func submitPost(text: String, parent: Int? = nil, realm: String? = nil, image: TaggrDraftImage? = nil, reloadMode: TaggrFeedMode? = nil) async {
         await runBusy {
             let body = [text, image?.markdown]
                 .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
@@ -128,7 +128,7 @@ final class TaggrAppState: ObservableObject {
             } else {
                 _ = try await api.addPost(text: body, parent: parent, realm: realm, identity: authSession)
             }
-            await loadFeed(mode: .latest, reset: true)
+            await loadFeed(mode: reloadMode ?? .latest, reset: true)
         }
     }
 
@@ -169,6 +169,11 @@ final class TaggrAppState: ObservableObject {
     func signOut() {
         identityStore.clear()
         authSession = nil
+        profile = nil
+        focusedPost = nil
+        if case .feed(.personal) = route {
+            feed = []
+        }
     }
 
     private func runBusy(_ operation: () async throws -> Void) async {

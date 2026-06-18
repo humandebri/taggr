@@ -355,6 +355,113 @@ final class TaggrTests: XCTestCase {
         XCTAssertNil(state.errorMessage)
     }
 
+    @MainActor
+    func testSubmitPostPassesRealmAndReloadsRealmFeed() async throws {
+        var calls: [(method: String, arg: Data)] = []
+        let api = makeStubbedAPI { request in
+            if let call = self.requestMethodAndArg(from: request) {
+                calls.append(call)
+            }
+            let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
+            if request.url?.path.hasSuffix("/query") == true {
+                return (response, Self.queryReply(Data("[]".utf8)))
+            }
+            return (response, Self.queryReply(Data("null".utf8)))
+        }
+        let state = TaggrAppState(api: api)
+        state.authSession = makeAuthSession(privateKey: Curve25519.Signing.PrivateKey())
+
+        await state.submitPost(text: "hello", realm: "DEV", reloadMode: .realm("DEV"))
+
+        XCTAssertNil(state.errorMessage)
+        XCTAssertEqual(calls.map(\.method), ["add_post", "last_posts"])
+        XCTAssertEqual(calls.first?.arg, TaggrCandid.encodeAddPost(text: "hello", parent: nil, realm: "DEV"))
+        XCTAssertEqual(calls.last?.arg, try TaggrCandid.jsonArguments([api.domain, "DEV", 0, 0, true]))
+    }
+
+    @MainActor
+    func testSubmitImagePostPassesRealmToPostData() async throws {
+        var calls: [(method: String, arg: Data)] = []
+        let api = makeStubbedAPI { request in
+            if let call = self.requestMethodAndArg(from: request) {
+                calls.append(call)
+            }
+            let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
+            if request.url?.path.hasSuffix("/query") == true {
+                return (response, Self.queryReply(Data("[]".utf8)))
+            }
+            return (response, Self.queryReply(Data("null".utf8)))
+        }
+        let state = TaggrAppState(api: api)
+        state.authSession = makeAuthSession(privateKey: Curve25519.Signing.PrivateKey())
+        let image = TaggrDraftImage(id: "blob1", data: Data([1, 2, 3]))
+
+        await state.submitPost(text: "hello", realm: "DEV", image: image, reloadMode: .realm("DEV"))
+
+        XCTAssertNil(state.errorMessage)
+        XCTAssertEqual(calls.map(\.method), ["add_post_data", "add_post_blob", "commit_post", "last_posts"])
+        XCTAssertEqual(
+            calls.first?.arg,
+            TaggrCandid.encodePostData(text: "hello\n\n![image](/blob/blob1)", realm: "DEV")
+        )
+        XCTAssertEqual(calls.last?.arg, try TaggrCandid.jsonArguments([api.domain, "DEV", 0, 0, true]))
+    }
+
+    @MainActor
+    func testSubmitPostDefaultsToLatestReload() async throws {
+        var calls: [(method: String, arg: Data)] = []
+        let api = makeStubbedAPI { request in
+            if let call = self.requestMethodAndArg(from: request) {
+                calls.append(call)
+            }
+            let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
+            if request.url?.path.hasSuffix("/query") == true {
+                return (response, Self.queryReply(Data("[]".utf8)))
+            }
+            return (response, Self.queryReply(Data("null".utf8)))
+        }
+        let state = TaggrAppState(api: api)
+        state.authSession = makeAuthSession(privateKey: Curve25519.Signing.PrivateKey())
+
+        await state.submitPost(text: "hello")
+
+        XCTAssertNil(state.errorMessage)
+        XCTAssertEqual(calls.map(\.method), ["add_post", "last_posts"])
+        XCTAssertEqual(calls.last?.arg, try TaggrCandid.jsonArguments([api.domain, "", 0, 0, true]))
+    }
+
+    @MainActor
+    func testSignOutClearsPersonalFeed() {
+        let post = samplePost(body: "hello", files: [:])
+        let state = TaggrAppState()
+        state.route = .feed(.personal)
+        state.authSession = makeAuthSession(privateKey: Curve25519.Signing.PrivateKey())
+        state.feed = [post]
+        state.focusedPost = post
+        state.profile = TaggrUser(id: 1, name: "alice", about: "", principal: nil, realms: [], followees: [], followers: [], blacklist: [], mode: nil)
+
+        state.signOut()
+
+        XCTAssertNil(state.authSession)
+        XCTAssertNil(state.focusedPost)
+        XCTAssertNil(state.profile)
+        XCTAssertEqual(state.feed, [])
+    }
+
+    @MainActor
+    func testSignOutKeepsPublicFeed() {
+        let post = samplePost(body: "hello", files: [:])
+        let state = TaggrAppState()
+        state.route = .feed(.latest)
+        state.authSession = makeAuthSession(privateKey: Curve25519.Signing.PrivateKey())
+        state.feed = [post]
+
+        state.signOut()
+
+        XCTAssertNil(state.authSession)
+        XCTAssertEqual(state.feed, [post])
+    }
+
     func testIdentityPayloadValidation() throws {
         let privateKey = Curve25519.Signing.PrivateKey()
         let rootPublicKey = TaggrIdentityBridge.derPublicKey(from: Data(repeating: 1, count: 32))
@@ -484,6 +591,17 @@ final class TaggrTests: XCTestCase {
             data.append(buffer, count: count)
         }
         return data
+    }
+
+    private func requestMethodAndArg(from request: URLRequest) -> (method: String, arg: Data)? {
+        guard let body = Self.requestBody(from: request),
+              case .map(let envelope)? = TaggrCBOR.decode(body),
+              case .map(let content)? = value(named: "content", in: envelope),
+              case .text(let method)? = value(named: "method_name", in: content),
+              case .bytes(let arg)? = value(named: "arg", in: content) else {
+            return nil
+        }
+        return (method, arg)
     }
 
     private func samplePost(body: String, files: [String: [LosslessInt]]) -> TaggrPost {
