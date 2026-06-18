@@ -85,12 +85,16 @@ enum TaggrCBOR {
         return nil
     }
 
-    static func certificateStatusArg(from readStateData: Data, requestId: Data, canister: Data, verifier: TaggrCertificateVerifier = TaggrCertificateVerifier()) throws -> Result<Data?, Error>? {
-        let verified = try verifier.verifiedCertificate(from: readStateData, canister: canister)
-        return certificateStatusArg(fromVerifiedTree: verified.tree, requestId: requestId)
+    static func certificateStatusArg(from readStateData: Data, requestId: Data) throws -> Result<Data?, Error>? {
+        guard case .bytes(let certificateData)? = mapValue(readStateData, key: "certificate"),
+              case .map(let certificate)? = unwrapTag(decode(certificateData)),
+              let tree = certificate.first(where: { $0.0 == .text("tree") })?.1 else {
+            throw TaggrAPIError.invalidResponse("read_state certificate")
+        }
+        return certificateStatusArg(fromCertificateTree: tree, requestId: requestId)
     }
 
-    static func certificateStatusArg(fromVerifiedTree tree: Value, requestId: Data) -> Result<Data?, Error>? {
+    static func certificateStatusArg(fromCertificateTree tree: Value, requestId: Data) -> Result<Data?, Error>? {
         guard case .array = tree else {
             return nil
         }

@@ -13,11 +13,8 @@ enum DiscordTheme {
 
 struct FeedView: View {
     @EnvironmentObject private var state: TaggrAppState
-    @State private var composerText = ""
     @State private var selectedMode = TaggrFeedMode.hot
-    @State private var selectedPhoto: PhotosPickerItem?
-    @State private var draftImage: TaggrDraftImage?
-    @State private var draftPreview: Image?
+    @State private var showingComposer = false
 
     var body: some View {
         ZStack {
@@ -42,28 +39,33 @@ struct FeedView: View {
                     }
                     .padding(.vertical, 8)
                 }
-                if state.authSession != nil {
-                    ComposerView(
-                        text: $composerText,
-                        selectedPhoto: $selectedPhoto,
-                        draftPreview: draftPreview,
-                        clearImage: clearImage,
-                        submit: submit
-                    )
+            }
+            if state.authSession != nil {
+                VStack {
+                    Spacer()
+                    HStack {
+                        Spacer()
+                        Button {
+                            showingComposer = true
+                        } label: {
+                            Image(systemName: "square.and.pencil")
+                                .font(.title3.weight(.bold))
+                                .foregroundStyle(.white)
+                                .frame(width: 56, height: 56)
+                                .background(DiscordTheme.accent)
+                                .clipShape(Circle())
+                                .shadow(color: .black.opacity(0.35), radius: 10, y: 4)
+                        }
+                        .accessibilityLabel("Post")
+                        .padding(.trailing, 18)
+                        .padding(.bottom, 18)
+                    }
                 }
             }
         }
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(DiscordTheme.background, for: .navigationBar)
         .toolbarColorScheme(.dark, for: .navigationBar)
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                ShareLink(item: TaggrNavigation.universalURL(for: state.route)) {
-                    Image(systemName: "square.and.arrow.up")
-                        .foregroundStyle(DiscordTheme.text)
-                }
-            }
-        }
         .refreshable {
             await state.loadFeed(mode: selectedMode, reset: true)
         }
@@ -76,8 +78,9 @@ struct FeedView: View {
                     .clipShape(RoundedRectangle(cornerRadius: 8))
             }
         }
-        .onChange(of: selectedPhoto) { _, item in
-            Task { await loadPhoto(item) }
+        .fullScreenCover(isPresented: $showingComposer) {
+            ComposePostView(isPresented: $showingComposer)
+                .environmentObject(state)
         }
     }
 
@@ -86,52 +89,6 @@ struct FeedView: View {
         state.route = .feed(mode)
         Task { await state.loadFeed(mode: mode, reset: true) }
     }
-
-    private func submit() {
-        let text = composerText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !text.isEmpty || draftImage != nil else { return }
-        let image = draftImage
-        composerText = ""
-        clearImage()
-        Task { await state.submitPost(text: text, image: image) }
-    }
-
-    @MainActor
-    private func loadPhoto(_ item: PhotosPickerItem?) async {
-        guard let item,
-              let data = try? await item.loadTransferable(type: Data.self),
-              let normalized = Self.normalizedImageData(data) else {
-            clearImage()
-            return
-        }
-        draftImage = TaggrDraftImage(id: Self.blobId(), data: normalized)
-        if let image = UIImage(data: normalized) {
-            draftPreview = Image(uiImage: image)
-        }
-    }
-
-    private func clearImage() {
-        selectedPhoto = nil
-        draftImage = nil
-        draftPreview = nil
-    }
-
-    private static func blobId() -> String {
-        String(UUID().uuidString.replacingOccurrences(of: "-", with: "").prefix(8)).lowercased()
-    }
-
-    private static func normalizedImageData(_ data: Data) -> Data? {
-        guard let image = UIImage(data: data) else { return nil }
-        if data.count <= 460_800 { return data }
-        var quality: CGFloat = 0.82
-        while quality >= 0.35 {
-            if let compressed = image.jpegData(compressionQuality: quality), compressed.count <= 460_800 {
-                return compressed
-            }
-            quality -= 0.12
-        }
-        return image.jpegData(compressionQuality: 0.35)
-    }
 }
 
 private struct FeedHeader: View {
@@ -139,15 +96,15 @@ private struct FeedHeader: View {
     let changeMode: (TaggrFeedMode) -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 12) {
                 RoundedRectangle(cornerRadius: 8)
                     .fill(DiscordTheme.accent)
-                    .frame(width: 42, height: 42)
-                    .overlay(Text("T").font(.title3.weight(.black)).foregroundStyle(.white))
+                    .frame(width: 34, height: 34)
+                    .overlay(Text("T").font(.subheadline.weight(.black)).foregroundStyle(.white))
                 VStack(alignment: .leading, spacing: 2) {
                     Text("TAGGR")
-                        .font(.title2.weight(.black))
+                        .font(.headline.weight(.black))
                         .foregroundStyle(DiscordTheme.text)
                     Text(channelTitle)
                         .font(.caption.weight(.semibold))
@@ -162,8 +119,8 @@ private struct FeedHeader: View {
             }
         }
         .padding(.horizontal, 16)
-        .padding(.top, 12)
-        .padding(.bottom, 14)
+        .padding(.top, 8)
+        .padding(.bottom, 10)
         .background(DiscordTheme.panel)
     }
 
@@ -199,69 +156,162 @@ private struct ChannelPill: View {
     }
 }
 
-private struct ComposerView: View {
-    @Binding var text: String
-    @Binding var selectedPhoto: PhotosPickerItem?
-    let draftPreview: Image?
-    let clearImage: () -> Void
-    let submit: () -> Void
+private struct ComposePostView: View {
+    @EnvironmentObject private var state: TaggrAppState
+    @Binding var isPresented: Bool
+    @State private var text = ""
+    @State private var selectedPhoto: PhotosPickerItem?
+    @State private var draftImage: TaggrDraftImage?
+    @State private var draftPreview: Image?
+    @State private var isSubmitting = false
 
     var body: some View {
-        VStack(spacing: 10) {
-            if let draftPreview {
+        ZStack {
+            DiscordTheme.background.ignoresSafeArea()
+            VStack(spacing: 0) {
                 HStack {
-                    draftPreview
-                        .resizable()
-                        .scaledToFill()
-                        .frame(width: 72, height: 72)
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
-                    Spacer()
-                    Button(action: clearImage) {
+                    Button {
+                        isPresented = false
+                    } label: {
                         Image(systemName: "xmark")
-                            .font(.caption.weight(.bold))
+                            .font(.body.weight(.semibold))
+                            .foregroundStyle(DiscordTheme.text)
+                            .frame(width: 40, height: 40)
+                    }
+                    Spacer()
+                    Button(action: submit) {
+                        Text("Post")
+                            .font(.subheadline.weight(.bold))
                             .foregroundStyle(.white)
-                            .frame(width: 28, height: 28)
-                            .background(Color.black.opacity(0.45))
-                            .clipShape(Circle())
+                            .padding(.horizontal, 18)
+                            .frame(height: 36)
+                            .background(canSubmit && !isSubmitting ? DiscordTheme.accent : DiscordTheme.panelRaised)
+                            .clipShape(Capsule())
+                    }
+                    .disabled(!canSubmit || state.isBusy || isSubmitting)
+                }
+                .padding(.horizontal, 12)
+                .padding(.top, 8)
+                .padding(.bottom, 6)
+                .background(DiscordTheme.background)
+
+                Divider().overlay(DiscordTheme.panelRaised)
+
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 16) {
+                        ZStack(alignment: .topLeading) {
+                            TextEditor(text: $text)
+                                .scrollContentBackground(.hidden)
+                                .font(.title3)
+                                .foregroundStyle(DiscordTheme.text)
+                                .frame(minHeight: 170)
+                                .tint(DiscordTheme.accent)
+                            if text.isEmpty {
+                                Text("What's happening?")
+                                    .font(.title3)
+                                    .foregroundStyle(DiscordTheme.secondaryText)
+                                    .padding(.top, 8)
+                                    .padding(.leading, 5)
+                                    .allowsHitTesting(false)
+                            }
+                        }
+                        if let draftPreview {
+                            ZStack(alignment: .topTrailing) {
+                                draftPreview
+                                    .resizable()
+                                    .scaledToFit()
+                                    .frame(maxWidth: .infinity)
+                                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                                Button(action: clearImage) {
+                                    Image(systemName: "xmark")
+                                        .font(.caption.weight(.bold))
+                                        .foregroundStyle(.white)
+                                        .frame(width: 30, height: 30)
+                                        .background(Color.black.opacity(0.55))
+                                        .clipShape(Circle())
+                                }
+                                .padding(8)
+                            }
+                        }
+                    }
+                    .padding(.horizontal, 18)
+                    .padding(.top, 16)
+                }
+
+                Divider().overlay(DiscordTheme.panelRaised)
+
+                HStack {
+                    PhotosPicker(selection: $selectedPhoto, matching: .images) {
+                        Image(systemName: "photo")
+                            .font(.title3.weight(.semibold))
+                            .foregroundStyle(DiscordTheme.accent)
+                            .frame(width: 44, height: 44)
+                    }
+                    Spacer()
+                    if state.isBusy || isSubmitting {
+                        ProgressView()
+                            .tint(.white)
                     }
                 }
-            }
-            HStack(alignment: .bottom, spacing: 10) {
-                PhotosPicker(selection: $selectedPhoto, matching: .images) {
-                    Image(systemName: "photo")
-                        .font(.body.weight(.semibold))
-                        .foregroundStyle(DiscordTheme.secondaryText)
-                        .frame(width: 34, height: 34)
-                        .background(DiscordTheme.panelRaised)
-                        .clipShape(Circle())
-                }
-                TextField("Message #taggr", text: $text, axis: .vertical)
-                    .lineLimit(1...5)
-                    .textFieldStyle(.plain)
-                    .foregroundStyle(DiscordTheme.text)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 10)
-                    .background(DiscordTheme.panelRaised)
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
-                Button(action: submit) {
-                    Image(systemName: "arrow.up")
-                        .font(.body.weight(.bold))
-                        .foregroundStyle(.white)
-                        .frame(width: 34, height: 34)
-                        .background(DiscordTheme.accent)
-                        .clipShape(Circle())
-                }
+                .padding(.horizontal, 18)
+                .padding(.vertical, 8)
+                .background(DiscordTheme.background)
             }
         }
-        .padding(12)
-        .background(DiscordTheme.panel)
+        .onChange(of: selectedPhoto) { _, item in
+            Task { await loadPhoto(item) }
+        }
+    }
+
+    private var canSubmit: Bool {
+        !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || draftImage != nil
+    }
+
+    private func submit() {
+        let body = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard canSubmit, !isSubmitting else { return }
+        let image = draftImage
+        isSubmitting = true
+        Task {
+            await state.submitPost(text: body, image: image)
+            isSubmitting = false
+            if state.errorMessage == nil {
+                clearDraft()
+                isPresented = false
+            }
+        }
+    }
+
+    @MainActor
+    private func loadPhoto(_ item: PhotosPickerItem?) async {
+        guard let item,
+              let data = try? await item.loadTransferable(type: Data.self),
+              let normalized = ImageDrafts.normalizedImageData(data) else {
+            clearImage()
+            return
+        }
+        draftImage = TaggrDraftImage(id: ImageDrafts.blobId(), data: normalized)
+        if let image = UIImage(data: normalized) {
+            draftPreview = Image(uiImage: image)
+        }
+    }
+
+    private func clearImage() {
+        selectedPhoto = nil
+        draftImage = nil
+        draftPreview = nil
+    }
+
+    private func clearDraft() {
+        text = ""
+        clearImage()
     }
 }
 
 private struct EmptyFeedView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("No messages")
+            Text("No posts")
                 .font(.headline)
                 .foregroundStyle(DiscordTheme.text)
             Text("Pull to refresh or switch channels.")
@@ -269,6 +319,25 @@ private struct EmptyFeedView: View {
                 .foregroundStyle(DiscordTheme.secondaryText)
         }
         .padding(16)
+    }
+}
+
+private enum ImageDrafts {
+    static func blobId() -> String {
+        String(UUID().uuidString.replacingOccurrences(of: "-", with: "").prefix(8)).lowercased()
+    }
+
+    static func normalizedImageData(_ data: Data) -> Data? {
+        guard let image = UIImage(data: data) else { return nil }
+        if data.count <= 460_800 { return data }
+        var quality: CGFloat = 0.82
+        while quality >= 0.35 {
+            if let compressed = image.jpegData(compressionQuality: quality), compressed.count <= 460_800 {
+                return compressed
+            }
+            quality -= 0.12
+        }
+        return image.jpegData(compressionQuality: 0.35)
     }
 }
 
@@ -294,8 +363,10 @@ struct PostRow: View {
                     Text(post.displayBody)
                         .font(.body)
                         .foregroundStyle(DiscordTheme.text)
+                        .lineSpacing(3)
                         .lineLimit(10)
                         .textSelection(.enabled)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 ForEach(post.imageAttachments()) { attachment in
                     AsyncImage(url: attachment.url) { phase in
@@ -317,9 +388,9 @@ struct PostRow: View {
                             EmptyView()
                         }
                     }
-                    .frame(maxWidth: 320, minHeight: 120, maxHeight: 260)
+                    .frame(maxWidth: .infinity, minHeight: 160, maxHeight: 360)
                     .background(DiscordTheme.panelRaised)
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
                 }
                 HStack(spacing: 18) {
                     Button {
@@ -339,8 +410,14 @@ struct PostRow: View {
             Spacer(minLength: 0)
         }
         .padding(.horizontal, 16)
-        .padding(.vertical, 12)
+        .padding(.vertical, 14)
         .background(DiscordTheme.background)
+        .overlay(alignment: .bottom) {
+            Rectangle()
+                .fill(DiscordTheme.panelRaised.opacity(0.8))
+                .frame(height: 1)
+                .padding(.leading, 66)
+        }
     }
 }
 

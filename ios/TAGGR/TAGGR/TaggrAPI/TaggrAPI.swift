@@ -152,10 +152,10 @@ final class TaggrAPI {
         if let arg = TaggrCBOR.decodeReplyArg(data) {
             return arg
         }
-        return try await poll(requestId: requestId, canister: canister, identity: identity)
+        return try await poll(requestId: requestId, identity: identity)
     }
 
-    private func poll(requestId: Data, canister: Data, identity: TaggrAuthSession) async throws -> Data {
+    private func poll(requestId: Data, identity: TaggrAuthSession) async throws -> Data {
         let url = apiURL(for: "read_state")
         for _ in 0..<30 {
             try await Task.sleep(nanoseconds: 1_000_000_000)
@@ -174,7 +174,7 @@ final class TaggrAPI {
             guard let status = (response as? HTTPURLResponse)?.statusCode, status == 200 else {
                 throw TaggrAPIError.invalidResponse(Self.httpFailureContext("read_state", data: data, response: response))
             }
-            if let result = try TaggrCBOR.certificateStatusArg(from: data, requestId: requestId, canister: canister) {
+            if let result = try TaggrCBOR.certificateStatusArg(from: data, requestId: requestId) {
                 if let reply = try result.get() {
                     return reply
                 }

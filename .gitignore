@@ -63,23 +63,6 @@ xcuserdata/
 *.dSYM
 *.dSYM.zip
 
-# vendored blst files required by the iOS Apple ASM build
-/ios/TAGGR/ThirdParty/blst/*
-!/ios/TAGGR/ThirdParty/blst/LICENSE
-!/ios/TAGGR/ThirdParty/blst/bindings/
-/ios/TAGGR/ThirdParty/blst/bindings/*
-!/ios/TAGGR/ThirdParty/blst/bindings/blst.h
-!/ios/TAGGR/ThirdParty/blst/bindings/blst_aux.h
-!/ios/TAGGR/ThirdParty/blst/build/
-/ios/TAGGR/ThirdParty/blst/build/*
-!/ios/TAGGR/ThirdParty/blst/build/assembly.S
-!/ios/TAGGR/ThirdParty/blst/build/mach-o/
-!/ios/TAGGR/ThirdParty/blst/build/mach-o/*
-!/ios/TAGGR/ThirdParty/blst/src/
-/ios/TAGGR/ThirdParty/blst/src/*
-!/ios/TAGGR/ThirdParty/blst/src/*.c
-!/ios/TAGGR/ThirdParty/blst/src/*.h
-
 # e2e tests
 test-results/
 playwright-report/

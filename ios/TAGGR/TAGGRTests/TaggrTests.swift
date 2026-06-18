@@ -295,44 +295,35 @@ final class TaggrTests: XCTestCase {
         XCTAssertThrowsError(try TaggrIdentityBridge.makeSession(from: #"{"kind":"authorize-client-failure","text":"denied"}"#, privateKey: privateKey))
     }
 
-    func testVerifiedCertificateStatusReadsReply() throws {
+    func testReadStateCertificateStatusReadsReply() throws {
         let requestId = Data(repeating: 7, count: 32)
         let reply = Data([1, 2, 3])
         let tree = certificateTree(requestId: requestId, status: "replied", reply: reply)
-        let certificate = TaggrCBOR.encode(.map([
-            (.text("tree"), tree),
-            (.text("signature"), .bytes(Data([9]))),
-        ]))
-        let readState = TaggrCBOR.encode(.map([(.text("certificate"), .bytes(certificate))]))
-        let verifier = TaggrCertificateVerifier { publicKey, signature, message in
-            publicKey.count == 96 && signature == Data([9]) && !message.isEmpty
-        }
-        let result = try TaggrCBOR.certificateStatusArg(
-            from: readState,
-            requestId: requestId,
-            canister: PrincipalBlob.parse(TaggrAPI.canisterId)!,
-            verifier: verifier
-        )
+        let readState = readStateResponse(tree: tree)
+        let result = try TaggrCBOR.certificateStatusArg(from: readState, requestId: requestId)
         XCTAssertEqual(try result?.get(), reply)
     }
 
-    func testVerifiedCertificateRejectsBadSignature() {
+    func testReadStateCertificateStatusMapsRejected() throws {
         let requestId = Data(repeating: 7, count: 32)
-        let tree = certificateTree(requestId: requestId, status: "replied", reply: Data([1]))
-        let certificate = TaggrCBOR.encode(.map([
-            (.text("tree"), tree),
-            (.text("signature"), .bytes(Data([8]))),
-        ]))
-        let readState = TaggrCBOR.encode(.map([(.text("certificate"), .bytes(certificate))]))
-        let verifier = TaggrCertificateVerifier { _, signature, _ in
-            signature == Data([9])
+        let tree = certificateTree(requestId: requestId, status: "rejected", rejectMessage: "denied")
+        let readState = readStateResponse(tree: tree)
+        let result = try TaggrCBOR.certificateStatusArg(from: readState, requestId: requestId)
+        guard case .failure(let error)? = result,
+              case TaggrAPIError.rejected(let message) = error else {
+            return XCTFail("Expected rejected status.")
         }
-        XCTAssertThrowsError(try TaggrCBOR.certificateStatusArg(
-            from: readState,
-            requestId: requestId,
-            canister: PrincipalBlob.parse(TaggrAPI.canisterId)!,
-            verifier: verifier
-        ))
+        XCTAssertEqual(message, "denied")
+    }
+
+    func testReadStateCertificatePendingStatusesReturnNil() throws {
+        let requestId = Data(repeating: 7, count: 32)
+        for status in ["received", "processing", "unknown"] {
+            let tree = certificateTree(requestId: requestId, status: status)
+            let readState = readStateResponse(tree: tree)
+            let result = try TaggrCBOR.certificateStatusArg(from: readState, requestId: requestId)
+            XCTAssertNil(try result?.get())
+        }
     }
 
     private func makeAuthSession(privateKey: Curve25519.Signing.PrivateKey) -> TaggrAuthSession {
@@ -360,12 +351,25 @@ final class TaggrTests: XCTestCase {
         values.first { $0.0 == .text(name) }?.1
     }
 
-    private func certificateTree(requestId: Data, status: String, reply: Data) -> TaggrCBOR.Value {
-        let requestTree: TaggrCBOR.Value = .array([
-            .unsigned(1),
-            labeled("reply", .array([.unsigned(3), .bytes(reply)])),
+    private func readStateResponse(tree: TaggrCBOR.Value) -> Data {
+        let certificate = TaggrCBOR.encode(.map([
+            (.text("tree"), tree),
+            (.text("signature"), .bytes(Data([9]))),
+        ]))
+        return TaggrCBOR.encode(.map([(.text("certificate"), .bytes(certificate))]))
+    }
+
+    private func certificateTree(requestId: Data, status: String, reply: Data? = nil, rejectMessage: String? = nil) -> TaggrCBOR.Value {
+        var requestBranches: [TaggrCBOR.Value] = [
             labeled("status", .array([.unsigned(3), .bytes(Data(status.utf8))])),
-        ])
+        ]
+        if let reply {
+            requestBranches.insert(labeled("reply", .array([.unsigned(3), .bytes(reply)])), at: 0)
+        }
+        if let rejectMessage {
+            requestBranches.insert(labeled("reject_message", .array([.unsigned(3), .bytes(Data(rejectMessage.utf8))])), at: 0)
+        }
+        let requestTree = forkedTree(requestBranches)
         let statusTree = labeledBytes(requestId, requestTree)
         let timeTree = labeled("time", .array([.unsigned(3), .bytes(leb128(UInt64((Date().timeIntervalSince1970) * 1_000_000_000)))]))
         return .array([
@@ -373,6 +377,15 @@ final class TaggrTests: XCTestCase {
             labeled("request_status", statusTree),
             timeTree,
         ])
+    }
+
+    private func forkedTree(_ branches: [TaggrCBOR.Value]) -> TaggrCBOR.Value {
+        guard let first = branches.first else {
+            return .array([.unsigned(0)])
+        }
+        return branches.dropFirst().reduce(first) { partial, branch in
+            .array([.unsigned(1), partial, branch])
+        }
     }
 
     private func labeled(_ label: String, _ value: TaggrCBOR.Value) -> TaggrCBOR.Value {
