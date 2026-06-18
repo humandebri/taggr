@@ -54,14 +54,13 @@ enum TaggrCandid {
     }
 
     static func jsonArguments(_ values: [Any?]) throws -> Data {
-        let compact = values.compactMap { $0 }
         let object: Any
-        if compact.isEmpty {
+        if values.isEmpty {
             object = NSNull()
-        } else if compact.count == 1 {
-            object = compact[0]
+        } else if values.count == 1 {
+            object = values[0] ?? NSNull()
         } else {
-            object = compact
+            object = values.map { $0 ?? NSNull() }
         }
         // TAGGR の JSON query/update は単一の primitive や null も引数に使う。
         // JSONSerialization の標準設定は top-level fragment を拒否するため、

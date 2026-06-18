@@ -128,6 +128,9 @@ final class TaggrAPI {
             throw TaggrAPIError.invalidResponse(Self.httpFailureContext("query \(method)", data: data, response: response))
         }
         guard let arg = TaggrCBOR.decodeReplyArg(data) else {
+            if let message = TaggrCBOR.decodeRejectMessage(data) {
+                throw TaggrAPIError.rejected(message)
+            }
             throw TaggrAPIError.emptyResponse
         }
         return arg
@@ -151,6 +154,9 @@ final class TaggrAPI {
         }
         if let arg = TaggrCBOR.decodeReplyArg(data) {
             return arg
+        }
+        if let message = TaggrCBOR.decodeRejectMessage(data) {
+            throw TaggrAPIError.rejected(message)
         }
         return try await poll(requestId: requestId, identity: identity)
     }

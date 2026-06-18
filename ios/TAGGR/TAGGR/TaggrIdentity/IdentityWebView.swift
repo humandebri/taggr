@@ -3,6 +3,8 @@ import SwiftUI
 import WebKit
 
 struct IdentityWebView: UIViewRepresentable {
+    static let bridgeForMainFrameOnly = true
+
     let onComplete: (Result<TaggrAuthSession, Error>) -> Void
 
     func makeCoordinator() -> Coordinator {
@@ -15,7 +17,7 @@ struct IdentityWebView: UIViewRepresentable {
         controller.addUserScript(WKUserScript(
             source: context.coordinator.bridgeScript(),
             injectionTime: .atDocumentStart,
-            forMainFrameOnly: false,
+            forMainFrameOnly: Self.bridgeForMainFrameOnly,
             in: .page
         ))
         let configuration = WKWebViewConfiguration()
@@ -41,6 +43,11 @@ struct IdentityWebView: UIViewRepresentable {
         }
 
         func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
+            let origin = message.frameInfo.securityOrigin
+            guard message.frameInfo.isMainFrame,
+                  Self.acceptsIdentityOrigin(scheme: origin.protocol, host: origin.host, port: origin.port) else {
+                return
+            }
             guard let payload = message.body as? String else {
                 onComplete(.failure(TaggrIdentityError.invalidPayload))
                 return
@@ -49,6 +56,35 @@ struct IdentityWebView: UIViewRepresentable {
                 onComplete(.success(try TaggrIdentityBridge.makeSession(from: payload, privateKey: privateKey)))
             } catch {
                 onComplete(.failure(error))
+            }
+        }
+
+        static func acceptsIdentityOrigin(
+            scheme: String,
+            host: String,
+            port: Int,
+            config: TaggrRuntimeConfig = .current
+        ) -> Bool {
+            guard let expectedScheme = config.identityURL.scheme?.lowercased(),
+                  let expectedHost = config.identityURL.host?.lowercased() else {
+                return false
+            }
+            let actualScheme = scheme.lowercased()
+            let actualPort = port == 0 ? defaultPort(for: actualScheme) : port
+            let expectedPort = config.identityURL.port ?? defaultPort(for: expectedScheme)
+            return actualScheme == expectedScheme
+                && host.lowercased() == expectedHost
+                && actualPort == expectedPort
+        }
+
+        private static func defaultPort(for scheme: String) -> Int? {
+            switch scheme.lowercased() {
+            case "http":
+                return 80
+            case "https":
+                return 443
+            default:
+                return nil
             }
         }
 

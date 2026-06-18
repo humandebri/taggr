@@ -47,6 +47,7 @@ struct TaggrPost: Identifiable, Equatable {
             guard !seen.contains(id) else { return nil }
             seen.insert(id)
             guard let file = files.first(where: { $0.key.split(separator: "@").first.map(String.init) == id }),
+                  file.value.count >= 2,
                   let bucketId = file.key.split(separator: "@").dropFirst().first.map(String.init),
                   let offset = UInt64(exactly: file.value[0].value),
                   let length = Int(exactly: file.value[1].value),

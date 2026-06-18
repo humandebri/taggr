@@ -66,6 +66,10 @@ struct FeedView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(DiscordTheme.background, for: .navigationBar)
         .toolbarColorScheme(.dark, for: .navigationBar)
+        .onAppear(perform: syncSelectedModeWithRoute)
+        .onChange(of: state.route) { _, _ in
+            syncSelectedModeWithRoute()
+        }
         .refreshable {
             await state.loadFeed(mode: selectedMode, reset: true)
         }
@@ -88,6 +92,16 @@ struct FeedView: View {
         selectedMode = mode
         state.route = .feed(mode)
         Task { await state.loadFeed(mode: mode, reset: true) }
+    }
+
+    private func syncSelectedModeWithRoute() {
+        guard let mode = Self.feedMode(from: state.route) else { return }
+        selectedMode = mode
+    }
+
+    static func feedMode(from route: TaggrRoute) -> TaggrFeedMode? {
+        guard case .feed(let mode) = route else { return nil }
+        return mode
     }
 }
 
@@ -322,22 +336,28 @@ private struct EmptyFeedView: View {
     }
 }
 
-private enum ImageDrafts {
+enum ImageDrafts {
+    static let maxImageBytes = 460_800
+
     static func blobId() -> String {
         String(UUID().uuidString.replacingOccurrences(of: "-", with: "").prefix(8)).lowercased()
     }
 
-    static func normalizedImageData(_ data: Data) -> Data? {
+    static func normalizedImageData(_ data: Data, maxBytes: Int = maxImageBytes) -> Data? {
         guard let image = UIImage(data: data) else { return nil }
-        if data.count <= 460_800 { return data }
+        if data.count <= maxBytes { return data }
         var quality: CGFloat = 0.82
         while quality >= 0.35 {
-            if let compressed = image.jpegData(compressionQuality: quality), compressed.count <= 460_800 {
+            if let compressed = image.jpegData(compressionQuality: quality), compressed.count <= maxBytes {
                 return compressed
             }
             quality -= 0.12
         }
-        return image.jpegData(compressionQuality: 0.35)
+        guard let compressed = image.jpegData(compressionQuality: 0.35),
+              compressed.count <= maxBytes else {
+            return nil
+        }
+        return compressed
     }
 }
 

@@ -85,12 +85,32 @@ enum TaggrCBOR {
         return nil
     }
 
+    static func decodeRejectMessage(_ data: Data) -> String? {
+        guard case .map(let top)? = unwrapTag(decode(data)),
+              top.contains(where: { $0.0 == .text("status") && $0.1 == .text("rejected") }) else {
+            return nil
+        }
+        for (key, value) in top where key == .text("reject_message") {
+            switch value {
+            case .text(let message):
+                return message
+            case .bytes(let data):
+                return String(data: data, encoding: .utf8)
+            default:
+                return nil
+            }
+        }
+        return "IC request rejected."
+    }
+
     static func certificateStatusArg(from readStateData: Data, requestId: Data) throws -> Result<Data?, Error>? {
         guard case .bytes(let certificateData)? = mapValue(readStateData, key: "certificate"),
               case .map(let certificate)? = unwrapTag(decode(certificateData)),
               let tree = certificate.first(where: { $0.0 == .text("tree") })?.1 else {
             throw TaggrAPIError.invalidResponse("read_state certificate")
         }
+        // iOS MVP trusts the boundary node / replica read_state response only as an
+        // update-completion signal; no BLS certificate or root hash verification runs here.
         return certificateStatusArg(fromCertificateTree: tree, requestId: requestId)
     }
 

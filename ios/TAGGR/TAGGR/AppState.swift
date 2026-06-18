@@ -23,8 +23,13 @@ final class TaggrAppState: ObservableObject {
     @Published var errorMessage: String?
     @Published var showingIdentity = false
 
-    let api = TaggrAPI()
-    let identityStore = TaggrIdentityStore()
+    let api: TaggrAPI
+    let identityStore: TaggrIdentityStore
+
+    init(api: TaggrAPI = TaggrAPI(), identityStore: TaggrIdentityStore = TaggrIdentityStore()) {
+        self.api = api
+        self.identityStore = identityStore
+    }
 
     func bootstrap() async {
         authSession = identityStore.load()
@@ -77,7 +82,11 @@ final class TaggrAppState: ObservableObject {
             case .latest:
                 posts = try await loadPostEnvelopes("last_posts", api.domain, "", 0, 0, true)
             case .personal:
-                posts = try await loadPostEnvelopes("personal_feed", api.domain, 0, 0)
+                if let authSession {
+                    posts = try await loadPostEnvelopes("personal_feed", args: [api.domain, 0, 0], identity: authSession)
+                } else {
+                    posts = []
+                }
             case .realm(let name):
                 posts = try await loadPostEnvelopes("last_posts", api.domain, name, 0, 0, true)
             }
@@ -145,6 +154,7 @@ final class TaggrAppState: ObservableObject {
     func completeIdentity(_ session: TaggrAuthSession) async {
         await runBusy {
             logLocalIdentity("signed user query starting")
+            // This signed canister query is the practical verifier before the II delegation is saved.
             _ = try await api.signedQuery("user", args: [api.domain, []], identity: session, as: Optional<TaggrUser>.self)
             logLocalIdentity("signed user query succeeded")
             try identityStore.save(session)
@@ -180,7 +190,16 @@ final class TaggrAppState: ObservableObject {
     }
 
     private func loadPostEnvelopes(_ method: String, _ args: Any?...) async throws -> [TaggrPost] {
-        let rows = try await api.query(method, args: args, as: [TaggrPostEnvelope].self) ?? []
-        return rows.map(\.post)
+        try await loadPostEnvelopes(method, args: args, identity: nil)
+    }
+
+    private func loadPostEnvelopes(_ method: String, args: [Any?], identity: TaggrAuthSession?) async throws -> [TaggrPost] {
+        let rows: [TaggrPostEnvelope]?
+        if let identity {
+            rows = try await api.signedQuery(method, args: args, identity: identity, as: [TaggrPostEnvelope].self)
+        } else {
+            rows = try await api.query(method, args: args, as: [TaggrPostEnvelope].self)
+        }
+        return (rows ?? []).map(\.post)
     }
 }

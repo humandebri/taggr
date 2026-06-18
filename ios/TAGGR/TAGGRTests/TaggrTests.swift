@@ -1,5 +1,6 @@
 import XCTest
 import CryptoKit
+import UIKit
 @testable import TAGGR
 
 final class TaggrTests: XCTestCase {
@@ -107,10 +108,12 @@ final class TaggrTests: XCTestCase {
     func testJsonArgumentFragments() throws {
         let empty = try TaggrCandid.jsonArguments([])
         let single = try TaggrCandid.jsonArguments([12])
-        let nullRemoved = try TaggrCandid.jsonArguments(["domain", nil, 1])
+        let singleNil = try TaggrCandid.jsonArguments([nil])
+        let nullPreserved = try TaggrCandid.jsonArguments(["domain", nil, 1])
         XCTAssertEqual(String(data: empty, encoding: .utf8), "null")
         XCTAssertEqual(String(data: single, encoding: .utf8), "12")
-        XCTAssertEqual(String(data: nullRemoved, encoding: .utf8), "[\"domain\",1]")
+        XCTAssertEqual(String(data: singleNil, encoding: .utf8), "null")
+        XCTAssertEqual(String(data: nullPreserved, encoding: .utf8), "[\"domain\",null,1]")
     }
 
     func testCandidGoldenFixtures() {
@@ -203,6 +206,15 @@ final class TaggrTests: XCTestCase {
         XCTAssertEqual(TaggrCBOR.decodeReplyArg(response), Data([1, 2, 3]))
     }
 
+    func testCBORRejectedResponseReadsMessage() {
+        let response = TaggrCBOR.encode(.map([
+            (.text("status"), .text("rejected")),
+            (.text("reject_code"), .unsigned(5)),
+            (.text("reject_message"), .text("denied")),
+        ]))
+        XCTAssertEqual(TaggrCBOR.decodeRejectMessage(response), "denied")
+    }
+
     func testCBORDecodesNestedByteSlice() {
         let nested = TaggrCBOR.encode(.map([(.text("value"), .unsigned(7))]))
         let container = TaggrCBOR.encode(.map([(.text("nested"), .bytes(nested))]))
@@ -256,6 +268,91 @@ final class TaggrTests: XCTestCase {
             TaggrPostImages.imageURL(bucketId: "aaaaa-aa", offset: 12, length: 34, config: local)?.absoluteString,
             "http://aaaaa-aa.raw.localhost:8001/image?offset=12&len=34"
         )
+    }
+
+    func testPostImageAttachmentsSkipMalformedFilesMetadata() {
+        let post = samplePost(
+            body: "hello\n\n![x](/blob/a1b2c3d4)",
+            files: ["a1b2c3d4@aaaaa-aa": [LosslessInt(12)]]
+        )
+        XCTAssertEqual(post.imageAttachments(), [])
+    }
+
+    func testImageDraftsRejectsOversizedCompressedOutput() {
+        let renderer = UIGraphicsImageRenderer(size: CGSize(width: 16, height: 16))
+        let image = renderer.image { context in
+            UIColor.red.setFill()
+            context.fill(CGRect(x: 0, y: 0, width: 16, height: 16))
+        }
+        guard let data = image.pngData() else {
+            return XCTFail("Fixture image is missing.")
+        }
+        XCTAssertNil(ImageDrafts.normalizedImageData(data, maxBytes: 1))
+    }
+
+    func testFeedModeDerivesFromFeedRoute() {
+        XCTAssertEqual(FeedView.feedMode(from: .feed(.realm("DEV"))), .realm("DEV"))
+        XCTAssertNil(FeedView.feedMode(from: .realm("DEV")))
+    }
+
+    func testIdentityBridgeRestrictsMessagesToIdentityMainFrameOrigin() {
+        let config = TaggrRuntimeConfig.from(info: [
+            "TAGGR_II_URL": "http://id.ai.localhost:8000/#authorize",
+        ])
+        XCTAssertTrue(IdentityWebView.bridgeForMainFrameOnly)
+        XCTAssertTrue(IdentityWebView.Coordinator.acceptsIdentityOrigin(
+            scheme: "http",
+            host: "id.ai.localhost",
+            port: 8000,
+            config: config
+        ))
+        XCTAssertFalse(IdentityWebView.Coordinator.acceptsIdentityOrigin(
+            scheme: "http",
+            host: "evil.localhost",
+            port: 8000,
+            config: config
+        ))
+    }
+
+    func testQueryRejectedResponseSurfacesRejectedError() async throws {
+        let api = makeStubbedAPI { request in
+            let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
+            let body = TaggrCBOR.encode(.map([
+                (.text("status"), .text("rejected")),
+                (.text("reject_message"), .text("denied")),
+            ]))
+            return (response, body)
+        }
+        do {
+            _ = try await api.query("stats", args: [], as: TaggrStats.self)
+            XCTFail("Expected rejected error.")
+        } catch TaggrAPIError.rejected(let message) {
+            XCTAssertEqual(message, "denied")
+        } catch {
+            XCTFail("Expected rejected error, got \(error).")
+        }
+    }
+
+    @MainActor
+    func testPersonalFeedUsesSignedQueryWhenAuthenticated() async throws {
+        var capturedBody: Data?
+        let api = makeStubbedAPI { request in
+            capturedBody = Self.requestBody(from: request)
+            let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
+            return (response, Self.queryReply(Data("[]".utf8)))
+        }
+        let privateKey = Curve25519.Signing.PrivateKey()
+        let state = TaggrAppState(api: api)
+        state.authSession = makeAuthSession(privateKey: privateKey)
+
+        await state.loadFeed(mode: .personal, reset: true)
+
+        guard let capturedBody,
+              case .map(let envelope)? = TaggrCBOR.decode(capturedBody) else {
+            return XCTFail("Signed personal feed query was not sent.")
+        }
+        XCTAssertNotNil(value(named: "sender_sig", in: envelope))
+        XCTAssertNil(state.errorMessage)
     }
 
     func testIdentityPayloadValidation() throws {
@@ -349,6 +446,70 @@ final class TaggrTests: XCTestCase {
 
     private func value(named name: String, in values: [(TaggrCBOR.Value, TaggrCBOR.Value)]) -> TaggrCBOR.Value? {
         values.first { $0.0 == .text(name) }?.1
+    }
+
+    private func makeStubbedAPI(_ handler: @escaping (URLRequest) throws -> (HTTPURLResponse, Data)) -> TaggrAPI {
+        TaggrURLProtocolStub.requestHandler = handler
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [TaggrURLProtocolStub.self]
+        let config = TaggrRuntimeConfig.from(info: [
+            "TAGGR_API_BASE_URL": "https://example.test",
+        ])
+        return TaggrAPI(session: URLSession(configuration: configuration), config: config)
+    }
+
+    private static func queryReply(_ arg: Data) -> Data {
+        TaggrCBOR.encode(.map([
+            (.text("status"), .text("replied")),
+            (.text("reply"), .map([(.text("arg"), .bytes(arg))])),
+        ]))
+    }
+
+    private static func requestBody(from request: URLRequest) -> Data? {
+        if let body = request.httpBody {
+            return body
+        }
+        guard let stream = request.httpBodyStream else {
+            return nil
+        }
+        stream.open()
+        defer { stream.close() }
+        var data = Data()
+        var buffer = [UInt8](repeating: 0, count: 4_096)
+        while stream.hasBytesAvailable {
+            let count = buffer.withUnsafeMutableBufferPointer {
+                stream.read($0.baseAddress!, maxLength: $0.count)
+            }
+            if count <= 0 { break }
+            data.append(buffer, count: count)
+        }
+        return data
+    }
+
+    private func samplePost(body: String, files: [String: [LosslessInt]]) -> TaggrPost {
+        TaggrPost(
+            id: 1,
+            parent: nil,
+            user: 1,
+            body: body,
+            effBody: nil,
+            realm: nil,
+            timestamp: LosslessInt(1),
+            reactions: [:],
+            children: [],
+            meta: TaggrPostMeta(authorName: "alice", realmColor: nil, nsfw: false, viewerBlocked: false),
+            watchers: [],
+            reposts: [],
+            files: files,
+            patches: [],
+            tips: [],
+            hashes: [],
+            extensionValue: nil,
+            treeSize: nil,
+            treeUpdate: nil,
+            encrypted: false,
+            hiddenFor: []
+        )
     }
 
     private func readStateResponse(tree: TaggrCBOR.Value) -> Data {
@@ -445,4 +606,33 @@ final class TaggrTests: XCTestCase {
             """#.utf8
         )
     }
+}
+
+private final class TaggrURLProtocolStub: URLProtocol {
+    static var requestHandler: ((URLRequest) throws -> (HTTPURLResponse, Data))?
+
+    override class func canInit(with request: URLRequest) -> Bool {
+        true
+    }
+
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest {
+        request
+    }
+
+    override func startLoading() {
+        guard let requestHandler = Self.requestHandler else {
+            client?.urlProtocol(self, didFailWithError: TaggrAPIError.invalidResponse("missing URLProtocol stub"))
+            return
+        }
+        do {
+            let (response, data) = try requestHandler(request)
+            client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+            client?.urlProtocol(self, didLoad: data)
+            client?.urlProtocolDidFinishLoading(self)
+        } catch {
+            client?.urlProtocol(self, didFailWithError: error)
+        }
+    }
+
+    override func stopLoading() {}
 }
