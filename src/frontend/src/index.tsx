@@ -57,6 +57,7 @@ import {
 } from "./delegation";
 import { LoginMasks } from "./authentication";
 import { maybePromptTopUp } from "./user_storage";
+import { NativeAuth } from "./native_auth";
 
 const { hash, pathname } = location;
 
@@ -67,7 +68,8 @@ if (!hash && pathname != "/") {
 const REFRESH_RATE_SECS = 10 * 60;
 
 const parseHash = (): string[] => {
-    const parts = window.location.hash.replace("#", "").split("/");
+    const pathHash = window.location.hash.split("?")[0] || "#/";
+    const parts = pathHash.replace("#", "").split("/");
     parts.shift();
     return parts.map(decodeURI);
 };
@@ -138,6 +140,9 @@ const App = () => {
 
     if (handler == "whitepaper") {
         content = <Whitepaper />;
+    } else if (handler == "native-auth") {
+        headerStyle = "hidden";
+        content = <NativeAuth />;
     } else if (handler == "settings") {
         content = auth(<Settings tab={param} />);
     } else if (handler == "sign-in") {

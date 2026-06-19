@@ -10,6 +10,13 @@
 
 # dfx temporary files
 .dfx/
+.icp/
+
+# local build outputs
+.build/
+
+# local iOS workspace
+ios/
 
 # rust
 target/

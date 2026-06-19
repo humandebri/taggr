@@ -93,6 +93,12 @@ pub fn load(domains: &HashMap<String, DomainConfig>) {
     );
 
     add_asset(
+        &["/.well-known/apple-app-site-association"],
+        vec![("Content-Type".into(), "application/json".into())],
+        include_bytes!("../../src/frontend/assets/.well-known/apple-app-site-association").to_vec(),
+    );
+
+    add_asset(
         &["/.well-known/ii-alternative-origins"],
         vec![("Content-Type".into(), "application/json".into())],
         format!(
@@ -194,4 +200,33 @@ fn certificate_header(path: &str) -> (String, String) {
             general_purpose::STANDARD.encode(serializer.into_inner())
         ),
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn serves_aasa_from_well_known_path() {
+        let domains = HashMap::from([("taggr.test".into(), DomainConfig::default())]);
+        load(&domains);
+
+        let (headers, body) =
+            asset("/.well-known/apple-app-site-association").expect("missing AASA");
+
+        assert!(headers
+            .iter()
+            .any(|(name, value)| name == "Content-Type" && value == "application/json"));
+        let aasa: serde_json::Value =
+            serde_json::from_slice(body.as_ref()).expect("AASA should be valid JSON");
+        assert_eq!(
+            aasa["applinks"]["details"][0]["appIDs"][0],
+            "AKN976G7AK.network.taggr.ios"
+        );
+        assert!(aasa["applinks"]["details"][0]["components"]
+            .as_array()
+            .expect("components should be an array")
+            .iter()
+            .any(|component| component["/"] == "/ios-auth-callback"));
+    }
 }
