@@ -1,15 +1,16 @@
-// src/frontend/src/native_auth.tsx
 // Hosts the iOS Internet Identity bridge inside the certified TAGGR frontend.
 // Native iOS opens this route in a system auth session and receives the result
-// through either the production Universal Link callback or the local URL scheme.
+// through the production Universal Link callback.
 import * as React from "react";
 import { ButtonWithLoading, getCanonicalDomain } from "./common";
+import { MAINNET_MODE } from "./env";
 import { Infinity } from "./icons";
 import {
     buildCallbackUrl,
     canonicalOrigin,
     messageKind,
     nativeAuthEnvironment,
+    nativeAuthRouteHash,
     normalizeAuthResponse,
     parseNativeAuthParams,
     textToBase64Url,
@@ -41,8 +42,10 @@ export const NativeAuth = () => {
     );
 
     React.useEffect(() => {
-        if (env.mainnetMode && window.location.origin != canonicalOrigin(env)) {
-            window.location.replace(`${canonicalOrigin(env)}/${env.hash}`);
+        if (MAINNET_MODE && window.location.origin != canonicalOrigin(env)) {
+            window.location.replace(
+                `${canonicalOrigin(env)}/${nativeAuthRouteHash(env)}`,
+            );
         }
     }, [env]);
 

@@ -1,17 +1,13 @@
-// src/frontend/src/native_auth_core.ts
 // Keeps native iOS Internet Identity URL validation and payload conversion
 // outside the React component so auth edge cases can be tested directly.
-import { II_URL, MAINNET_MODE } from "./env";
 
-export type NativeAuthEnvironment = {
-    mainnetMode: boolean;
-    iiUrl: string;
-    currentHostname: string;
+type NativeAuthEnvironment = {
     canonicalDomain: string;
     hash: string;
+    search: string;
 };
 
-export type NativeAuthParams = {
+type NativeAuthParams = {
     state: string;
     callback: string;
     identityProvider: string;
@@ -19,64 +15,35 @@ export type NativeAuthParams = {
     maxTimeToLive: bigint;
 };
 
-const localCallback = "taggr://identity-callback";
 const nativeMaxTimeToLive = "2592000000000000";
 const nativeMaxTimeToLiveNanos = BigInt(nativeMaxTimeToLive);
 const allowedMainnetIIQuery = "?feature_flag_guided_upgrade=true";
+const nativeIdentityProvider = `https://id.ai/${allowedMainnetIIQuery}`;
 
 export const nativeAuthEnvironment = (
     canonicalDomain: string,
 ): NativeAuthEnvironment => ({
-    mainnetMode: MAINNET_MODE,
-    iiUrl: II_URL,
-    currentHostname: window.location.hostname,
     canonicalDomain,
     hash: window.location.hash,
+    search: window.location.search,
 });
 
 export const canonicalOrigin = (env: NativeAuthEnvironment) =>
     `https://${env.canonicalDomain}`;
 
-export const productionCallback = (env: NativeAuthEnvironment) =>
+const productionCallback = (env: NativeAuthEnvironment) =>
     `${canonicalOrigin(env)}/ios-auth-callback`;
 
-export const isLocalHost = (hostname: string) =>
-    hostname == "localhost" ||
-    hostname == "127.0.0.1" ||
-    hostname.endsWith(".localhost");
-
-export const isNgrokHost = (hostname: string) =>
-    hostname.endsWith(".ngrok-free.app") ||
-    hostname.endsWith(".ngrok-free.dev") ||
-    hostname.endsWith(".ngrok.app");
-
-const isDevTunnelHost = (env: NativeAuthEnvironment) =>
-    !env.mainnetMode && isNgrokHost(env.currentHostname);
-
-export const isAllowedCallback = (
-    callback: string,
-    env: NativeAuthEnvironment,
-) =>
-    callback == productionCallback(env) ||
-    (!env.mainnetMode &&
-        (isLocalHost(env.currentHostname) || isDevTunnelHost(env)) &&
-        callback == localCallback);
-
-const sameIdentityProvider = (left: string, right: string) => {
-    try {
-        const leftURL = new URL(left);
-        const rightURL = new URL(right);
-        return (
-            leftURL.origin == rightURL.origin &&
-            leftURL.pathname == rightURL.pathname &&
-            leftURL.search == rightURL.search
-        );
-    } catch {
-        return false;
-    }
+export const nativeAuthRouteHash = (env: NativeAuthEnvironment) => {
+    const hash = env.hash || "#/native-auth";
+    if (hash.includes("?") || !env.search) return hash;
+    return `${hash}${env.search}`;
 };
 
-const isAllowedMainnetIdentityProvider = (value: string) => {
+const isAllowedCallback = (callback: string, env: NativeAuthEnvironment) =>
+    callback == productionCallback(env);
+
+export const isAllowedIdentityProvider = (value: string) => {
     try {
         const url = new URL(value);
         if (url.username || url.password) return false;
@@ -90,33 +57,14 @@ const isAllowedMainnetIdentityProvider = (value: string) => {
     }
 };
 
-export const isAllowedIdentityProvider = (
-    value: string,
-    env: NativeAuthEnvironment,
-) => {
-    if (env.mainnetMode) return isAllowedMainnetIdentityProvider(value);
-    if (sameIdentityProvider(value, env.iiUrl)) return true;
-    try {
-        const url = new URL(value);
-        if (url.username || url.password) return false;
-        if (url.protocol != "http:" && url.protocol != "https:") return false;
-        return (
-            (isLocalHost(env.currentHostname) && isLocalHost(url.hostname)) ||
-            (isDevTunnelHost(env) && url.hostname == env.currentHostname)
-        );
-    } catch {
-        return false;
-    }
-};
-
-export const base64UrlToBytes = (value: string) => {
+const base64UrlToBytes = (value: string) => {
     const base64 = value.replace(/-/g, "+").replace(/_/g, "/");
     const padded = base64 + "=".repeat((4 - (base64.length % 4)) % 4);
     const binary = globalThis.atob(padded);
     return Uint8Array.from(binary, (char) => char.charCodeAt(0));
 };
 
-export const bytesToBase64Url = (bytes: Uint8Array) =>
+const bytesToBase64Url = (bytes: Uint8Array) =>
     globalThis
         .btoa(String.fromCharCode(...bytes))
         .replace(/\+/g, "-")
@@ -176,17 +124,19 @@ export const parseNativeAuthParams = (
     env: NativeAuthEnvironment,
 ): NativeAuthParams => {
     const queryStart = env.hash.indexOf("?");
-    const query = queryStart >= 0 ? env.hash.slice(queryStart + 1) : "";
+    const hashQuery = queryStart >= 0 ? env.hash.slice(queryStart + 1) : "";
+    const query = hashQuery || env.search.replace(/^\?/, "");
     const params = new URLSearchParams(query);
     const state = params.get("state") || "";
     const callback = params.get("callback") || "";
     const encodedPublicKey = params.get("sessionPublicKey") || "";
     const maxTimeToLive = params.get("maxTimeToLive") || nativeMaxTimeToLive;
-    const identityProvider = params.get("identityProvider") || env.iiUrl;
+    const identityProvider =
+        params.get("identityProvider") || nativeIdentityProvider;
     if (!state) throw new Error("Missing state.");
     if (!isAllowedCallback(callback, env)) throw new Error("Invalid callback.");
     if (!encodedPublicKey) throw new Error("Missing session public key.");
-    if (!isAllowedIdentityProvider(identityProvider, env)) {
+    if (!isAllowedIdentityProvider(identityProvider)) {
         throw new Error("Invalid identity provider.");
     }
     return {

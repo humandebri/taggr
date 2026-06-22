@@ -1,0 +1,8 @@
+{
+    "extends": "./tsconfig.json",
+    "compilerOptions": {
+        "module": "commonjs",
+        "outDir": "./dist/frontend-test"
+    },
+    "include": ["src/frontend/src/native_auth_core.ts"]
+}

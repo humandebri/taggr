@@ -59,10 +59,11 @@ import { LoginMasks } from "./authentication";
 import { maybePromptTopUp } from "./user_storage";
 import { NativeAuth } from "./native_auth";
 
-const { hash, pathname } = location;
+const { hash, pathname, search } = location;
 
 if (!hash && pathname != "/") {
-    location.href = `#${pathname}`;
+    const query = pathname == "/native-auth" ? search : "";
+    location.replace(`/#${pathname}${query}`);
 }
 
 const REFRESH_RATE_SECS = 10 * 60;
