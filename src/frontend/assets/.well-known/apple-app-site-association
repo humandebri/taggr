@@ -1,46 +1,10 @@
 {
     "applinks": {
+        "apps": [],
         "details": [
             {
-                "appIDs": ["AKN976G7AK.network.taggr.ios"],
-                "components": [
-                    {
-                        "/": "/post/*",
-                        "comment": "Open TAGGR post routes in the iOS app."
-                    },
-                    {
-                        "/": "/user/*",
-                        "comment": "Open TAGGR user routes in the iOS app."
-                    },
-                    {
-                        "/": "/realm/*",
-                        "comment": "Open TAGGR realm routes in the iOS app."
-                    },
-                    {
-                        "/": "/ios-auth-callback",
-                        "comment": "Return Internet Identity authorization results to the iOS app."
-                    },
-                    {
-                        "/": "/transaction/*",
-                        "comment": "Open TAGGR transaction routes in the iOS app."
-                    },
-                    {
-                        "/": "/transactions",
-                        "comment": "Open the TAGGR transaction list in the iOS app."
-                    },
-                    {
-                        "/": "/transactions/*",
-                        "comment": "Open TAGGR transaction list subroutes in the iOS app."
-                    },
-                    {
-                        "/": "/tokens",
-                        "comment": "Open the TAGGR token route in the iOS app."
-                    },
-                    {
-                        "/": "/tokens/*",
-                        "comment": "Open TAGGR token subroutes in the iOS app."
-                    }
-                ]
+                "appID": "AKN976G7AK.network.taggr.ios",
+                "paths": ["/ios-auth-callback"]
             }
         ]
     }

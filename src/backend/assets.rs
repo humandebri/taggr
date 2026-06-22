@@ -219,14 +219,14 @@ mod tests {
             .any(|(name, value)| name == "Content-Type" && value == "application/json"));
         let aasa: serde_json::Value =
             serde_json::from_slice(body.as_ref()).expect("AASA should be valid JSON");
+        assert_eq!(aasa["applinks"]["apps"], serde_json::json!([]));
         assert_eq!(
-            aasa["applinks"]["details"][0]["appIDs"][0],
+            aasa["applinks"]["details"][0]["appID"],
             "AKN976G7AK.network.taggr.ios"
         );
-        assert!(aasa["applinks"]["details"][0]["components"]
-            .as_array()
-            .expect("components should be an array")
-            .iter()
-            .any(|component| component["/"] == "/ios-auth-callback"));
+        assert_eq!(
+            aasa["applinks"]["details"][0]["paths"],
+            serde_json::json!(["/ios-auth-callback"])
+        );
     }
 }

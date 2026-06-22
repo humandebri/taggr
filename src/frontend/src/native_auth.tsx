@@ -4,133 +4,30 @@
 // through either the production Universal Link callback or the local URL scheme.
 import * as React from "react";
 import { ButtonWithLoading, getCanonicalDomain } from "./common";
-import { II_URL, MAINNET_MODE } from "./env";
 import { Infinity } from "./icons";
+import {
+    buildCallbackUrl,
+    canonicalOrigin,
+    messageKind,
+    nativeAuthEnvironment,
+    normalizeAuthResponse,
+    parseNativeAuthParams,
+    textToBase64Url,
+} from "./native_auth_core";
 
-const localCallback = "taggr://identity-callback";
-const nativeMaxTimeToLive = "2592000000000000";
+const interruptionCheckIntervalMs = 500;
 
-const isLocalHost = () => {
-    const { hostname } = window.location;
-    return (
-        hostname == "localhost" ||
-        hostname == "127.0.0.1" ||
-        hostname.endsWith(".localhost")
-    );
-};
-
-const isNgrokHost = (hostname: string) =>
-    hostname.endsWith(".ngrok-free.app") ||
-    hostname.endsWith(".ngrok-free.dev") ||
-    hostname.endsWith(".ngrok.app");
-
-const isDevTunnelHost = () =>
-    !MAINNET_MODE && isNgrokHost(window.location.hostname);
-
-const productionCallback = () =>
-    `https://${getCanonicalDomain()}/ios-auth-callback`;
-
-const isAllowedCallback = (callback: string) =>
-    callback == productionCallback() ||
-    (!MAINNET_MODE &&
-        (isLocalHost() || isDevTunnelHost()) &&
-        callback == localCallback);
-
-const sameIdentityProvider = (left: string, right: string) => {
+const redirectToCallback = (
+    targetWindow: Window,
+    callbackURL: string,
+    statusCallback: (status: string) => void,
+) => {
     try {
-        const leftURL = new URL(left);
-        const rightURL = new URL(right);
-        return (
-            leftURL.origin == rightURL.origin &&
-            leftURL.pathname == rightURL.pathname &&
-            leftURL.search == rightURL.search
-        );
+        targetWindow.location.href = callbackURL;
     } catch {
-        return false;
+        window.location.href = callbackURL;
     }
-};
-
-const isAllowedIdentityProvider = (value: string) => {
-    if (sameIdentityProvider(value, II_URL)) return true;
-    if (MAINNET_MODE) return false;
-    try {
-        const url = new URL(value);
-        if (url.origin == "https://id.ai") return true;
-        return (
-            url.hostname == "localhost" ||
-            url.hostname == "127.0.0.1" ||
-            url.hostname.endsWith(".localhost") ||
-            (isDevTunnelHost() && isNgrokHost(url.hostname))
-        );
-    } catch {
-        return false;
-    }
-};
-
-const base64UrlToBytes = (value: string) => {
-    const base64 = value.replace(/-/g, "+").replace(/_/g, "/");
-    const padded = base64 + "=".repeat((4 - (base64.length % 4)) % 4);
-    const binary = window.atob(padded);
-    return Uint8Array.from(binary, (char) => char.charCodeAt(0));
-};
-
-const bytesToBase64Url = (bytes: Uint8Array) =>
-    window
-        .btoa(String.fromCharCode(...bytes))
-        .replace(/\+/g, "-")
-        .replace(/\//g, "_")
-        .replace(/=/g, "");
-
-const textToBase64Url = (value: string) =>
-    bytesToBase64Url(new TextEncoder().encode(value));
-
-const normalize = (value: unknown): unknown => {
-    if (typeof value == "bigint") return value.toString(10);
-    if (value instanceof Uint8Array) return Array.from(value);
-    if (value instanceof ArrayBuffer) return Array.from(new Uint8Array(value));
-    if (Array.isArray(value)) return value.map(normalize);
-    if (value && typeof value == "object") {
-        const toUint8Array = Reflect.get(value, "toUint8Array");
-        if (typeof toUint8Array == "function") {
-            return Array.from(toUint8Array.call(value));
-        }
-        return Object.fromEntries(
-            Object.entries(value).map(([key, nested]) => [
-                key,
-                normalize(nested),
-            ]),
-        );
-    }
-    return value;
-};
-
-const messageKind = (value: unknown) => {
-    if (!value || typeof value != "object") return "";
-    const kind = Reflect.get(value, "kind");
-    return typeof kind == "string" ? kind : "";
-};
-
-const parseNativeAuthParams = () => {
-    const query = window.location.hash.split("?")[1] || "";
-    const params = new URLSearchParams(query);
-    const state = params.get("state") || "";
-    const callback = params.get("callback") || "";
-    const encodedPublicKey = params.get("sessionPublicKey") || "";
-    const maxTimeToLive = params.get("maxTimeToLive") || nativeMaxTimeToLive;
-    const identityProvider = params.get("identityProvider") || II_URL;
-    if (!state) throw new Error("Missing state.");
-    if (!isAllowedCallback(callback)) throw new Error("Invalid callback.");
-    if (!encodedPublicKey) throw new Error("Missing session public key.");
-    if (!isAllowedIdentityProvider(identityProvider)) {
-        throw new Error("Invalid identity provider.");
-    }
-    return {
-        state,
-        callback,
-        identityProvider,
-        sessionPublicKey: base64UrlToBytes(encodedPublicKey),
-        maxTimeToLive: BigInt(maxTimeToLive),
-    };
+    statusCallback("Returning to TAGGR for iOS...");
 };
 
 export const NativeAuth = () => {
@@ -138,43 +35,80 @@ export const NativeAuth = () => {
     const [status, setStatus] = React.useState(
         "Continue in Internet Identity.",
     );
+    const env = React.useMemo(
+        () => nativeAuthEnvironment(getCanonicalDomain()),
+        [],
+    );
+
+    React.useEffect(() => {
+        if (env.mainnetMode && window.location.origin != canonicalOrigin(env)) {
+            window.location.replace(`${canonicalOrigin(env)}/${env.hash}`);
+        }
+    }, [env]);
+
+    React.useEffect(() => () => cleanupRef.current(), []);
+
     const parsed = React.useMemo(() => {
         try {
-            return { value: parseNativeAuthParams(), error: "" };
+            return { value: parseNativeAuthParams(env), error: "" };
         } catch (error) {
             return {
                 value: null,
                 error: error instanceof Error ? error.message : String(error),
             };
         }
-    }, []);
+    }, [env]);
 
     const start = async () => {
         if (!parsed.value) return;
         cleanupRef.current();
         setStatus("Waiting for Internet Identity...");
+
         const identityURL = new URL(parsed.value.identityProvider);
         identityURL.hash = "#authorize";
         const identityOrigin = identityURL.origin;
-        const idpWindow = window.open(identityURL.toString(), "taggrIdentity");
-        if (!idpWindow) {
-            setStatus("Internet Identity could not open.");
-            return;
-        }
+        let idpWindow: Window | null = null;
+        let interruptionTimer = 0;
+        let finished = false;
 
         const cleanup = () => {
             window.removeEventListener("message", handleMessage);
+            if (interruptionTimer) window.clearTimeout(interruptionTimer);
+            cleanupRef.current = () => {};
         };
-        cleanupRef.current = cleanup;
 
         const finish = (kind: "result" | "error", payload: string) => {
+            if (finished) return;
+            finished = true;
             cleanup();
-            const callbackURL = `${parsed.value.callback}?state=${encodeURIComponent(parsed.value.state)}&${kind}=${payload}`;
-            idpWindow.location.href = callbackURL;
+            const callbackURL = buildCallbackUrl(
+                parsed.value.callback,
+                parsed.value.state,
+                kind,
+                payload,
+            );
+            redirectToCallback(idpWindow || window, callbackURL, setStatus);
+        };
+
+        const fail = (message: string) => {
+            finish("error", textToBase64Url(message));
+        };
+
+        const checkInterruption = () => {
+            if (!idpWindow || finished) return;
+            if (idpWindow.closed) {
+                fail("Internet Identity authorization was interrupted.");
+                return;
+            }
+            interruptionTimer = window.setTimeout(
+                checkInterruption,
+                interruptionCheckIntervalMs,
+            );
         };
 
         const handleMessage = (event: MessageEvent<unknown>) => {
             if (event.origin != identityOrigin) return;
+            if (!idpWindow || event.source != idpWindow) return;
             const kind = messageKind(event.data);
             if (kind == "authorize-ready") {
                 idpWindow.postMessage(
@@ -182,6 +116,7 @@ export const NativeAuth = () => {
                         kind: "authorize-client",
                         sessionPublicKey: parsed.value.sessionPublicKey,
                         maxTimeToLive: parsed.value.maxTimeToLive,
+                        derivationOrigin: canonicalOrigin(env),
                     },
                     identityOrigin,
                 );
@@ -190,7 +125,9 @@ export const NativeAuth = () => {
             if (kind == "authorize-client-success") {
                 finish(
                     "result",
-                    textToBase64Url(JSON.stringify(normalize(event.data))),
+                    textToBase64Url(
+                        JSON.stringify(normalizeAuthResponse(event.data)),
+                    ),
                 );
                 return;
             }
@@ -199,18 +136,22 @@ export const NativeAuth = () => {
                     event.data && typeof event.data == "object"
                         ? Reflect.get(event.data, "text")
                         : "";
-                finish(
-                    "error",
-                    textToBase64Url(
-                        typeof text == "string"
-                            ? text
-                            : "Internet Identity authorization failed.",
-                    ),
+                fail(
+                    typeof text == "string"
+                        ? text
+                        : "Internet Identity authorization failed.",
                 );
             }
         };
 
         window.addEventListener("message", handleMessage);
+        cleanupRef.current = cleanup;
+        idpWindow = window.open(identityURL.toString(), "taggrIdentity");
+        if (!idpWindow) {
+            fail("Internet Identity could not open.");
+            return;
+        }
+        checkInterruption();
     };
 
     return (
