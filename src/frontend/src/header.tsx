@@ -243,7 +243,10 @@ const UserSection = ({ user }: { user: UserType }) => {
                     title="SIGN OUT"
                     className="icon_link"
                     href=""
-                    onClick={signOut}
+                    onClick={(event) => {
+                        event.preventDefault();
+                        void signOut();
+                    }}
                 >
                     <Logout /> SIGN OUT
                 </a>
