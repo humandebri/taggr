@@ -10,15 +10,6 @@
 
 # dfx temporary files
 .dfx/
-.icp/
-
-# local build outputs
-.build/
-
-ios/DerivedData/
-ios/**/build/
-ios/**/xcuserdata/
-ios/**/*.xcuserstate
 
 # rust
 target/
