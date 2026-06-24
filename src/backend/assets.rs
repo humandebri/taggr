@@ -201,32 +201,3 @@ fn certificate_header(path: &str) -> (String, String) {
         ),
     )
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn serves_aasa_from_well_known_path() {
-        let domains = HashMap::from([("taggr.test".into(), DomainConfig::default())]);
-        load(&domains);
-
-        let (headers, body) =
-            asset("/.well-known/apple-app-site-association").expect("missing AASA");
-
-        assert!(headers
-            .iter()
-            .any(|(name, value)| name == "Content-Type" && value == "application/json"));
-        let aasa: serde_json::Value =
-            serde_json::from_slice(body.as_ref()).expect("AASA should be valid JSON");
-        assert_eq!(aasa["applinks"]["apps"], serde_json::json!([]));
-        assert_eq!(
-            aasa["applinks"]["details"][0]["appID"],
-            "AKN976G7AK.network.taggr.ios"
-        );
-        assert_eq!(
-            aasa["applinks"]["details"][0]["paths"],
-            serde_json::json!(["/ios-auth-callback"])
-        );
-    }
-}

@@ -4,7 +4,7 @@
         "details": [
             {
                 "appID": "AKN976G7AK.network.taggr.ios",
-                "paths": ["/ios-auth-callback"]
+                "paths": ["/*"]
             }
         ]
     }
