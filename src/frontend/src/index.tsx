@@ -61,16 +61,26 @@ import { NativeAuth } from "./native_auth";
 
 const { hash, pathname, search } = location;
 
-if (!hash && pathname != "/") {
-    const query = pathname == "/native-auth" ? search : "";
-    location.replace(`/#${pathname}${query}`);
+if (!hash && pathname == "/native-auth") {
+    location.replace(`/#${pathname}${search}`);
+}
+
+if (!hash && pathname != "/" && pathname != "/native-auth") {
+    location.href = `#${pathname}`;
 }
 
 const REFRESH_RATE_SECS = 10 * 60;
 
+const nativeAuthRouteHash = (hash: string) => {
+    if (!hash.startsWith("#/native-auth?")) return hash;
+    const queryStart = hash.indexOf("?");
+    return hash.slice(0, queryStart);
+};
+
 const parseHash = (): string[] => {
-    const pathHash = window.location.hash.split("?")[0] || "#/";
-    const parts = pathHash.replace("#", "").split("/");
+    const parts = nativeAuthRouteHash(window.location.hash)
+        .replace("#", "")
+        .split("/");
     parts.shift();
     return parts.map(decodeURI);
 };

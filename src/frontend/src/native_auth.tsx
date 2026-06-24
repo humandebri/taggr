@@ -64,10 +64,11 @@ export const NativeAuth = () => {
 
     const start = async () => {
         if (!parsed.value) return;
+        const params = parsed.value;
         cleanupRef.current();
         setStatus("Waiting for Internet Identity...");
 
-        const identityURL = new URL(parsed.value.identityProvider);
+        const identityURL = new URL(params.identityProvider);
         identityURL.hash = "#authorize";
         const identityOrigin = identityURL.origin;
         let idpWindow: Window | null = null;
@@ -85,8 +86,8 @@ export const NativeAuth = () => {
             finished = true;
             cleanup();
             const callbackURL = buildCallbackUrl(
-                parsed.value.callback,
-                parsed.value.state,
+                params.callback,
+                params.state,
                 kind,
                 payload,
             );
@@ -117,8 +118,8 @@ export const NativeAuth = () => {
                 idpWindow.postMessage(
                     {
                         kind: "authorize-client",
-                        sessionPublicKey: parsed.value.sessionPublicKey,
-                        maxTimeToLive: parsed.value.maxTimeToLive,
+                        sessionPublicKey: params.sessionPublicKey,
+                        maxTimeToLive: params.maxTimeToLive,
                         derivationOrigin: canonicalOrigin(env),
                     },
                     identityOrigin,

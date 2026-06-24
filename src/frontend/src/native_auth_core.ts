@@ -17,7 +17,8 @@ type NativeAuthParams = {
 
 const nativeMaxTimeToLive = "2592000000000000";
 const nativeMaxTimeToLiveNanos = BigInt(nativeMaxTimeToLive);
-const nativeIdentityProvider = "https://id.ai/";
+const nativeIdentityProvider =
+    "https://id.ai/?feature_flag_guided_upgrade=true";
 
 export const nativeAuthEnvironment = (
     canonicalDomain: string,
@@ -32,6 +33,14 @@ export const canonicalOrigin = (env: NativeAuthEnvironment) =>
 
 const productionCallback = (env: NativeAuthEnvironment) =>
     `${canonicalOrigin(env)}/ios-auth-callback`;
+
+const hashQuery = (hash: string) => {
+    const queryStart = hash.indexOf("?");
+    return queryStart >= 0 ? hash.slice(queryStart + 1) : "";
+};
+
+const searchQuery = (search: string) =>
+    search.startsWith("?") ? search.slice(1) : search;
 
 export const nativeAuthRouteHash = (env: NativeAuthEnvironment) => {
     const hash = env.hash || "#/native-auth";
@@ -49,7 +58,7 @@ export const isAllowedIdentityProvider = (value: string) => {
         return (
             url.origin == "https://id.ai" &&
             url.pathname == "/" &&
-            url.search == ""
+            url.search == "?feature_flag_guided_upgrade=true"
         );
     } catch {
         return false;
@@ -122,9 +131,7 @@ const parseMaxTimeToLive = (value: string) => {
 export const parseNativeAuthParams = (
     env: NativeAuthEnvironment,
 ): NativeAuthParams => {
-    const queryStart = env.hash.indexOf("?");
-    const hashQuery = queryStart >= 0 ? env.hash.slice(queryStart + 1) : "";
-    const query = hashQuery || env.search.replace(/^\?/, "");
+    const query = hashQuery(env.hash) || searchQuery(env.search);
     const params = new URLSearchParams(query);
     const state = params.get("state") || "";
     const callback = params.get("callback") || "";
