@@ -17,8 +17,7 @@ type NativeAuthParams = {
 
 const nativeMaxTimeToLive = "2592000000000000";
 const nativeMaxTimeToLiveNanos = BigInt(nativeMaxTimeToLive);
-const allowedMainnetIIQuery = "?feature_flag_guided_upgrade=true";
-const nativeIdentityProvider = `https://id.ai/${allowedMainnetIIQuery}`;
+const nativeIdentityProvider = "https://id.ai/";
 
 export const nativeAuthEnvironment = (
     canonicalDomain: string,
@@ -50,7 +49,7 @@ export const isAllowedIdentityProvider = (value: string) => {
         return (
             url.origin == "https://id.ai" &&
             url.pathname == "/" &&
-            (url.search == "" || url.search == allowedMainnetIIQuery)
+            url.search == ""
         );
     } catch {
         return false;
