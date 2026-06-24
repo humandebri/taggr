@@ -19,15 +19,10 @@ import {
 const interruptionCheckIntervalMs = 500;
 
 const redirectToCallback = (
-    targetWindow: Window,
     callbackURL: string,
     statusCallback: (status: string) => void,
 ) => {
-    try {
-        targetWindow.location.href = callbackURL;
-    } catch {
-        window.location.href = callbackURL;
-    }
+    window.location.href = callbackURL;
     statusCallback("Returning to TAGGR for iOS...");
 };
 
@@ -91,7 +86,7 @@ export const NativeAuth = () => {
                 kind,
                 payload,
             );
-            redirectToCallback(idpWindow || window, callbackURL, setStatus);
+            redirectToCallback(callbackURL, setStatus);
         };
 
         const fail = (message: string) => {

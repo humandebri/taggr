@@ -13,6 +13,14 @@ const sourcePath = path.join(
     "src",
     "native_auth_core.ts",
 );
+const aasaPath = path.join(
+    root,
+    "src",
+    "frontend",
+    "assets",
+    ".well-known",
+    "apple-app-site-association",
+);
 const tsSource = fs.readFileSync(sourcePath, "utf8");
 const output = ts.transpileModule(tsSource, {
     compilerOptions: {
@@ -141,5 +149,9 @@ assert.equal(
     buildCallbackUrl(callback, "state 1", "error", "ZGVuaWVk"),
     `${callback}?state=state%201&error=ZGVuaWVk`,
 );
+
+const aasa = JSON.parse(fs.readFileSync(aasaPath, "utf8"));
+assert.equal(aasa.applinks.details[0].appID, "AKN976G7AK.network.taggr.ios");
+assert.deepEqual(aasa.applinks.details[0].paths, ["/*"]);
 
 console.log("native auth core tests passed");
