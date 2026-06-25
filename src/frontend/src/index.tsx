@@ -57,17 +57,30 @@ import {
 } from "./delegation";
 import { LoginMasks } from "./authentication";
 import { maybePromptTopUp } from "./user_storage";
+import { NativeAuth } from "./native_auth";
 
-const { hash, pathname } = location;
+const { hash, pathname, search } = location;
 
-if (!hash && pathname != "/") {
+if (!hash && pathname == "/native-auth") {
+    location.replace(`/#${pathname}${search}`);
+}
+
+if (!hash && pathname != "/" && pathname != "/native-auth") {
     location.href = `#${pathname}`;
 }
 
 const REFRESH_RATE_SECS = 10 * 60;
 
+const nativeAuthRouteHash = (hash: string) => {
+    if (!hash.startsWith("#/native-auth?")) return hash;
+    const queryStart = hash.indexOf("?");
+    return hash.slice(0, queryStart);
+};
+
 const parseHash = (): string[] => {
-    const parts = window.location.hash.replace("#", "").split("/");
+    const parts = nativeAuthRouteHash(window.location.hash)
+        .replace("#", "")
+        .split("/");
     parts.shift();
     return parts.map(decodeURI);
 };
@@ -138,6 +151,9 @@ const App = () => {
 
     if (handler == "whitepaper") {
         content = <Whitepaper />;
+    } else if (handler == "native-auth") {
+        headerStyle = "hidden";
+        content = <NativeAuth />;
     } else if (handler == "settings") {
         content = auth(<Settings tab={param} />);
     } else if (handler == "sign-in") {

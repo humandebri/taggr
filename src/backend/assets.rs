@@ -93,6 +93,12 @@ pub fn load(domains: &HashMap<String, DomainConfig>) {
     );
 
     add_asset(
+        &["/.well-known/apple-app-site-association"],
+        vec![("Content-Type".into(), "application/json".into())],
+        include_bytes!("../../src/frontend/assets/.well-known/apple-app-site-association").to_vec(),
+    );
+
+    add_asset(
         &["/.well-known/ii-alternative-origins"],
         vec![("Content-Type".into(), "application/json".into())],
         format!(

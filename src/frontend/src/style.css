@@ -924,6 +924,42 @@ a.accent,
     color: $accent;
 }
 
+.native_auth_bridge {
+    min-height: calc(100vh - 6em);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2em 1em;
+}
+
+.native_auth_content {
+    max-width: 28rem;
+    gap: 1em;
+    align-items: center;
+}
+
+.native_auth_title {
+    margin: 0;
+}
+
+.native_auth_title svg {
+    margin-right: 0.35em;
+    vertical-align: text-bottom;
+}
+
+.native_auth_title path {
+    fill: currentColor;
+}
+
+.native_auth_status {
+    margin: 0;
+    max-width: 22rem;
+}
+
+.native_auth_action {
+    min-width: 10rem;
+}
+
 .vertically_spaced {
     margin-top: 2em;
     margin-bottom: 2em;
