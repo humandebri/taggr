@@ -31,29 +31,6 @@ export const nativeAuthEnvironment = (
     search: window.location.search,
 });
 
-export const canonicalOrigin = (env: NativeAuthEnvironment) =>
-    env.canonicalOrigin;
-
-const productionCallback = (env: NativeAuthEnvironment) =>
-    `${canonicalOrigin(env)}/ios-auth-callback`;
-
-const hashQuery = (hash: string) => {
-    const queryStart = hash.indexOf("?");
-    return queryStart >= 0 ? hash.slice(queryStart + 1) : "";
-};
-
-const searchQuery = (search: string) =>
-    search.startsWith("?") ? search.slice(1) : search;
-
-export const nativeAuthRouteHash = (env: NativeAuthEnvironment) => {
-    const hash = env.hash || "#/native-auth";
-    if (hash.includes("?") || !env.search) return hash;
-    return `${hash}${env.search}`;
-};
-
-const isAllowedCallback = (callback: string, env: NativeAuthEnvironment) =>
-    callback == productionCallback(env);
-
 export const isAllowedIdentityProvider = (value: string) => {
     try {
         const url = new URL(value);
@@ -75,25 +52,25 @@ const base64UrlToBytes = (value: string) => {
     return Uint8Array.from(binary, (char) => char.charCodeAt(0));
 };
 
-const bytesToBase64Url = (bytes: Uint8Array) =>
+export const textToBase64Url = (value: string) =>
     globalThis
-        .btoa(String.fromCharCode(...bytes))
+        .btoa(String.fromCharCode(...new TextEncoder().encode(value)))
         .replace(/\+/g, "-")
         .replace(/\//g, "_")
         .replace(/=/g, "");
 
-export const textToBase64Url = (value: string) =>
-    bytesToBase64Url(new TextEncoder().encode(value));
+const bytesToHex = (bytes: Uint8Array) =>
+    Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
 
 export const normalizeAuthResponse = (value: unknown): unknown => {
     if (typeof value == "bigint") return value.toString(10);
-    if (value instanceof Uint8Array) return Array.from(value);
-    if (value instanceof ArrayBuffer) return Array.from(new Uint8Array(value));
+    if (value instanceof Uint8Array) return bytesToHex(value);
+    if (value instanceof ArrayBuffer) return bytesToHex(new Uint8Array(value));
     if (Array.isArray(value)) return value.map(normalizeAuthResponse);
     if (value && typeof value == "object") {
         const toUint8Array = Reflect.get(value, "toUint8Array");
         if (typeof toUint8Array == "function") {
-            return Array.from(toUint8Array.call(value));
+            return bytesToHex(toUint8Array.call(value));
         }
         return Object.fromEntries(
             Object.entries(value).map(([key, nested]) => [
@@ -134,7 +111,8 @@ const parseMaxTimeToLive = (value: string) => {
 export const parseNativeAuthParams = (
     env: NativeAuthEnvironment,
 ): NativeAuthParams => {
-    const query = hashQuery(env.hash) || searchQuery(env.search);
+    const queryStart = env.hash.indexOf("?");
+    const query = queryStart >= 0 ? env.hash.slice(queryStart + 1) : "";
     const params = new URLSearchParams(query);
     const state = params.get("state") || "";
     const callback = params.get("callback") || "";
@@ -143,7 +121,9 @@ export const parseNativeAuthParams = (
     const identityProvider =
         params.get("identityProvider") || nativeIdentityProvider;
     if (!state) throw new Error("Missing state.");
-    if (!isAllowedCallback(callback, env)) throw new Error("Invalid callback.");
+    if (callback != `${env.canonicalOrigin}/ios-auth-callback`) {
+        throw new Error("Invalid callback.");
+    }
     if (!encodedPublicKey) throw new Error("Missing session public key.");
     if (!isAllowedIdentityProvider(identityProvider)) {
         throw new Error("Invalid identity provider.");

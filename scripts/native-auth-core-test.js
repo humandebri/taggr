@@ -93,17 +93,6 @@ for (const value of [
     assert.throws(() => parse(value), /Invalid max time to live/);
 }
 
-const searchParams = validParams(null);
-assert.equal(
-    parseNativeAuthParams({
-        canonicalDomain,
-        canonicalOrigin: `https://${canonicalDomain}`,
-        hash: "#/native-auth",
-        search: `?${searchParams.toString()}`,
-    }).state,
-    "state-1",
-);
-
 assert.equal(isAllowedIdentityProvider(identityProvider), true);
 assert.equal(isAllowedIdentityProvider("https://id.ai/"), false);
 assert.equal(
@@ -127,14 +116,14 @@ assert.throws(
 );
 
 const bytes = new Uint8Array([1, 2, 3]);
-assert.deepEqual(normalizeAuthResponse(bytes), [1, 2, 3]);
+assert.deepEqual(normalizeAuthResponse(bytes), "010203");
 assert.deepEqual(normalizeAuthResponse({ signature: bytes }), {
-    signature: [1, 2, 3],
+    signature: "010203",
 });
 const buffer = new Uint8Array([4, 5, 6]).buffer;
-assert.deepEqual(normalizeAuthResponse(buffer), [4, 5, 6]);
+assert.deepEqual(normalizeAuthResponse(buffer), "040506");
 assert.deepEqual(normalizeAuthResponse({ userPublicKey: buffer }), {
-    userPublicKey: [4, 5, 6],
+    userPublicKey: "040506",
 });
 
 assert.equal(messageKind({ kind: "authorize-ready" }), "authorize-ready");

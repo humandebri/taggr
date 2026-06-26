@@ -6,7 +6,6 @@ import { ButtonWithLoading } from "./common";
 import { Infinity } from "./icons";
 import {
     buildCallbackUrl,
-    canonicalOrigin,
     messageKind,
     nativeAuthEnvironment,
     normalizeAuthResponse,
@@ -16,22 +15,11 @@ import {
 
 const interruptionCheckIntervalMs = 500;
 
-const nativeAuthCanonicalDomain = () => window.location.host;
-
-const nativeAuthCanonicalOrigin = () => window.location.origin;
-
-const redirectToCallback = (callbackURL: string) => {
-    window.location.href = callbackURL;
-};
-
 export const NativeAuth = () => {
     const cleanupRef = React.useRef<() => void>(() => {});
     const env = React.useMemo(
         () =>
-            nativeAuthEnvironment(
-                nativeAuthCanonicalDomain(),
-                nativeAuthCanonicalOrigin(),
-            ),
+            nativeAuthEnvironment(window.location.host, window.location.origin),
         [],
     );
 
@@ -66,27 +54,26 @@ export const NativeAuth = () => {
             cleanupRef.current = () => {};
         };
 
-        const finish = (kind: "result" | "error", payload: string) => {
-            if (finished) return;
+        const finishInIdentityWindow = (
+            kind: "result" | "error",
+            payload: string,
+        ) => {
+            if (finished || !idpWindow || idpWindow.closed) return;
             finished = true;
             cleanup();
-            const callbackURL = buildCallbackUrl(
+            idpWindow.location.href = buildCallbackUrl(
                 params.callback,
                 params.state,
                 kind,
                 payload,
             );
-            redirectToCallback(callbackURL);
-        };
-
-        const fail = (message: string) => {
-            finish("error", textToBase64Url(message));
         };
 
         const checkInterruption = () => {
             if (!idpWindow || finished) return;
             if (idpWindow.closed) {
-                fail("Sign-in was interrupted.");
+                finished = true;
+                cleanup();
                 return;
             }
             interruptionTimer = window.setTimeout(
@@ -105,14 +92,14 @@ export const NativeAuth = () => {
                         kind: "authorize-client",
                         sessionPublicKey: params.sessionPublicKey,
                         maxTimeToLive: params.maxTimeToLive,
-                        derivationOrigin: canonicalOrigin(env),
+                        derivationOrigin: env.canonicalOrigin,
                     },
                     identityOrigin,
                 );
                 return;
             }
             if (kind == "authorize-client-success") {
-                finish(
+                finishInIdentityWindow(
                     "result",
                     textToBase64Url(
                         JSON.stringify(normalizeAuthResponse(event.data)),
@@ -125,7 +112,12 @@ export const NativeAuth = () => {
                     event.data && typeof event.data == "object"
                         ? Reflect.get(event.data, "text")
                         : "";
-                fail(typeof text == "string" ? text : "Sign-in failed.");
+                finishInIdentityWindow(
+                    "error",
+                    textToBase64Url(
+                        typeof text == "string" ? text : "Sign-in failed.",
+                    ),
+                );
             }
         };
 
@@ -133,30 +125,39 @@ export const NativeAuth = () => {
         cleanupRef.current = cleanup;
         idpWindow = window.open(identityURL.toString(), "taggrIdentity");
         if (!idpWindow) {
-            fail("Sign-in window could not open.");
+            finished = true;
+            cleanup();
+            window.location.href = buildCallbackUrl(
+                params.callback,
+                params.state,
+                "error",
+                textToBase64Url("Sign-in window could not open."),
+            );
             return;
         }
         checkInterruption();
     };
 
     return (
-        <div className="native_auth_bridge text_centered">
-            <div className="native_auth_content column_container">
-                <h1 className="native_auth_title">
-                    <Infinity /> Internet Identity
-                </h1>
-                <p
-                    className="native_auth_status small_text"
-                    style={parsed.error ? { color: "red" } : undefined}
-                >
-                    {parsed.error || "Sign in to TAGGR for iOS."}
+        <div className="vertically_spaced column_container">
+            <div className="text_centered">
+                <h1>Sign-in</h1>
+                <p className={parsed.error ? "small_text banner" : undefined}>
+                    {parsed.error || "Continue with Internet Identity."}
                 </p>
-                <ButtonWithLoading
-                    classNameArg="active native_auth_action"
-                    disabled={!parsed.value}
-                    label="Continue"
-                    onClick={start}
-                />
+                <div className="left_spaced right_spaced bottom_spaced">
+                    <ButtonWithLoading
+                        classNameArg="active"
+                        disabled={!parsed.value}
+                        label={
+                            <>
+                                <Infinity /> Internet Identity
+                            </>
+                        }
+                        onClick={start}
+                        styleArg={{ width: "100%" }}
+                    />
+                </div>
             </div>
         </div>
     );
