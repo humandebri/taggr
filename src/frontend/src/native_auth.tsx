@@ -3,10 +3,12 @@
 // through the production Universal Link callback.
 import * as React from "react";
 import { ButtonWithLoading } from "./common";
-import { Infinity } from "./icons";
+import { AppleLogo, GoogleLogo, Infinity } from "./icons";
 import {
     buildCallbackUrl,
+    buildIdentityUrl,
     messageKind,
+    NativeLoginMethod,
     nativeAuthEnvironment,
     normalizeAuthResponse,
     parseNativeAuthParams,
@@ -36,13 +38,12 @@ export const NativeAuth = () => {
         }
     }, [env]);
 
-    const start = async () => {
+    const start = async (method: NativeLoginMethod) => {
         if (!parsed.value) return;
         const params = parsed.value;
         cleanupRef.current();
 
-        const identityURL = new URL(params.identityProvider);
-        identityURL.hash = "#authorize";
+        const identityURL = buildIdentityUrl(params.identityProvider, method);
         const identityOrigin = identityURL.origin;
         let idpWindow: Window | null = null;
         let interruptionTimer = 0;
@@ -151,10 +152,41 @@ export const NativeAuth = () => {
                         disabled={!parsed.value}
                         label={
                             <>
-                                <Infinity /> Internet Identity
+                                <span className="native_auth_provider_icon">
+                                    <Infinity />
+                                </span>
+                                Continue with Passkey
                             </>
                         }
-                        onClick={start}
+                        onClick={() => start("passkey")}
+                        styleArg={{ width: "100%" }}
+                    />
+                    <ButtonWithLoading
+                        classNameArg="active top_spaced"
+                        disabled={!parsed.value}
+                        label={
+                            <>
+                                <span className="native_auth_provider_icon">
+                                    <AppleLogo />
+                                </span>
+                                Continue with Apple
+                            </>
+                        }
+                        onClick={() => start("apple")}
+                        styleArg={{ width: "100%" }}
+                    />
+                    <ButtonWithLoading
+                        classNameArg="active top_spaced"
+                        disabled={!parsed.value}
+                        label={
+                            <>
+                                <span className="native_auth_provider_icon">
+                                    <GoogleLogo />
+                                </span>
+                                Continue with Google
+                            </>
+                        }
+                        onClick={() => start("google")}
                         styleArg={{ width: "100%" }}
                     />
                 </div>

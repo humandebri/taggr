@@ -36,6 +36,7 @@ vm.runInNewContext(output, sandbox, { filename: sourcePath });
 
 const {
     buildCallbackUrl,
+    buildIdentityUrl,
     isAllowedIdentityProvider,
     messageKind,
     normalizeAuthResponse,
@@ -95,6 +96,26 @@ for (const value of [
 
 assert.equal(isAllowedIdentityProvider(identityProvider), true);
 assert.equal(isAllowedIdentityProvider("https://id.ai/"), false);
+assert.equal(
+    buildIdentityUrl(identityProvider, "passkey").toString(),
+    "https://id.ai/?feature_flag_guided_upgrade=true#authorize",
+);
+assert.equal(
+    buildIdentityUrl(identityProvider, "apple").toString(),
+    "https://id.ai/authorize?openid=https://appleid.apple.com",
+);
+assert.equal(
+    buildIdentityUrl(identityProvider, "google").toString(),
+    "https://id.ai/authorize?openid=https://accounts.google.com",
+);
+assert.throws(
+    () =>
+        buildIdentityUrl(
+            "https://id.ai/?feature_flag_guided_upgrade=true&openid=https://evil.example",
+            "apple",
+        ),
+    /Invalid identity provider/,
+);
 assert.equal(
     isAllowedIdentityProvider(
         "https://user:pass@id.ai/?feature_flag_guided_upgrade=true",

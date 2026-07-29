@@ -16,10 +16,16 @@ type NativeAuthParams = {
     maxTimeToLive: bigint;
 };
 
+export type NativeLoginMethod = "passkey" | "apple" | "google";
+
 const nativeMaxTimeToLive = "2592000000000000";
 const nativeMaxTimeToLiveNanos = BigInt(nativeMaxTimeToLive);
 const nativeIdentityProvider =
     "https://id.ai/?feature_flag_guided_upgrade=true";
+const nativeAppleIdentityProvider =
+    "https://id.ai/authorize?openid=https://appleid.apple.com";
+const nativeGoogleIdentityProvider =
+    "https://id.ai/authorize?openid=https://accounts.google.com";
 
 export const nativeAuthEnvironment = (
     canonicalDomain: string,
@@ -43,6 +49,22 @@ export const isAllowedIdentityProvider = (value: string) => {
     } catch {
         return false;
     }
+};
+
+export const buildIdentityUrl = (
+    identityProvider: string,
+    method: NativeLoginMethod,
+) => {
+    if (!isAllowedIdentityProvider(identityProvider)) {
+        throw new Error("Invalid identity provider.");
+    }
+    if (method == "apple") return new URL(nativeAppleIdentityProvider);
+    if (method == "google") return new URL(nativeGoogleIdentityProvider);
+    if (method != "passkey") throw new Error("Invalid login method.");
+
+    const identityURL = new URL(identityProvider);
+    identityURL.hash = "#authorize";
+    return identityURL;
 };
 
 const base64UrlToBytes = (value: string) => {
