@@ -1,0 +1,292 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		010001000000000000000001 /* TAGGRApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 010000000000000000000001 /* TAGGRApp.swift */; };
+		010001000000000000000002 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 010000000000000000000002 /* AppState.swift */; };
+		010001000000000000000035 /* AppStores.swift in Sources */ = {isa = PBXBuildFile; fileRef = 010000000000000000000035 /* AppStores.swift */; };
+		010001000000000000000036 /* AppActions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 010000000000000000000036 /* AppActions.swift */; };
+		010001000000000000000034 /* PostDraftStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 010000000000000000000034 /* PostDraftStore.swift */; };
+		01000100000000000000001A /* TaggrRuntimeConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01000000000000000000001A /* TaggrRuntimeConfig.swift */; };
+		010001000000000000000003 /* TaggrModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 010000000000000000000003 /* TaggrModels.swift */; };
+		010001000000000000000027 /* TaggrAccountImage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 010000000000000000000027 /* TaggrAccountImage.swift */; };
+		010001000000000000000037 /* TaggrRelativeTime.swift in Sources */ = {isa = PBXBuildFile; fileRef = 010000000000000000000037 /* TaggrRelativeTime.swift */; };
+		010001000000000000000004 /* TaggrAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 010000000000000000000004 /* TaggrAPI.swift */; };
+		010001000000000000000005 /* CandidEncoder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 010000000000000000000005 /* CandidEncoder.swift */; };
+		010001000000000000000009 /* TaggrNavigation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 010000000000000000000009 /* TaggrNavigation.swift */; };
+		01000100000000000000000A /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01000000000000000000000A /* RootView.swift */; };
+		010001000000000000000030 /* TaggrTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 010000000000000000000030 /* TaggrTheme.swift */; };
+		01000100000000000000000B /* FeedViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01000000000000000000000B /* FeedViews.swift */; };
+		010001000000000000000038 /* PostInteractionViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 010000000000000000000038 /* PostInteractionViews.swift */; };
+		010001000000000000000039 /* RealmListViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 010000000000000000000039 /* RealmListViews.swift */; };
+		010001000000000000000029 /* ComposePostView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 010000000000000000000029 /* ComposePostView.swift */; };
+		01000100000000000000002A /* PostComposerMode.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01000000000000000000002A /* PostComposerMode.swift */; };
+		01000100000000000000002B /* ImageDrafts.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01000000000000000000002B /* ImageDrafts.swift */; };
+		01000100000000000000002C /* TaggrEditPatch.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01000000000000000000002C /* TaggrEditPatch.swift */; };
+		010001000000000000000024 /* PostImageViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 010000000000000000000024 /* PostImageViews.swift */; };
+		01000100000000000000002F /* PostImageLoaderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01000000000000000000002F /* PostImageLoaderView.swift */; };
+		010001000000000000000028 /* TaggrMarkdownText.swift in Sources */ = {isa = PBXBuildFile; fileRef = 010000000000000000000028 /* TaggrMarkdownText.swift */; };
+		01000100000000000000002D /* AvatarSettingsViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01000000000000000000002D /* AvatarSettingsViews.swift */; };
+		010001000000000000000025 /* UserImageLibraryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 010000000000000000000025 /* UserImageLibraryView.swift */; };
+		010001000000000000000026 /* AccountImagePagerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 010000000000000000000026 /* AccountImagePagerView.swift */; };
+		010001000000000000000033 /* TaggrImagePagerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 010000000000000000000033 /* TaggrImagePagerView.swift */; };
+		010001000000000000000020 /* PostDetailViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 010000000000000000000020 /* PostDetailViews.swift */; };
+		010001000000000000000022 /* RealmViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 010000000000000000000022 /* RealmViews.swift */; };
+		010001000000000000000023 /* SharedViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 010000000000000000000023 /* SharedViews.swift */; };
+		01000100000000000000002E /* TaggrRefreshable.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01000000000000000000002E /* TaggrRefreshable.swift */; };
+		01000100000000000000001C /* ProfileViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01000000000000000000001C /* ProfileViews.swift */; };
+		01000100000000000000001E /* InboxView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01000000000000000000001E /* InboxView.swift */; };
+		01000100000000000000000C /* AuthSettingsViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01000000000000000000000C /* AuthSettingsViews.swift */; };
+		01000100000000000000000D /* TaggrTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01000000000000000000000D /* TaggrTests.swift */; };
+		01000100000000000000003A /* TaggrFeatureTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01000000000000000000003A /* TaggrFeatureTests.swift */; };
+		01000100000000000000003B /* TaggrStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01000000000000000000003B /* TaggrStateTests.swift */; };
+		01000100000000000000003C /* TaggrActionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01000000000000000000003C /* TaggrActionTests.swift */; };
+		01000100000000000000001D /* TaggrIdentityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01000000000000000000001D /* TaggrIdentityTests.swift */; };
+		01000100000000000000001B /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 01000000000000000000001B /* Assets.xcassets */; };
+		010001000000000000000031 /* ICNativeClient in Frameworks */ = {isa = PBXBuildFile; productRef = 01000D000000000000000001 /* ICNativeClient */; };
+		010001000000000000000032 /* ICNativeClient in Frameworks */ = {isa = PBXBuildFile; productRef = 01000D000000000000000002 /* ICNativeClient */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		010002000000000000000001 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 010003000000000000000001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 010004000000000000000001;
+			remoteInfo = TAGGR;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		010000000000000000000001 /* TAGGRApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TAGGRApp.swift; sourceTree = "<group>"; };
+		010000000000000000000002 /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
+		010000000000000000000035 /* AppStores.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppStores.swift; sourceTree = "<group>"; };
+		010000000000000000000036 /* AppActions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppActions.swift; sourceTree = "<group>"; };
+		010000000000000000000034 /* PostDraftStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PostDraftStore.swift; sourceTree = "<group>"; };
+		01000000000000000000001A /* TaggrRuntimeConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaggrRuntimeConfig.swift; sourceTree = "<group>"; };
+		010000000000000000000003 /* TaggrModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaggrModels.swift; sourceTree = "<group>"; };
+		010000000000000000000027 /* TaggrAccountImage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaggrAccountImage.swift; sourceTree = "<group>"; };
+		010000000000000000000037 /* TaggrRelativeTime.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaggrRelativeTime.swift; sourceTree = "<group>"; };
+		010000000000000000000004 /* TaggrAPI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaggrAPI.swift; sourceTree = "<group>"; };
+		010000000000000000000005 /* CandidEncoder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CandidEncoder.swift; sourceTree = "<group>"; };
+		010000000000000000000009 /* TaggrNavigation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaggrNavigation.swift; sourceTree = "<group>"; };
+		01000000000000000000000A /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
+		010000000000000000000030 /* TaggrTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaggrTheme.swift; sourceTree = "<group>"; };
+		01000000000000000000000B /* FeedViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeedViews.swift; sourceTree = "<group>"; };
+		010000000000000000000038 /* PostInteractionViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PostInteractionViews.swift; sourceTree = "<group>"; };
+		010000000000000000000039 /* RealmListViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RealmListViews.swift; sourceTree = "<group>"; };
+		010000000000000000000029 /* ComposePostView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ComposePostView.swift; sourceTree = "<group>"; };
+		01000000000000000000002A /* PostComposerMode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PostComposerMode.swift; sourceTree = "<group>"; };
+		01000000000000000000002B /* ImageDrafts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageDrafts.swift; sourceTree = "<group>"; };
+		01000000000000000000002C /* TaggrEditPatch.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaggrEditPatch.swift; sourceTree = "<group>"; };
+		010000000000000000000024 /* PostImageViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PostImageViews.swift; sourceTree = "<group>"; };
+		01000000000000000000002F /* PostImageLoaderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PostImageLoaderView.swift; sourceTree = "<group>"; };
+		010000000000000000000028 /* TaggrMarkdownText.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaggrMarkdownText.swift; sourceTree = "<group>"; };
+		01000000000000000000002D /* AvatarSettingsViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AvatarSettingsViews.swift; sourceTree = "<group>"; };
+		010000000000000000000025 /* UserImageLibraryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserImageLibraryView.swift; sourceTree = "<group>"; };
+		010000000000000000000026 /* AccountImagePagerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountImagePagerView.swift; sourceTree = "<group>"; };
+		010000000000000000000033 /* TaggrImagePagerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaggrImagePagerView.swift; sourceTree = "<group>"; };
+		010000000000000000000020 /* PostDetailViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PostDetailViews.swift; sourceTree = "<group>"; };
+		010000000000000000000022 /* RealmViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RealmViews.swift; sourceTree = "<group>"; };
+		010000000000000000000023 /* SharedViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedViews.swift; sourceTree = "<group>"; };
+		01000000000000000000002E /* TaggrRefreshable.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaggrRefreshable.swift; sourceTree = "<group>"; };
+		01000000000000000000001C /* ProfileViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileViews.swift; sourceTree = "<group>"; };
+		01000000000000000000001E /* InboxView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InboxView.swift; sourceTree = "<group>"; };
+		01000000000000000000000C /* AuthSettingsViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthSettingsViews.swift; sourceTree = "<group>"; };
+		01000000000000000000000D /* TaggrTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaggrTests.swift; sourceTree = "<group>"; };
+		01000000000000000000003A /* TaggrFeatureTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaggrFeatureTests.swift; sourceTree = "<group>"; };
+		01000000000000000000003B /* TaggrStateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaggrStateTests.swift; sourceTree = "<group>"; };
+		01000000000000000000003C /* TaggrActionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaggrActionTests.swift; sourceTree = "<group>"; };
+		01000000000000000000001D /* TaggrIdentityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaggrIdentityTests.swift; sourceTree = "<group>"; };
+		01000000000000000000000E /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		01000000000000000000000F /* TAGGR.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = TAGGR.entitlements; sourceTree = "<group>"; };
+		01000000000000000000001B /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		010000000000000000000010 /* TAGGR.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = TAGGR.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		010000000000000000000011 /* TAGGRTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = TAGGRTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		010005000000000000000001 /* Frameworks */ = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (010001000000000000000031,); runOnlyForDeploymentPostprocessing = 0; };
+		010005000000000000000002 /* Frameworks */ = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (010001000000000000000032,); runOnlyForDeploymentPostprocessing = 0; };
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		010006000000000000000001 = {
+			isa = PBXGroup;
+			children = (
+				010006000000000000000002 /* TAGGR */,
+				010006000000000000000003 /* TAGGRTests */,
+				010006000000000000000004 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		010006000000000000000002 /* TAGGR */ = {
+			isa = PBXGroup;
+			children = (
+				010000000000000000000001 /* TAGGRApp.swift */,
+				010000000000000000000002 /* AppState.swift */,
+				010000000000000000000035 /* AppStores.swift */,
+				010000000000000000000036 /* AppActions.swift */,
+				010000000000000000000034 /* PostDraftStore.swift */,
+				01000000000000000000001A /* TaggrRuntimeConfig.swift */,
+				01000000000000000000000E /* Info.plist */,
+				01000000000000000000000F /* TAGGR.entitlements */,
+				01000000000000000000001B /* Assets.xcassets */,
+				010006000000000000000005 /* TaggrModels */,
+				010006000000000000000006 /* TaggrAPI */,
+				010006000000000000000008 /* TaggrNavigation */,
+				010006000000000000000009 /* Views */,
+			);
+			path = TAGGR;
+			sourceTree = "<group>";
+		};
+		010006000000000000000003 /* TAGGRTests */ = {
+			isa = PBXGroup;
+			children = (
+				01000000000000000000000D /* TaggrTests.swift */,
+				01000000000000000000003A /* TaggrFeatureTests.swift */,
+				01000000000000000000003B /* TaggrStateTests.swift */,
+				01000000000000000000003C /* TaggrActionTests.swift */,
+				01000000000000000000001D /* TaggrIdentityTests.swift */,
+			);
+			path = TAGGRTests;
+			sourceTree = "<group>";
+		};
+		010006000000000000000004 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				010000000000000000000010 /* TAGGR.app */,
+				010000000000000000000011 /* TAGGRTests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		010006000000000000000005 /* TaggrModels */ = {isa = PBXGroup; children = (010000000000000000000003 /* TaggrModels.swift */,010000000000000000000027 /* TaggrAccountImage.swift */,010000000000000000000037 /* TaggrRelativeTime.swift */,01000000000000000000002C /* TaggrEditPatch.swift */,); path = TaggrModels; sourceTree = "<group>"; };
+		010006000000000000000006 /* TaggrAPI */ = {isa = PBXGroup; children = (010000000000000000000004 /* TaggrAPI.swift */,010000000000000000000005 /* CandidEncoder.swift */,); path = TaggrAPI; sourceTree = "<group>"; };
+		010006000000000000000008 /* TaggrNavigation */ = {isa = PBXGroup; children = (010000000000000000000009 /* TaggrNavigation.swift */,); path = TaggrNavigation; sourceTree = "<group>"; };
+		010006000000000000000009 /* Views */ = {isa = PBXGroup; children = (01000000000000000000000A /* RootView.swift */,010000000000000000000030 /* TaggrTheme.swift */,01000000000000000000000B /* FeedViews.swift */,010000000000000000000038 /* PostInteractionViews.swift */,010000000000000000000039 /* RealmListViews.swift */,010000000000000000000029 /* ComposePostView.swift */,01000000000000000000002A /* PostComposerMode.swift */,01000000000000000000002B /* ImageDrafts.swift */,010000000000000000000024 /* PostImageViews.swift */,01000000000000000000002F /* PostImageLoaderView.swift */,010000000000000000000033 /* TaggrImagePagerView.swift */,010000000000000000000028 /* TaggrMarkdownText.swift */,01000000000000000000002D /* AvatarSettingsViews.swift */,010000000000000000000025 /* UserImageLibraryView.swift */,010000000000000000000026 /* AccountImagePagerView.swift */,010000000000000000000020 /* PostDetailViews.swift */,010000000000000000000022 /* RealmViews.swift */,010000000000000000000023 /* SharedViews.swift */,01000000000000000000002E /* TaggrRefreshable.swift */,01000000000000000000001C /* ProfileViews.swift */,01000000000000000000001E /* InboxView.swift */,01000000000000000000000C /* AuthSettingsViews.swift */,); path = Views; sourceTree = "<group>"; };
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		010004000000000000000001 /* TAGGR */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 01000A000000000000000003 /* Build configuration list for PBXNativeTarget "TAGGR" */;
+			buildPhases = (010007000000000000000001 /* Sources */,010005000000000000000001 /* Frameworks */,010008000000000000000001 /* Resources */,);
+			buildRules = ();
+			dependencies = ();
+			name = TAGGR;
+			packageProductDependencies = (01000D000000000000000001 /* ICNativeClient */,);
+			productName = TAGGR;
+			productReference = 010000000000000000000010 /* TAGGR.app */;
+			productType = "com.apple.product-type.application";
+		};
+		010004000000000000000002 /* TAGGRTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 01000A000000000000000004 /* Build configuration list for PBXNativeTarget "TAGGRTests" */;
+			buildPhases = (010007000000000000000002 /* Sources */,010005000000000000000002 /* Frameworks */,010008000000000000000002 /* Resources */,);
+			buildRules = ();
+			dependencies = (010009000000000000000001 /* PBXTargetDependency */,);
+			name = TAGGRTests;
+			packageProductDependencies = (01000D000000000000000002 /* ICNativeClient */,);
+			productName = TAGGRTests;
+			productReference = 010000000000000000000011 /* TAGGRTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		010003000000000000000001 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 2650;
+				LastUpgradeCheck = 2650;
+				TargetAttributes = {
+					010004000000000000000001 = {CreatedOnToolsVersion = 26.5;};
+					010004000000000000000002 = {CreatedOnToolsVersion = 26.5; TestTargetID = 010004000000000000000001;};
+				};
+			};
+			buildConfigurationList = 01000A000000000000000001 /* Build configuration list for PBXProject "TAGGR" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (en, Base,);
+			mainGroup = 010006000000000000000001;
+			packageReferences = (01000C000000000000000001 /* XCRemoteSwiftPackageReference "ICNativeClient" */,);
+			productRefGroup = 010006000000000000000004 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (010004000000000000000001 /* TAGGR */,010004000000000000000002 /* TAGGRTests */,);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		010008000000000000000001 /* Resources */ = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (01000100000000000000001B,); runOnlyForDeploymentPostprocessing = 0; };
+		010008000000000000000002 /* Resources */ = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		010007000000000000000001 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (010001000000000000000001,010001000000000000000002,010001000000000000000035,010001000000000000000036,010001000000000000000034,01000100000000000000001A,010001000000000000000003,010001000000000000000027,010001000000000000000037,01000100000000000000002C,010001000000000000000004,010001000000000000000005,010001000000000000000009,01000100000000000000000A,010001000000000000000030,01000100000000000000000B,010001000000000000000038,010001000000000000000039,010001000000000000000029,01000100000000000000002A,01000100000000000000002B,010001000000000000000024,01000100000000000000002F,010001000000000000000033,010001000000000000000028,01000100000000000000002D,010001000000000000000025,010001000000000000000026,010001000000000000000020,010001000000000000000022,010001000000000000000023,01000100000000000000002E,01000100000000000000001C,01000100000000000000001E,01000100000000000000000C,);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		010007000000000000000002 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (01000100000000000000000D,01000100000000000000003A,01000100000000000000003B,01000100000000000000003C,01000100000000000000001D,);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		010009000000000000000001 /* PBXTargetDependency */ = {isa = PBXTargetDependency; target = 010004000000000000000001 /* TAGGR */; targetProxy = 010002000000000000000001 /* PBXContainerItemProxy */; };
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		01000B000000000000000001 /* Debug */ = {isa = XCBuildConfiguration; buildSettings = {ALWAYS_SEARCH_USER_PATHS = NO; CLANG_ANALYZER_NONNULL = YES; CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE; CLANG_CXX_LANGUAGE_STANDARD = "gnu++20"; CLANG_ENABLE_MODULES = YES; CLANG_ENABLE_OBJC_ARC = YES; CLANG_ENABLE_OBJC_WEAK = YES; CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES; CLANG_WARN_BOOL_CONVERSION = YES; CLANG_WARN_COMMA = YES; CLANG_WARN_CONSTANT_CONVERSION = YES; CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES; CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR; CLANG_WARN_DOCUMENTATION_COMMENTS = YES; CLANG_WARN_EMPTY_BODY = YES; CLANG_WARN_ENUM_CONVERSION = YES; CLANG_WARN_INFINITE_RECURSION = YES; CLANG_WARN_INT_CONVERSION = YES; CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES; CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES; CLANG_WARN_OBJC_LITERAL_CONVERSION = YES; CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR; CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES; CLANG_WARN_RANGE_LOOP_ANALYSIS = YES; CLANG_WARN_STRICT_PROTOTYPES = YES; CLANG_WARN_SUSPICIOUS_MOVE = YES; CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE; CLANG_WARN_UNREACHABLE_CODE = YES; CLANG_WARN__DUPLICATE_METHOD_MATCH = YES; COPY_PHASE_STRIP = NO; DEBUG_INFORMATION_FORMAT = dwarf; ENABLE_STRICT_OBJC_MSGSEND = YES; ENABLE_TESTABILITY = YES; GCC_C_LANGUAGE_STANDARD = gnu17; GCC_DYNAMIC_NO_PIC = NO; GCC_NO_COMMON_BLOCKS = YES; GCC_OPTIMIZATION_LEVEL = 0; GCC_PREPROCESSOR_DEFINITIONS = ("DEBUG=1","$(inherited)",); GCC_WARN_64_TO_32_BIT_CONVERSION = YES; GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR; GCC_WARN_UNDECLARED_SELECTOR = YES; GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE; GCC_WARN_UNUSED_FUNCTION = YES; GCC_WARN_UNUSED_VARIABLE = YES; IPHONEOS_DEPLOYMENT_TARGET = 17.4; SDKROOT = iphoneos; SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG; SWIFT_OPTIMIZATION_LEVEL = "-Onone"; }; name = Debug; };
+		01000B000000000000000002 /* Release */ = {isa = XCBuildConfiguration; buildSettings = {ALWAYS_SEARCH_USER_PATHS = NO; CLANG_ANALYZER_NONNULL = YES; CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE; CLANG_CXX_LANGUAGE_STANDARD = "gnu++20"; CLANG_ENABLE_MODULES = YES; CLANG_ENABLE_OBJC_ARC = YES; CLANG_ENABLE_OBJC_WEAK = YES; CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES; CLANG_WARN_BOOL_CONVERSION = YES; CLANG_WARN_COMMA = YES; CLANG_WARN_CONSTANT_CONVERSION = YES; CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES; CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR; CLANG_WARN_DOCUMENTATION_COMMENTS = YES; CLANG_WARN_EMPTY_BODY = YES; CLANG_WARN_ENUM_CONVERSION = YES; CLANG_WARN_INFINITE_RECURSION = YES; CLANG_WARN_INT_CONVERSION = YES; CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES; CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES; CLANG_WARN_OBJC_LITERAL_CONVERSION = YES; CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR; CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES; CLANG_WARN_RANGE_LOOP_ANALYSIS = YES; CLANG_WARN_STRICT_PROTOTYPES = YES; CLANG_WARN_SUSPICIOUS_MOVE = YES; CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE; CLANG_WARN_UNREACHABLE_CODE = YES; CLANG_WARN__DUPLICATE_METHOD_MATCH = YES; COPY_PHASE_STRIP = NO; DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym"; ENABLE_NS_ASSERTIONS = NO; ENABLE_STRICT_OBJC_MSGSEND = YES; GCC_C_LANGUAGE_STANDARD = gnu17; GCC_NO_COMMON_BLOCKS = YES; GCC_WARN_64_TO_32_BIT_CONVERSION = YES; GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR; GCC_WARN_UNDECLARED_SELECTOR = YES; GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE; GCC_WARN_UNUSED_FUNCTION = YES; GCC_WARN_UNUSED_VARIABLE = YES; IPHONEOS_DEPLOYMENT_TARGET = 17.4; SDKROOT = iphoneos; SWIFT_COMPILATION_MODE = wholemodule; VALIDATE_PRODUCT = YES; }; name = Release; };
+		01000B000000000000000003 /* Debug */ = {isa = XCBuildConfiguration; buildSettings = {ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon; ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor; CODE_SIGN_ENTITLEMENTS = TAGGR/TAGGR.entitlements; CODE_SIGN_STYLE = Automatic; CURRENT_PROJECT_VERSION = 202608070959; DEVELOPMENT_TEAM = AKN976G7AK; GENERATE_INFOPLIST_FILE = NO; INFOPLIST_FILE = TAGGR/Info.plist; LD_RUNPATH_SEARCH_PATHS = ("$(inherited)","@executable_path/Frameworks",); MARKETING_VERSION = 0.1.2; PRODUCT_BUNDLE_IDENTIFIER = network.taggr.ios; PRODUCT_NAME = "$(TARGET_NAME)"; SWIFT_EMIT_LOC_STRINGS = YES; SWIFT_STRICT_CONCURRENCY = complete; SWIFT_VERSION = 6.0; TARGETED_DEVICE_FAMILY = 1; }; name = Debug; };
+		01000B000000000000000004 /* Release */ = {isa = XCBuildConfiguration; buildSettings = {ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon; ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor; CODE_SIGN_ENTITLEMENTS = TAGGR/TAGGR.entitlements; CODE_SIGN_STYLE = Automatic; CURRENT_PROJECT_VERSION = 202608070959; DEVELOPMENT_TEAM = AKN976G7AK; GENERATE_INFOPLIST_FILE = NO; INFOPLIST_FILE = TAGGR/Info.plist; LD_RUNPATH_SEARCH_PATHS = ("$(inherited)","@executable_path/Frameworks",); MARKETING_VERSION = 0.1.2; PRODUCT_BUNDLE_IDENTIFIER = network.taggr.ios; PRODUCT_NAME = "$(TARGET_NAME)"; SWIFT_EMIT_LOC_STRINGS = YES; SWIFT_STRICT_CONCURRENCY = complete; SWIFT_VERSION = 6.0; TARGETED_DEVICE_FAMILY = 1; }; name = Release; };
+		01000B000000000000000005 /* Debug */ = {isa = XCBuildConfiguration; buildSettings = {BUNDLE_LOADER = "$(TEST_HOST)"; CODE_SIGN_STYLE = Automatic; CURRENT_PROJECT_VERSION = 202608070959; DEVELOPMENT_TEAM = AKN976G7AK; GENERATE_INFOPLIST_FILE = YES; IPHONEOS_DEPLOYMENT_TARGET = 17.4; MARKETING_VERSION = 0.1.2; PRODUCT_BUNDLE_IDENTIFIER = network.taggr.ios.tests; PRODUCT_NAME = "$(TARGET_NAME)"; SWIFT_STRICT_CONCURRENCY = complete; SWIFT_VERSION = 6.0; TARGETED_DEVICE_FAMILY = 1; TEST_HOST = "$(BUILT_PRODUCTS_DIR)/TAGGR.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/TAGGR"; }; name = Debug; };
+		01000B000000000000000006 /* Release */ = {isa = XCBuildConfiguration; buildSettings = {BUNDLE_LOADER = "$(TEST_HOST)"; CODE_SIGN_STYLE = Automatic; CURRENT_PROJECT_VERSION = 202608070959; DEVELOPMENT_TEAM = AKN976G7AK; GENERATE_INFOPLIST_FILE = YES; IPHONEOS_DEPLOYMENT_TARGET = 17.4; MARKETING_VERSION = 0.1.2; PRODUCT_BUNDLE_IDENTIFIER = network.taggr.ios.tests; PRODUCT_NAME = "$(TARGET_NAME)"; SWIFT_STRICT_CONCURRENCY = complete; SWIFT_VERSION = 6.0; TARGETED_DEVICE_FAMILY = 1; TEST_HOST = "$(BUILT_PRODUCTS_DIR)/TAGGR.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/TAGGR"; }; name = Release; };
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		01000A000000000000000001 /* Build configuration list for PBXProject "TAGGR" */ = {isa = XCConfigurationList; buildConfigurations = (01000B000000000000000001 /* Debug */,01000B000000000000000002 /* Release */,); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
+		01000A000000000000000003 /* Build configuration list for PBXNativeTarget "TAGGR" */ = {isa = XCConfigurationList; buildConfigurations = (01000B000000000000000003 /* Debug */,01000B000000000000000004 /* Release */,); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
+		01000A000000000000000004 /* Build configuration list for PBXNativeTarget "TAGGRTests" */ = {isa = XCConfigurationList; buildConfigurations = (01000B000000000000000005 /* Debug */,01000B000000000000000006 /* Release */,); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
+/* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		01000C000000000000000001 /* XCRemoteSwiftPackageReference "ICNativeClient" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/humandebri/ICNativeClient.git";
+			requirement = {
+				kind = upToNextMinorVersion;
+				minimumVersion = 0.2.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		01000D000000000000000001 /* ICNativeClient */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 01000C000000000000000001 /* XCRemoteSwiftPackageReference "ICNativeClient" */;
+			productName = ICNativeClient;
+		};
+		01000D000000000000000002 /* ICNativeClient */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 01000C000000000000000001 /* XCRemoteSwiftPackageReference "ICNativeClient" */;
+			productName = ICNativeClient;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = 010003000000000000000001 /* Project object */;
+}

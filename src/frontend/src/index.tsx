@@ -47,6 +47,7 @@ import { Search } from "./search";
 import { Distribution } from "./distribution";
 import { populateUserNameCache } from "./user_resolve";
 import { LinksPage } from "./links";
+import { PrivacyPage } from "./privacy";
 import { ApiGenerator } from "./api";
 import { MAINNET_MODE } from "./env";
 import { Domains } from "./domains";
@@ -57,9 +58,7 @@ import {
 } from "./delegation";
 import { LoginMasks } from "./authentication";
 import { maybePromptTopUp } from "./user_storage";
-
 const { hash, pathname } = location;
-
 if (!hash && pathname != "/") {
     location.href = `#${pathname}`;
 }
@@ -237,6 +236,8 @@ const App = () => {
         content = <Domains />;
     } else if (handler == "links") {
         content = <LinksPage />;
+    } else if (handler == "privacy") {
+        content = <PrivacyPage />;
     } else if (handler == "distribution") {
         content = <Distribution />;
     } else if (handler == "bookmarks") {
