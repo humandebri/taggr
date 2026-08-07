@@ -252,5 +252,16 @@ mod tests {
         assert!(String::from_utf8_lossy(&body).contains("Authentication complete"));
         assert_ne!(asset_hashes().get(b"/.well-known/ii-auth-callbacks"), None);
         assert_ne!(asset_hashes().get(b"/ios-auth-callback"), None);
+
+        let (_, body) = asset("/.well-known/apple-app-site-association").expect("AASA");
+        let value: serde_json::Value = serde_json::from_slice(&body).expect("valid AASA JSON");
+        assert_eq!(
+            value["applinks"]["details"][0]["paths"],
+            serde_json::json!(["/ios-auth-callback"])
+        );
+        assert_eq!(
+            value["webcredentials"]["apps"],
+            serde_json::json!(["AKN976G7AK.network.taggr.ios"])
+        );
     }
 }
