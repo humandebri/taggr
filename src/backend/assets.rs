@@ -257,7 +257,7 @@ mod tests {
         let value: serde_json::Value = serde_json::from_slice(&body).expect("valid AASA JSON");
         assert_eq!(
             value["applinks"]["details"][0]["paths"],
-            serde_json::json!(["/ios-auth-callback"])
+            serde_json::json!(["/*"])
         );
         assert_eq!(
             value["webcredentials"]["apps"],
