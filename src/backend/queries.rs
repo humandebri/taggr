@@ -6,6 +6,7 @@ use env::{
     config::CONFIG,
     memory,
     post::{Post, PostId},
+    push::{PushBatch, PushInstallationResolution},
     user::UserId,
     State,
 };
@@ -24,6 +25,22 @@ fn caller(state: &State) -> Principal {
 fn check_invite() {
     let code: String = parse(&arg_data_raw());
     reply(read(|state| state.invite_codes.contains_key(&code)))
+}
+
+#[query]
+fn resolve_push_installation(
+    installation_id: String,
+    secret_hash: String,
+    token_hash: String,
+) -> Result<PushInstallationResolution, String> {
+    require_push_relay()?;
+    read(|state| state.resolve_push_installation(installation_id, secret_hash, token_hash))
+}
+
+#[query]
+fn push_events(after_id: u64, limit: u16) -> Result<PushBatch, String> {
+    require_push_relay()?;
+    Ok(read(|state| state.push_events(after_id, limit)))
 }
 
 #[export_name = "canister_query migration_pending"]

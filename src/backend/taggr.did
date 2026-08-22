@@ -102,6 +102,31 @@ type Result_1 = variant { Ok; Err : text };
 type Result_2 = variant { Ok : text; Err : text };
 type Result_3 = variant { Ok : nat; Err : TransferError };
 type Result_4 = variant { Ok : nat32; Err : text };
+type PushBatch = record {
+  latest_id : nat64;
+  events : vec PushEvent;
+  oldest_available_id : nat64;
+};
+type PushEvent = record {
+  id : nat64;
+  installation_ids : vec text;
+  post_id : nat64;
+  author_name : text;
+  preview : text;
+  kind : nat8;
+  recipient : nat64;
+  created_at : nat64;
+  unread_count : nat64;
+  notification_id : nat64;
+  watched_post_id : opt nat64;
+};
+type PushInstallationResolution = record {
+  user_id : nat64;
+  enabled_kinds : nat8;
+};
+type PushInvalidation = record { installation_id : text; token_hash : text };
+type Result_5 = variant { Ok : PushBatch; Err : text };
+type Result_6 = variant { Ok : PushInstallationResolution; Err : text };
 type Standard = record { url : text; name : text };
 type SupportedBlockType = record { url : text; block_type : text };
 type TransferArgs = record {
@@ -152,10 +177,16 @@ service : () -> {
   icrc3_get_blocks : (vec GetBlocksRequest) -> (GetBlocksResult) query;
   icrc3_get_tip_certificate : () -> (opt ICRC3DataCertificate) query;
   icrc3_supported_block_types : () -> (vec SupportedBlockType) query;
+  invalidate_push_installations : (vec PushInvalidation) -> (Result_1);
   link_cold_wallet : (nat64) -> (Result_1);
   prod_release : () -> (bool);
   propose_release : (nat64, text, blob) -> (Result_4);
+  push_events : (nat64, nat16) -> (Result_5) query;
+  register_push_installation : (text, text, text, nat8) -> (Result_1);
+  remove_push_installation : (text, text) -> (Result_1);
+  resolve_push_installation : (text, text, text) -> (Result_6) query;
   set_emergency_release : (blob) -> ();
   stable_mem_read : (nat64) -> (vec record { nat64; blob }) query;
   unlink_cold_wallet : () -> (Result_1);
+  update_push_preferences : (text, text, nat8) -> (Result_1);
 }

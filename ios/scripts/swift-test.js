@@ -27,7 +27,10 @@ function availableSimulatorDestination() {
                 .flat()
                 .filter(
                     (device) =>
-                        device.isAvailable && /^iPhone\b/.test(device.name),
+                        device.isAvailable &&
+                        device.deviceTypeIdentifier?.includes(
+                            ".SimDeviceType.iPhone-",
+                        ),
                 );
             const selected =
                 devices.find((device) => device.state === "Booted") ||

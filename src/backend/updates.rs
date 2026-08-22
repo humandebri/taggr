@@ -1,6 +1,7 @@
 use crate::env::{
     domains::{change_domain_config, DomainConfig},
     proposals::{Payload, Release},
+    push::{PushBatch, PushInstallationResolution, PushInvalidation},
     realms::{clean_up_realm, Realm, RealmId},
     user::{Mode, UserFilter},
 };
@@ -174,6 +175,55 @@ fn clear_notifications() {
         }
         msg_reply([]);
     })
+}
+
+#[update]
+fn register_push_installation(
+    installation_id: String,
+    binding_secret: String,
+    token_hash: String,
+    enabled_kinds: u8,
+) -> Result<(), String> {
+    mutate(|state| {
+        let principal = caller(state);
+        state.register_push_installation(
+            principal,
+            installation_id,
+            binding_secret,
+            token_hash,
+            enabled_kinds,
+        )
+    })
+}
+
+#[update]
+fn update_push_preferences(
+    installation_id: String,
+    binding_secret: String,
+    enabled_kinds: u8,
+) -> Result<(), String> {
+    mutate(|state| {
+        let principal = caller(state);
+        state.update_push_preferences(principal, installation_id, binding_secret, enabled_kinds)
+    })
+}
+
+#[update]
+fn remove_push_installation(installation_id: String, binding_secret: String) -> Result<(), String> {
+    mutate(|state| {
+        let principal = caller(state);
+        state.remove_push_installation(principal, installation_id, binding_secret)
+    })
+}
+
+#[update]
+fn invalidate_push_installations(invalidations: Vec<PushInvalidation>) -> Result<(), String> {
+    require_push_relay()?;
+    if invalidations.len() > 100 {
+        return Err("too many invalidations".into());
+    }
+    mutate(|state| state.invalidate_push_installations(invalidations));
+    Ok(())
 }
 
 #[export_name = "canister_update crypt"]

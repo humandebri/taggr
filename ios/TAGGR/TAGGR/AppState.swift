@@ -65,6 +65,7 @@ final class TaggrAppCoordinator {
     let feedStore = FeedStore()
     let contentStore = ContentStore()
     let walletStorageStore = WalletStorageStore()
+    let pushNotifications = TaggrPushNotificationManager()
     let sessionStore: SessionStore
 
     var route: TaggrRoute {
@@ -184,6 +185,10 @@ final class TaggrAppCoordinator {
         get { walletStorageStore.storageCreationState }
         set { walletStorageStore.storageCreationState = newValue }
     }
+    var pushPreferences = TaggrPushPreferences()
+    var pushAuthorizationStatus: TaggrPushAuthorizationStatus = .unknown
+    var showPushPrePrompt = false
+    var pendingPushDestination: (postId: Int, notificationId: Int?)?
 
     var api: TaggrAPI
     var identityStore: ICIdentityStore
@@ -257,6 +262,7 @@ final class TaggrAppCoordinator {
         self.identityStore = identityStore ?? identityStoreFactory(config)
         self.identityAuthenticator = identityAuthenticator ?? identityAuthenticatorFactory(config)
         self.postDraftStore = postDraftStore
+        self.pushNotifications.attach(to: self)
     }
 
     var isStagingNetwork: Bool {
@@ -286,6 +292,7 @@ final class TaggrAppCoordinator {
         identityStore = identityStoreFactory(nextConfig)
         identityAuthenticator = identityAuthenticatorFactory(nextConfig)
         persistRuntimeNetwork(nextNetwork)
+        pushNotifications.runtimeDidChange()
         Task {
             await reloadCache()
             routeLoadRevision += 1
@@ -296,6 +303,8 @@ final class TaggrAppCoordinator {
         authSession = identityStore.load()
         await reloadCache()
         await refreshCurrentUser()
+        await pushNotifications.prepareAfterAccountLoad()
+        await openPendingPushIfPossible()
         routeLoadRevision += 1
     }
 

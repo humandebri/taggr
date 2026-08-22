@@ -3,6 +3,7 @@ import SwiftUI
 
 @main
 struct TAGGRApp: App {
+    @UIApplicationDelegateAdaptor(TaggrApplicationDelegate.self) private var appDelegate
     @State private var state: TaggrAppCoordinator
 
     init() {
@@ -24,6 +25,7 @@ struct TAGGRApp: App {
             RootView()
                 .environment(state)
                 .task {
+                    appDelegate.pushNotifications = state.pushNotifications
                     if !ProcessInfo.processInfo.isRunningXCTest {
                         await state.bootstrap()
 #if DEBUG
@@ -37,7 +39,52 @@ struct TAGGRApp: App {
                 .onOpenURL { url in
                     state.open(url)
                 }
+                .sheet(
+                    isPresented: Binding(
+                        get: { state.showPushPrePrompt },
+                        set: { state.showPushPrePrompt = $0 }
+                    )
+                ) {
+                    PushNotificationPrePromptView()
+                        .environment(state)
+                }
         }
+    }
+}
+
+private struct PushNotificationPrePromptView: View {
+    @Environment(TaggrAppCoordinator.self) private var state
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            VStack(alignment: .leading, spacing: 18) {
+                Image(systemName: "bell.badge.fill")
+                    .font(.system(size: 48))
+                    .foregroundStyle(TaggrTheme.clickable)
+                Text("Keep up with TAGGR")
+                    .font(.title.bold())
+                Text("Get notified about replies, mentions, reposts, and updates to threads you watch. You can change each type under Account at any time.")
+                    .foregroundStyle(TaggrTheme.secondaryText)
+                Button("Enable notifications") {
+                    Task {
+                        await state.pushNotifications.requestAuthorization()
+                        dismiss()
+                    }
+                }
+                .buttonStyle(.borderedProminent)
+                Button("Not now") {
+                    state.showPushPrePrompt = false
+                    dismiss()
+                }
+                .foregroundStyle(TaggrTheme.secondaryText)
+                Spacer()
+            }
+            .padding(24)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(TaggrTheme.background)
+        }
+        .presentationDetents([.medium])
     }
 }
 

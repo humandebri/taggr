@@ -68,9 +68,11 @@ TAGGR is a social network with user-generated content.
 
 Privacy policy route: `#/privacy`
 
-The MVP iOS app adds no analytics SDK, advertising SDK, or push notification
-token collection. It uses native SwiftUI screens, Internet Identity, and the
-same production canister APIs as the website.
+The iOS app adds no analytics or advertising SDK. When a signed-in user enables
+notifications, the app sends its APNs device token to TAGGR's Cloudflare push
+relay for app-functionality delivery only. The token is linked to the TAGGR
+account, is not used for tracking, and is removed when notifications are
+disabled or the user signs out.
 
 ## Token And Crypto Policy
 

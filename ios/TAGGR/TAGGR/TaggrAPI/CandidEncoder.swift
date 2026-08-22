@@ -232,6 +232,24 @@ enum TaggrCandid {
         Data(#"{"Repost":\#(postId)}"#.utf8)
     }
 
+    static func encodeRegisterPushInstallation(installationId: String, bindingSecret: String, tokenHash: String, enabledKinds: UInt8) throws -> Data {
+        try encodeCandid(
+            types: [.primitive(-15), .primitive(-15), .primitive(-15), .primitive(-5)],
+            values: [.text(installationId), .text(bindingSecret), .text(tokenHash), .nat(UInt64(enabledKinds))]
+        )
+    }
+
+    static func encodeUpdatePushPreferences(installationId: String, bindingSecret: String, enabledKinds: UInt8) throws -> Data {
+        try encodeCandid(
+            types: [.primitive(-15), .primitive(-15), .primitive(-5)],
+            values: [.text(installationId), .text(bindingSecret), .nat(UInt64(enabledKinds))]
+        )
+    }
+
+    static func encodeRemovePushInstallation(installationId: String, bindingSecret: String) throws -> Data {
+        try encodeCandid(types: [.primitive(-15), .primitive(-15)], values: [.text(installationId), .text(bindingSecret)])
+    }
+
     static func encodeBucketWasmHash() -> Data {
         encodeEmpty()
     }

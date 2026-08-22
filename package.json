@@ -25,12 +25,16 @@
         "ios:testflight:dry-run": "node ios/scripts/testflight-upload.js --dry-run",
         "ios:testflight:upload": "node ios/scripts/testflight-upload.js",
         "ios:local:icp": "node ios/scripts/local-icp-transfer.js",
+        "push:types": "wrangler types --config workers/push-relay/wrangler.jsonc workers/push-relay/worker-configuration.d.ts",
+        "push:check": "tsc -p workers/push-relay/tsconfig.json --noEmit",
+        "push:test": "vitest run --config workers/push-relay/vitest.config.mts",
         "test:e2e": "playwright test",
         "install:e2e": "playwright install chromium --with-deps",
         "format": "prettier --write .",
         "format:check": "prettier --check ."
     },
     "devDependencies": {
+        "@cloudflare/vitest-pool-workers": "0.22.0",
         "@playwright/test": "1.56.1",
         "@types/isomorphic-fetch": "0.0.39",
         "@types/react-dom": "19.0.0",
@@ -46,9 +50,11 @@
         "terser-webpack-plugin": "^5.3.10",
         "ts-loader": "9.5.0",
         "typescript": "5.8.3",
+        "vitest": "4.1.11",
         "webpack": "^5.106.2",
         "webpack-cli": "5.1.4",
-        "webpack-dev-server": "^5.1.0"
+        "webpack-dev-server": "^5.1.0",
+        "wrangler": "4.107.1"
     },
     "browserslist": [
         "last 2 chrome version",

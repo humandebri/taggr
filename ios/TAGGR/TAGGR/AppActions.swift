@@ -2,6 +2,7 @@ import AuthenticationServices
 import Foundation
 import ICNativeClient
 import SwiftUI
+import UserNotifications
 
 extension TaggrAppCoordinator {
     func submitPost(text: String, parent: Int? = nil, realm: String? = nil, images: [TaggrDraftImage] = [], reloadMode: TaggrFeedMode? = nil) async {
@@ -220,6 +221,7 @@ extension TaggrAppCoordinator {
             _ = try await api.createUser(name: trimmedName, invite: trimmedInvite, identity: authSession)
             icpInvoice = nil
             try await loadCurrentUserIfNeeded()
+            await pushNotifications.prepareAfterAccountLoad()
             await reloadCache()
             await loadCurrentRoute()
         }
@@ -534,10 +536,13 @@ extension TaggrAppCoordinator {
             authSession = session
             await reloadCache()
             await loadCurrentRoute()
+            await pushNotifications.prepareAfterAccountLoad()
+            await openPendingPushIfPossible()
         }
     }
 
     func signOut() {
+        pushNotifications.signOut()
         identityStore.clear()
         authSession = nil
         currentUser = nil
@@ -588,6 +593,44 @@ extension TaggrAppCoordinator {
             notifications[id] = TaggrNotificationEntry(notification: entry.notification, read: true)
         }
         currentUser = user.updatingNotifications(notifications)
+        Task { await updateApplicationBadge() }
+    }
+
+    func handleForegroundPush() async {
+        await updateCurrentUserIfPossible()
+        await updateApplicationBadge()
+    }
+
+    func handlePushTap(postId: Int?, notificationId: Int?) async {
+        guard let postId else { return }
+        guard authSession != nil else {
+            pendingPushDestination = (postId, notificationId)
+            return
+        }
+        navigateToPost(postId)
+        routeLoadRevision += 1
+        if let notificationId {
+            await markNotificationsRead([notificationId])
+        }
+        await updateApplicationBadge()
+    }
+
+    func openPendingPushIfPossible() async {
+        guard authSession != nil, let pending = pendingPushDestination else { return }
+        pendingPushDestination = nil
+        await handlePushTap(postId: pending.postId, notificationId: pending.notificationId)
+    }
+
+    func updateApplicationBadge() async {
+        try? await UNUserNotificationCenter.current().setBadgeCount(unreadNotificationCount)
+    }
+
+    func setPushMasterEnabled(_ enabled: Bool) async {
+        await pushNotifications.setMasterEnabled(enabled)
+    }
+
+    func pushPreferencesChanged() async {
+        await pushNotifications.preferencesChanged()
     }
 
     func uploadBlobs(_ blobs: [(id: String, data: Data)]) async throws -> [TaggrCandid.FileRef] {

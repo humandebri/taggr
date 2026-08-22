@@ -1,0 +1,7 @@
+RELAY_IDENTITY_JSON=["public key hex","private key hex"]
+APNS_SANDBOX_KEY_ID=replace-me
+APNS_SANDBOX_TEAM_ID=replace-me
+APNS_SANDBOX_PRIVATE_KEY=-----BEGIN PRIVATE KEY-----\nreplace-me\n-----END PRIVATE KEY-----
+APNS_PRODUCTION_KEY_ID=replace-me
+APNS_PRODUCTION_TEAM_ID=replace-me
+APNS_PRODUCTION_PRIVATE_KEY=-----BEGIN PRIVATE KEY-----\nreplace-me\n-----END PRIVATE KEY-----

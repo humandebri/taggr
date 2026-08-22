@@ -15,7 +15,9 @@ ICRC-167 authorization URL directly in `ASWebAuthenticationSession`.
 -   Account supports TAGGR balances, ICP balances, ICP transfers, reward
     withdrawals, and ICP credit minting. Auction bidding and external
     exchange/trading links remain hidden.
--   Push notifications are out of scope for the first Swift release.
+-   Replies, mentions, reposts, and watched-post updates use native APNs push
+    notifications through the TAGGR push relay. The in-app inbox remains the
+    authoritative notification record.
 
 ## Build And Review Gates
 

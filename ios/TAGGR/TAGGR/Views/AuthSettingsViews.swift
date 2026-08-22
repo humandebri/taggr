@@ -89,6 +89,10 @@ struct SettingsView: View {
                     }
                     if state.authSession != nil {
                         if let user = state.currentUser {
+                            SettingsPanel(title: "Notifications") {
+                                PushNotificationSettingsPanel()
+                                    .environment(state)
+                            }
                             SettingsPanel(title: "Icon") {
                                 AccountAvatarSettingsPanel(user: user)
                             }
@@ -387,6 +391,61 @@ private struct StorageSettingsPanel: View {
             return String(format: "%.2fB", Double(cycles) / 1_000_000_000)
         }
         return cycles.formatted()
+    }
+}
+
+private struct PushNotificationSettingsPanel: View {
+    @Environment(TaggrAppCoordinator.self) private var state
+    @Environment(\.openURL) private var openURL
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Toggle("Push notifications", isOn: binding(\.masterEnabled, master: true))
+                .font(.subheadline.weight(.bold))
+            Group {
+                Toggle("Replies", isOn: binding(\.replies))
+                Toggle("Mentions", isOn: binding(\.mentions))
+                Toggle("Reposts", isOn: binding(\.reposts))
+                Toggle("Watched thread updates", isOn: binding(\.watchedThreads))
+            }
+            .disabled(!state.pushPreferences.masterEnabled)
+            if state.pushAuthorizationStatus == .denied {
+                Text("Notifications are disabled in iOS Settings.")
+                    .font(.footnote)
+                    .foregroundStyle(TaggrTheme.secondaryText)
+                Button("Open iOS Settings") {
+                    if let url = URL(string: UIApplication.openSettingsURLString) {
+                        openURL(url)
+                    }
+                }
+            }
+            if state.runtimeConfig.pushRelayURL == nil {
+                Text("Push relay is not configured for this build.")
+                    .font(.footnote)
+                    .foregroundStyle(.orange)
+            }
+        }
+        .toggleStyle(.switch)
+        .tint(TaggrTheme.clickable)
+    }
+
+    private func binding(
+        _ keyPath: WritableKeyPath<TaggrPushPreferences, Bool>,
+        master: Bool = false
+    ) -> Binding<Bool> {
+        Binding(
+            get: { state.pushPreferences[keyPath: keyPath] },
+            set: { value in
+                state.pushPreferences[keyPath: keyPath] = value
+                Task {
+                    if master {
+                        await state.setPushMasterEnabled(value)
+                    } else {
+                        await state.pushPreferencesChanged()
+                    }
+                }
+            }
+        )
     }
 }
 

@@ -61,6 +61,7 @@ struct TaggrRuntimeConfig: Equatable, Sendable {
     let callbackDomain: String
     let identityURL: URL
     let derivationOrigin: String
+    let pushRelayURL: URL?
 
     static var current: TaggrRuntimeConfig {
         from(info: Bundle.main.infoDictionary ?? [:])
@@ -73,13 +74,15 @@ struct TaggrRuntimeConfig: Equatable, Sendable {
         let callbackDomain = stringValue("TAGGR_CALLBACK_DOMAIN", in: info) ?? domain
         let identityURL = urlValue("TAGGR_II_URL", in: info) ?? productionIdentityURL
         let derivationOrigin = httpsStringValue("TAGGR_DERIVATION_ORIGIN", in: info) ?? productionDerivationOrigin
+        let pushRelayURL = urlValue("TAGGR_PUSH_RELAY_URL", in: info)
         return TaggrRuntimeConfig(
             canisterId: canisterId,
             apiBaseURL: apiBaseURL,
             domain: domain,
             callbackDomain: callbackDomain,
             identityURL: identityURL,
-            derivationOrigin: derivationOrigin
+            derivationOrigin: derivationOrigin,
+            pushRelayURL: pushRelayURL
         )
     }
 
@@ -92,7 +95,8 @@ struct TaggrRuntimeConfig: Equatable, Sendable {
                 domain: productionDomain,
                 callbackDomain: productionDomain,
                 identityURL: productionIdentityURL,
-                derivationOrigin: productionDerivationOrigin
+                derivationOrigin: productionDerivationOrigin,
+                pushRelayURL: current.pushRelayURL
             )
         case .staging:
             return TaggrRuntimeConfig(
@@ -101,7 +105,8 @@ struct TaggrRuntimeConfig: Equatable, Sendable {
                 domain: stagingDomain,
                 callbackDomain: stagingDomain,
                 identityURL: productionIdentityURL,
-                derivationOrigin: stagingDerivationOrigin
+                derivationOrigin: stagingDerivationOrigin,
+                pushRelayURL: current.pushRelayURL
             )
         }
     }

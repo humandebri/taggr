@@ -39,7 +39,7 @@ Checked against the Apple App Privacy and App Store Connect submission help on
     `ASWebAuthenticationSession`.
 -   No analytics SDK.
 -   No advertising SDK.
--   No push notification SDK in MVP.
+-   APNs is used directly through system frameworks; no third-party push SDK.
 
 ## Data Types To Review In App Store Connect
 
@@ -58,6 +58,8 @@ off-device beyond real-time request handling.
         retained.
     -   Use: App Functionality.
     -   Linked to user: Yes.
+    -   Includes the APNs device token while push notifications are enabled.
+    -   Purpose: App Functionality. Tracking: No.
 -   Financial Info:
     -   Token balances, transactions, ICP-related records, and wallet-related
         public account data visible in TAGGR.
@@ -79,7 +81,6 @@ off-device beyond real-time request handling.
 -   No native photos library collection outside explicit user-selected uploads
     through `PhotosPicker`.
 -   No native microphone, camera, HealthKit, or fitness data collection.
--   No push notification token collection in Phase 1.
 
 ## Pre-Submission Checks
 
@@ -87,5 +88,7 @@ off-device beyond real-time request handling.
 -   Confirm App Store Connect answers match current backend data retention.
 -   Confirm token/crypto policy matches the enabled iOS wallet actions.
 -   Confirm support/contact path is public and reachable without login.
+-   Declare the APNs device token under Device ID/Identifiers as App
+    Functionality, linked to the user, and not used for tracking.
 -   Update this document if any analytics, advertising, push, crash reporting, or
     native SDK is added.

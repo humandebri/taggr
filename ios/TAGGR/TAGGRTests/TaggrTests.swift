@@ -7,6 +7,78 @@ import ICNativeClient
 
 @MainActor
 final class TaggrTests: XCTestCase {
+    func testPushPreferenceBitmaskHonorsMasterAndIndividualKinds() {
+        var preferences = TaggrPushPreferences()
+        XCTAssertEqual(preferences.enabledKinds, 0)
+        preferences.masterEnabled = true
+        XCTAssertEqual(preferences.enabledKinds, 15)
+        preferences.mentions = false
+        preferences.watchedThreads = false
+        XCTAssertEqual(preferences.enabledKinds, 5)
+    }
+
+    func testPushOperationsRunInEnqueueOrder() async {
+        let barrier = TaggrPushOperationBarrier()
+        var events: [String] = []
+        let cleanup = barrier.enqueue {
+            events.append("cleanup-start")
+            try? await Task.sleep(for: .milliseconds(20))
+            events.append("cleanup-end")
+        }
+        let registration = barrier.enqueue {
+            events.append("registration")
+        }
+
+        await cleanup.value
+        await registration.value
+
+        XCTAssertEqual(events, ["cleanup-start", "cleanup-end", "registration"])
+    }
+
+    func testBootstrapOpensPushDeferredUntilStoredSessionLoads() async throws {
+        let config = TaggrRuntimeConfig.from(info: [:])
+        let store = makeTestIdentityStore(
+            config: config,
+            service: testIdentityService()
+        )
+        defer { store.clear() }
+        try store.save(
+            makeAuthSession(
+                privateKey: Curve25519.Signing.PrivateKey(),
+                config: config
+            )
+        )
+        let api = makeStubbedAPI({ request in
+            let response = HTTPURLResponse(
+                url: request.url!,
+                statusCode: 200,
+                httpVersion: nil,
+                headerFields: nil
+            )!
+            switch self.requestMethodAndArg(from: request)?.method {
+            case "stats":
+                return (response, Self.queryReply(Data(#"{"canister_id":"\#(config.canisterId)"}"#.utf8)))
+            case "config":
+                return (response, Self.queryReply(Data(#"{"feed_page_size":30}"#.utf8)))
+            case "user":
+                return (response, Self.queryReply(Self.currentUserFixture()))
+            default:
+                return (response, Self.queryReply(Data("null".utf8)))
+            }
+        }, config: config)
+        let state = TaggrAppCoordinator(
+            api: api,
+            identityStore: store,
+            buildConfig: config
+        )
+        state.pendingPushDestination = (postId: 42, notificationId: nil)
+
+        await state.bootstrap()
+
+        XCTAssertEqual(state.route, .post(42))
+        XCTAssertNil(state.pendingPushDestination)
+    }
+
     func testRoutesUniversalLinks() {
         XCTAssertEqual(TaggrNavigation.route(from: URL(string: "https://6qfxa-ryaaa-aaaai-qbhsq-cai.icp0.io/post/12")!), .post(12))
         XCTAssertEqual(TaggrNavigation.route(from: URL(string: "https://6qfxa-ryaaa-aaaai-qbhsq-cai.icp0.io/user/alice")!), .profile("alice"))
@@ -181,6 +253,7 @@ final class TaggrTests: XCTestCase {
             "TAGGR_DOMAIN": "taggr.trycloudflare.com",
             "TAGGR_II_URL": "https://taggr-identity.trycloudflare.com/authorize",
             "TAGGR_DERIVATION_ORIGIN": "https://taggr.trycloudflare.com",
+            "TAGGR_PUSH_RELAY_URL": "https://push.taggr.example",
         ])
         XCTAssertEqual(config.canisterId, "bkyz2-fmaaa-aaaaa-qaaaq-cai")
         XCTAssertEqual(config.apiURL(for: "query").absoluteString, "https://taggr.trycloudflare.com/api/v3/canister/bkyz2-fmaaa-aaaaa-qaaaq-cai/query")
@@ -188,6 +261,7 @@ final class TaggrTests: XCTestCase {
         XCTAssertEqual(config.callbackDomain, "6qfxa-ryaaa-aaaai-qbhsq-cai.icp0.io")
         XCTAssertEqual(config.identityURL.absoluteString, "https://taggr-identity.trycloudflare.com/authorize")
         XCTAssertEqual(config.derivationOrigin, "https://taggr.trycloudflare.com")
+        XCTAssertEqual(config.pushRelayURL?.absoluteString, "https://push.taggr.example")
         XCTAssertTrue(config.shouldLoadBucketImagesThroughAPI)
     }
 
@@ -199,6 +273,7 @@ final class TaggrTests: XCTestCase {
             "TAGGR_DOMAIN": "$(TAGGR_DOMAIN)",
             "TAGGR_II_URL": "$(TAGGR_II_URL)",
             "TAGGR_DERIVATION_ORIGIN": "$(TAGGR_DERIVATION_ORIGIN)",
+            "TAGGR_PUSH_RELAY_URL": "$(TAGGR_PUSH_RELAY_URL)",
         ])
         XCTAssertEqual(config, TaggrRuntimeConfig.from(info: [:]))
     }

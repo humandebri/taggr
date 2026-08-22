@@ -72,7 +72,7 @@ const linksChecks = [
     ["src/frontend/src/privacy.tsx", "Token and wallet surfaces"],
     ["src/frontend/src/privacy.tsx", "no analytics SDK"],
     ["src/frontend/src/privacy.tsx", "advertising SDK"],
-    ["src/frontend/src/privacy.tsx", "push notification token collection"],
+    ["src/frontend/src/privacy.tsx", "APNs device token"],
     ["src/frontend/src/privacy.tsx", "HELP"],
     ["src/frontend/src/privacy.tsx", "OpenChat"],
     ["src/frontend/src/common.tsx", "report"],

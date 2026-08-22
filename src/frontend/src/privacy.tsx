@@ -29,8 +29,10 @@ export const PrivacyPage = ({}) => {
             <h2>iOS app data</h2>
             <p>
                 The iOS app stores the current TAGGR session locally. The app
-                includes no analytics SDK and no advertising SDK. It does not
-                perform push notification token collection.
+                includes no analytics SDK and no advertising SDK. If the user
+                enables notifications, the APNs device token is stored by the
+                TAGGR push relay solely to deliver account notifications. It is
+                linked to the account and is not used for tracking.
             </p>
             <h2>Third-party services</h2>
             <p>

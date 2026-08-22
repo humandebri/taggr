@@ -6,6 +6,7 @@ const required = [
     "ios/TAGGR/TAGGR/TAGGRApp.swift",
     "ios/TAGGR/TAGGR/AppState.swift",
     "ios/TAGGR/TAGGR/AppActions.swift",
+    "ios/TAGGR/TAGGR/PushNotifications.swift",
     "ios/TAGGR/TAGGR/AppStores.swift",
     "ios/TAGGR/TAGGR/TaggrRuntimeConfig.swift",
     "ios/TAGGR/TAGGR/TaggrAPI/TaggrAPI.swift",
@@ -42,8 +43,19 @@ if (!project.includes("PRODUCT_BUNDLE_IDENTIFIER = network.taggr.ios")) {
 if (!project.includes("IPHONEOS_DEPLOYMENT_TARGET = 17.4")) {
     failures.push("Swift app deployment target must be iOS 17.4 or newer");
 }
+if (
+    !project.includes("com.apple.Push") ||
+    !project.includes("PushNotifications.swift in Sources")
+) {
+    failures.push(
+        "Push Notifications capability and native source must be enabled",
+    );
+}
 
 const entitlements = read("ios/TAGGR/TAGGR/TAGGR.entitlements");
+if (!entitlements.includes("aps-environment")) {
+    failures.push("APNs environment entitlement is missing");
+}
 if (!entitlements.includes("applinks:6qfxa-ryaaa-aaaai-qbhsq-cai.icp0.io")) {
     failures.push(
         "Associated Domains entitlement is missing canonical TAGGR applinks host",

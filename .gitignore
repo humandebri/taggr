@@ -28,6 +28,8 @@ release-artifacts/
 # frontend code
 node_modules/
 dist/
+workers/**/.dev.vars
+workers/**/.wrangler/
 
 # e2e tests
 test-results/

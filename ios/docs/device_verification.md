@@ -153,6 +153,12 @@ evidence. It records early responsive checks before full Xcode is available.
 
 ## Required Notes
 
+-   On a physical device, verify the first-login explanation, permission grant
+    and denial paths, sandbox token registration, a locked-screen notification,
+    foreground suppression, badge count, and notification-tap navigation to the
+    post. Repeat disable and logout flows and confirm the relay subscription is
+    removed.
+
 -   Internet Identity continuity must compare the iOS app account with the
     existing web account for the same user and must record whether the Identity
     window returned through the direct ICRC-167 HTTPS callback.

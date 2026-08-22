@@ -283,7 +283,7 @@ fn snippet(value: &str, term: &str) -> String {
     .replace('\n', " ")
 }
 
-fn remove_markdown(md: &str) -> String {
+pub(crate) fn remove_markdown(md: &str) -> String {
     let mut result = String::new();
     let mut in_parentheses = false;
     let mut in_square_brackets = false;

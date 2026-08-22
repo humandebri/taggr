@@ -1,0 +1,28 @@
+{
+    "$schema": "../../node_modules/wrangler/config-schema.json",
+    "name": "taggr-push-relay",
+    "main": "src/index.ts",
+    "compatibility_date": "2026-08-22",
+    "triggers": {
+        "crons": ["* * * * *"],
+    },
+    "vars": {
+        "IC_HOST": "https://ic0.app",
+        "MAINNET_CANISTER_ID": "6qfxa-ryaaa-aaaai-qbhsq-cai",
+        "STAGING_CANISTER_ID": "e4i5g-biaaa-aaaao-ai7ja-cai",
+        "APNS_TOPIC": "network.taggr.ios",
+    },
+    "d1_databases": [
+        {
+            "binding": "DB",
+            "database_name": "taggr-push-relay",
+            "database_id": "00000000-0000-0000-0000-000000000000",
+            "migrations_dir": "migrations",
+        },
+    ],
+    "observability": {
+        "enabled": true,
+        "logs": { "head_sampling_rate": 1 },
+        "traces": { "enabled": true, "head_sampling_rate": 0.01 },
+    },
+}

@@ -299,6 +299,54 @@ actor TaggrAPI {
         try await updateJSON("toggle_following_post", args: [postId], identity: identity)
     }
 
+    func registerPushInstallation(
+        installationId: String,
+        bindingSecret: String,
+        tokenHash: String,
+        enabledKinds: UInt8,
+        identity: ICAuthSession?
+    ) async throws {
+        let identity = try Self.requireIdentity(identity)
+        let arg = try TaggrCandid.encodeRegisterPushInstallation(
+            installationId: installationId,
+            bindingSecret: bindingSecret,
+            tokenHash: tokenHash,
+            enabledKinds: enabledKinds
+        )
+        let response = try await updateRaw("register_push_installation", arg: arg, identity: identity)
+        try TaggrCandid.throwIfRejectedResult(response)
+    }
+
+    func updatePushPreferences(
+        installationId: String,
+        bindingSecret: String,
+        enabledKinds: UInt8,
+        identity: ICAuthSession?
+    ) async throws {
+        let identity = try Self.requireIdentity(identity)
+        let arg = try TaggrCandid.encodeUpdatePushPreferences(
+            installationId: installationId,
+            bindingSecret: bindingSecret,
+            enabledKinds: enabledKinds
+        )
+        let response = try await updateRaw("update_push_preferences", arg: arg, identity: identity)
+        try TaggrCandid.throwIfRejectedResult(response)
+    }
+
+    func removePushInstallation(
+        installationId: String,
+        bindingSecret: String,
+        identity: ICAuthSession?
+    ) async throws {
+        let identity = try Self.requireIdentity(identity)
+        let arg = try TaggrCandid.encodeRemovePushInstallation(
+            installationId: installationId,
+            bindingSecret: bindingSecret
+        )
+        let response = try await updateRaw("remove_push_installation", arg: arg, identity: identity)
+        try TaggrCandid.throwIfRejectedResult(response)
+    }
+
     func bucketWrite(bucketId: String, blob: Data, identity: ICAuthSession) async throws -> UInt64 {
         try validateIdentity(identity, requestCanisterId: bucketId)
         let response = try await updateRaw("write", arg: blob, canisterId: bucketId, identity: identity)

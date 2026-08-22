@@ -34,6 +34,8 @@
 	<string>$(TAGGR_DOMAIN)</string>
 	<key>TAGGR_II_URL</key>
 	<string>$(TAGGR_II_URL)</string>
+	<key>TAGGR_PUSH_RELAY_URL</key>
+	<string>$(TAGGR_PUSH_RELAY_URL)</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
