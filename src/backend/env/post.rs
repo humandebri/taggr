@@ -864,11 +864,27 @@ fn notify_about(state: &mut State, post: &Post) {
     {
         let parent_author = parent.user;
         if parent_author != post.user {
-            if let Some(user) = state.users.get_mut(&parent_author) {
+            let notification_id = if let Some(user) = state.users.get_mut(&parent_author) {
                 if user.accepts(post.user, &user_filter) {
-                    user.notify_about_post("A new reply to your post", post.id);
+                    let notification_id =
+                        user.notify_about_post("A new reply to your post", post.id);
                     notified.insert(user.id);
+                    notification_id
+                } else {
+                    None
                 }
+            } else {
+                None
+            };
+            if let Some(notification_id) = notification_id {
+                enqueue_post_push(
+                    state,
+                    parent_author,
+                    notification_id,
+                    push::PUSH_KIND_REPLY,
+                    post,
+                    None,
+                );
             }
         }
     }
@@ -884,11 +900,25 @@ fn notify_about(state: &mut State, post: &Post) {
         if notified.contains(&user_id) {
             return;
         }
-        if let Some(user) = state.users.get_mut(&user_id) {
+        let notification_id = if let Some(user) = state.users.get_mut(&user_id) {
             if user.accepts(post.user, &user_filter) {
-                user.notify_about_post("A new repost of your post", post.id);
+                user.notify_about_post("A new repost of your post", post.id)
+            } else {
+                None
             }
-            notified.insert(user.id);
+        } else {
+            None
+        };
+        notified.insert(user_id);
+        if let Some(notification_id) = notification_id {
+            enqueue_post_push(
+                state,
+                user_id,
+                notification_id,
+                push::PUSH_KIND_REPOST,
+                post,
+                None,
+            );
         }
     }
 
@@ -899,13 +929,27 @@ fn notify_about(state: &mut State, post: &Post) {
         .collect::<Vec<_>>()
         .into_iter()
         .for_each(|mentioned_user_id| {
-            let user = state
-                .users
-                .get_mut(&mentioned_user_id)
-                .expect("no user found");
-            if user.accepts(post.user, &user_filter) {
-                user.notify_about_post("You were mentioned in a post", post.id);
-                notified.insert(user.id);
+            let notification_id = {
+                let user = state
+                    .users
+                    .get_mut(&mentioned_user_id)
+                    .expect("no user found");
+                if user.accepts(post.user, &user_filter) {
+                    user.notify_about_post("You were mentioned in a post", post.id)
+                } else {
+                    None
+                }
+            };
+            notified.insert(mentioned_user_id);
+            if let Some(notification_id) = notification_id {
+                enqueue_post_push(
+                    state,
+                    mentioned_user_id,
+                    notification_id,
+                    push::PUSH_KIND_MENTION,
+                    post,
+                    None,
+                );
             }
         });
 
@@ -925,18 +969,93 @@ fn notify_about(state: &mut State, post: &Post) {
                 if notified.contains(&user_id) {
                     return;
                 }
-                if let Some(user) = state.users.get_mut(&user_id) {
+                let notification_id = if let Some(user) = state.users.get_mut(&user_id) {
                     if user.accepts(post.user, &user_filter) {
                         user.notify_about_watched_post(
                             post_id,
                             post.id,
                             post.parent.expect("no parent found"),
-                        );
+                        )
+                    } else {
+                        None
                     }
-                    notified.insert(user_id);
+                } else {
+                    None
+                };
+                notified.insert(user_id);
+                if let Some(notification_id) = notification_id {
+                    enqueue_post_push(
+                        state,
+                        user_id,
+                        notification_id,
+                        push::PUSH_KIND_WATCHED,
+                        post,
+                        Some(post_id),
+                    );
                 }
             });
     }
+}
+
+fn enqueue_post_push(
+    state: &mut State,
+    recipient: UserId,
+    notification_id: u64,
+    kind: u8,
+    post: &Post,
+    watched_post_id: Option<PostId>,
+) {
+    let sensitive = post.encrypted
+        || post
+            .realm
+            .as_ref()
+            .and_then(|realm_id| state.realms.get(realm_id))
+            .map(|realm| realm.adult_content)
+            .unwrap_or(false);
+    let (author_name, preview) = if sensitive {
+        (
+            String::new(),
+            "Open TAGGR to view this notification.".into(),
+        )
+    } else {
+        let author_name = state
+            .users
+            .get(&post.user)
+            .map(|user| user.name.clone())
+            .unwrap_or_default();
+        let preview = push_preview(&post.body);
+        let preview = if preview.is_empty() {
+            "Open TAGGR to view it.".into()
+        } else {
+            preview
+        };
+        (author_name, preview)
+    };
+    state.enqueue_push_event(
+        recipient,
+        notification_id,
+        kind,
+        author_name,
+        preview,
+        post.id,
+        watched_post_id,
+    );
+}
+
+fn push_preview(body: &str) -> String {
+    search::remove_markdown(body)
+        .split_whitespace()
+        .filter(|word| {
+            let word = word.to_ascii_lowercase();
+            !word.starts_with("http://")
+                && !word.starts_with("https://")
+                && !word.starts_with("www.")
+        })
+        .collect::<Vec<_>>()
+        .join(" ")
+        .chars()
+        .take(120)
+        .collect()
 }
 
 // Extracts hashtags from a string.
@@ -1018,6 +1137,15 @@ fn xor(text: &str, seed: &str, encrypt: bool) -> String {
 mod tests {
     use super::*;
     use crate::env::tests::{create_user, pr};
+
+    #[test]
+    fn push_preview_removes_markdown_urls_and_truncates_unicode() {
+        let body = format!("**hello** https://example.com {}", "界".repeat(200));
+        let preview = push_preview(&body);
+        assert!(!preview.contains("https://"));
+        assert!(!preview.contains("**"));
+        assert_eq!(preview.chars().count(), 120);
+    }
 
     #[test]
     fn test_post_encryption() {

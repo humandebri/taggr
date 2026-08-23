@@ -5,17 +5,39 @@ const CopyPlugin = require("copy-webpack-plugin");
 const TerserPlugin = require("terser-webpack-plugin");
 
 const isDevelopment = process.env.NODE_ENV !== "production";
-const NETWORK = process.env.DFX_NETWORK || (isDevelopment ? "local" : "ic");
+const NETWORK =
+    process.env.ICP_ENVIRONMENT ||
+    process.env.DFX_NETWORK ||
+    (isDevelopment ? "local" : "ic");
 
-function getDfxPort() {
+function icpLocalGatewayURL() {
     try {
         const { execSync } = require("child_process");
-        const port = execSync("dfx info webserver-port", {
-            encoding: "utf8",
-        }).trim();
-        return port;
+        const status = JSON.parse(
+            execSync("icp network status -e local --json", {
+                encoding: "utf8",
+                stdio: ["ignore", "pipe", "ignore"],
+            }),
+        );
+        return String(status.api_url || "http://127.0.0.1:8000").replace(
+            /\/+$/,
+            "",
+        );
     } catch (error) {
-        return "8080";
+        return "http://127.0.0.1:8000";
+    }
+}
+
+function icpLocalCanisters() {
+    try {
+        const { execSync } = require("child_process");
+        const taggr = execSync("icp canister status taggr -e local -i", {
+            encoding: "utf8",
+            stdio: ["ignore", "pipe", "ignore"],
+        }).trim();
+        return taggr ? { taggr: { local: taggr } } : undefined;
+    } catch (error) {
+        return undefined;
     }
 }
 
@@ -26,7 +48,7 @@ function initCanisterEnv() {
             path.resolve(".dfx", "local", "canister_ids.json"),
         );
     } catch (error) {
-        console.log("No local canister_ids.json found. Continuing production");
+        localCanisters = icpLocalCanisters();
     }
     try {
         prodCanisters = require(path.resolve("canister_ids.json"));
@@ -37,6 +59,7 @@ function initCanisterEnv() {
     }
 
     const canisterConfig = NETWORK === "local" ? localCanisters : prodCanisters;
+    if (!canisterConfig) return {};
 
     return Object.entries(canisterConfig).reduce((prev, current) => {
         const [_canisterName, canisterDetails] = current;
@@ -157,7 +180,7 @@ module.exports = {
         proxy: [
             {
                 context: ["/api"],
-                target: `http://127.0.0.1:${getDfxPort()}`,
+                target: icpLocalGatewayURL(),
                 changeOrigin: true,
                 pathRewrite: {
                     "^/api": "/api",

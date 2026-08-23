@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 
 pub type UserId = u64;
 
-#[derive(Default, Serialize, Deserialize)]
+#[derive(Clone, Default, Serialize, Deserialize)]
 pub struct Filters {
     pub users: BTreeSet<UserId>,
     pub tags: BTreeSet<String>,
@@ -57,7 +57,7 @@ impl UserFilter {
     }
 }
 
-#[derive(Default, Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Default, Debug, Serialize, Deserialize, PartialEq)]
 pub enum Mode {
     #[default]
     Mining,
@@ -65,7 +65,7 @@ pub enum Mode {
     Credits,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct User {
     pub id: UserId,
     pub name: String,
@@ -341,16 +341,18 @@ impl User {
         Self::validate_links(settings)
     }
 
-    fn insert_notifications(&mut self, notification: Notification) {
+    fn insert_notifications(&mut self, notification: Notification) -> Option<u64> {
         if self.is_bot() {
-            return;
+            return None;
         }
         self.messages += 1;
+        let notification_id = self.messages;
         self.notifications
             .insert(self.messages, (notification, false));
         while self.notifications.len() > 100 {
             self.notifications.pop_first();
         }
+        Some(notification_id)
     }
 
     pub fn clear_notifications(&mut self, mut ids: Vec<u64>) {
@@ -444,11 +446,16 @@ impl User {
         self.notify_with_params(message, None)
     }
 
-    pub fn notify_about_post<T: AsRef<str>>(&mut self, message: T, post_id: PostId) {
-        self.insert_notifications(Notification::NewPost(message.as_ref().into(), post_id));
+    pub fn notify_about_post<T: AsRef<str>>(&mut self, message: T, post_id: PostId) -> Option<u64> {
+        self.insert_notifications(Notification::NewPost(message.as_ref().into(), post_id))
     }
 
-    pub fn notify_about_watched_post(&mut self, post_id: PostId, comment: PostId, parent: PostId) {
+    pub fn notify_about_watched_post(
+        &mut self,
+        post_id: PostId,
+        comment: PostId,
+        parent: PostId,
+    ) -> Option<u64> {
         let entry = self
             .notifications
             .iter()
@@ -467,7 +474,7 @@ impl User {
                 notification.0
             })
             .unwrap_or_else(|| Notification::WatchedPostEntries(post_id, vec![comment]));
-        self.insert_notifications(notification);
+        self.insert_notifications(notification)
     }
 
     pub fn is_bot(&self) -> bool {

@@ -28,6 +28,7 @@ const CONTROLLERS_LEN_OFFSET: u64 = 8;
 const CONTROLLERS_BLOB_OFFSET: u64 = 12;
 const CONTROLLERS_REGION_END: u64 = 268;
 const CONTROLLERS_BLOB_MAX_LEN: u64 = CONTROLLERS_REGION_END - CONTROLLERS_BLOB_OFFSET;
+const STABLE_PAGE_SIZE: u64 = 64 * 1024;
 
 // HTTP request and response headers.
 type Headers = Vec<(String, String)>;
@@ -307,14 +308,24 @@ fn update_internal_controllers(controllers: Vec<Principal>) {
 }
 
 fn grow_to_fit(offset: u64, len: u64) {
-    if offset + len < (stable_size() << 16) {
+    let pages = stable_pages_to_grow(stable_size(), offset, len);
+    if pages == 0 {
         return;
     }
-    // amount of extra 64kb pages to reserve
-    let extra_wasm_pages = 200;
-    if stable_grow((len >> 16) + extra_wasm_pages) == u64::MAX {
+    if stable_grow(pages) == u64::MAX {
         panic!("couldn't grow stable memory");
     }
+}
+
+fn stable_pages_to_grow(current_pages: u64, offset: u64, len: u64) -> u64 {
+    let current_bytes = current_pages.saturating_mul(STABLE_PAGE_SIZE);
+    let required_bytes = offset.saturating_add(len);
+    if required_bytes <= current_bytes {
+        return 0;
+    }
+    required_bytes
+        .saturating_sub(current_bytes)
+        .div_ceil(STABLE_PAGE_SIZE)
 }
 
 fn read_blob(offset: u64, len: u64) -> Result<Vec<u8>, &'static str> {
@@ -332,4 +343,21 @@ fn read_blob(offset: u64, len: u64) -> Result<Vec<u8>, &'static str> {
     }
     stable_read(offset, &mut buf);
     Ok(buf)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn stable_pages_to_grow_reserves_only_required_pages() {
+        assert_eq!(stable_pages_to_grow(0, 0, CONTROLLERS_REGION_END), 1);
+        assert_eq!(stable_pages_to_grow(1, 0, CONTROLLERS_REGION_END), 0);
+        assert_eq!(stable_pages_to_grow(1, STABLE_PAGE_SIZE - 1, 1), 0);
+        assert_eq!(stable_pages_to_grow(1, STABLE_PAGE_SIZE, 1), 1);
+        assert_eq!(
+            stable_pages_to_grow(1, STABLE_PAGE_SIZE, STABLE_PAGE_SIZE + 1),
+            2
+        );
+    }
 }

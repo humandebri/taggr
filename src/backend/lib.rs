@@ -76,6 +76,25 @@ pub fn time() -> u64 {
     ic_cdk::api::time()
 }
 
+fn require_push_relay() -> Result<(), String> {
+    authorize_push_relay(
+        ic_cdk::api::msg_caller(),
+        option_env!("TAGGR_PUSH_RELAY_PRINCIPAL"),
+    )
+}
+
+fn authorize_push_relay(caller: Principal, configured: Option<&str>) -> Result<(), String> {
+    let configured = configured
+        .ok_or("push relay is not configured")
+        .and_then(|value| {
+            Principal::from_text(value).map_err(|_| "invalid push relay principal")
+        })?;
+    if caller != configured {
+        return Err("push relay authentication required".into());
+    }
+    Ok(())
+}
+
 #[allow(unused_imports)]
 use crate::env::{
     post::{FileRef, PostId},
@@ -93,3 +112,18 @@ use icrc_ledger_types::icrc3::{
 #[allow(unused_imports)]
 use serde_bytes::ByteBuf;
 export_candid!();
+
+#[cfg(test)]
+mod push_relay_auth_tests {
+    use super::*;
+
+    #[test]
+    fn only_the_configured_relay_principal_is_authorized() {
+        let relay = Principal::from_slice(&[1]);
+        let other = Principal::from_slice(&[2]);
+        let configured = relay.to_text();
+        assert!(authorize_push_relay(relay, Some(&configured)).is_ok());
+        assert!(authorize_push_relay(other, Some(&configured)).is_err());
+        assert!(authorize_push_relay(relay, None).is_err());
+    }
+}

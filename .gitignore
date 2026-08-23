@@ -10,6 +10,16 @@
 
 # dfx temporary files
 .dfx/
+.icp/
+.dfx-local*.log
+
+# local build outputs
+.build/
+
+ios/DerivedData/
+ios/**/build/
+ios/**/xcuserdata/
+ios/**/*.xcuserstate
 
 # rust
 target/
@@ -18,6 +28,8 @@ release-artifacts/
 # frontend code
 node_modules/
 dist/
+workers/**/.dev.vars
+workers/**/.wrangler/
 
 # e2e tests
 test-results/

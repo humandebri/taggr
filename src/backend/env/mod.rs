@@ -5,6 +5,7 @@ use self::invoices::{ICPInvoice, USER_ICP_SUBACCOUNT};
 use self::post::{archive_cold_posts, Extension, Post, PostId};
 use self::post_iterators::{IteratorMerger, MergeStrategy};
 use self::proposals::{Payload, ReleaseInfo, Status};
+use self::push::{PushEvent, PushInstallation};
 use self::token::{account, TransferArgs};
 use self::user::{Filters, Mode, Notification, Predicate, UserFilter};
 use crate::assets::export_token_supply;
@@ -44,6 +45,7 @@ pub mod nns_proposals;
 pub mod post;
 pub mod post_iterators;
 pub mod proposals;
+pub mod push;
 pub mod realms;
 pub mod reports;
 pub mod search;
@@ -252,6 +254,15 @@ pub struct State {
     // Per-canister snapshot of (cycles, idle_cycles_burned_per_day), refreshed by `canisters::top_up()` (hourly).
     #[serde(default)]
     pub canister_cycle_stats: BTreeMap<Principal, (u64, u64)>,
+
+    #[serde(default)]
+    pub push_installations: BTreeMap<String, PushInstallation>,
+
+    #[serde(default)]
+    pub push_events: VecDeque<PushEvent>,
+
+    #[serde(default)]
+    pub next_push_event_id: u64,
 }
 
 #[derive(Default, Deserialize, Serialize)]
@@ -1430,6 +1441,7 @@ impl State {
         mutate(|state| {
             state.backup_exists = false;
             state.conclude_polls(now);
+            state.prune_push_events(now);
         });
 
         State::fetch_xdr_rate().await;
