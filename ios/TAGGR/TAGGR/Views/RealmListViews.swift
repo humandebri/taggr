@@ -1,59 +1,5 @@
 import SwiftUI
 
-struct AvatarView: View {
-    let name: String
-    let avatarURLString: String?
-    let size: CGFloat
-
-    init(name: String, avatarURLString: String? = nil, size: CGFloat = 38) {
-        self.name = name
-        self.avatarURLString = TaggrAvatar.normalizedURLString(avatarURLString)
-        self.size = size
-    }
-
-    var body: some View {
-        Group {
-            if let avatarURL {
-                AsyncImage(url: avatarURL) { phase in
-                    switch phase {
-                    case .success(let image):
-                        image
-                            .resizable()
-                            .scaledToFill()
-                    case .failure, .empty:
-                        placeholder
-                    @unknown default:
-                        placeholder
-                    }
-                }
-            } else {
-                placeholder
-            }
-        }
-            .frame(width: size, height: size)
-            .background(TaggrTheme.panelRaised)
-            .clipShape(Circle())
-            .contentShape(Circle())
-            .accessibilityLabel("\(name) icon")
-    }
-
-    var avatarURL: URL? {
-        avatarURLString.flatMap(URL.init(string:))
-    }
-
-    var placeholder: some View {
-        ZStack {
-            Circle()
-                .fill(TaggrTheme.panelRaised)
-            Image(systemName: "person.crop.circle.fill")
-                .resizable()
-                .scaledToFit()
-                .foregroundStyle(TaggrTheme.secondaryText)
-                .padding(size * 0.18)
-        }
-    }
-}
-
 struct RealmsView: View {
     @Environment(TaggrAppCoordinator.self) private var state
     @State private var realmName = ""
@@ -89,17 +35,18 @@ struct RealmsView: View {
                         HStack(alignment: .top, spacing: 12) {
                             RealmBadgeView(realm: realm, size: 42)
                             VStack(alignment: .leading, spacing: 8) {
-                                Text("# \(realm.name.lowercased())")
-                                    .font(.headline.weight(.bold))
-                                    .foregroundStyle(TaggrTheme.text)
+                                Button {
+                                    state.navigateToRealm(realm.name)
+                                } label: {
+                                    Text("# \(realm.name.lowercased())")
+                                        .font(.headline.weight(.bold))
+                                        .foregroundStyle(TaggrTheme.clickable)
+                                }
+                                .buttonStyle(.plain)
+                                .accessibilityLabel("Open realm \(realm.name)")
                                 TaggrMarkdownText(text: realm.description)
                                     .font(.subheadline)
                                     .foregroundStyle(TaggrTheme.secondaryText)
-                                Button("Open feed") {
-                                    state.navigateToRealm(realm.name)
-                                }
-                                .font(.caption.weight(.bold))
-                                .foregroundStyle(TaggrTheme.clickable)
                             }
                             Spacer(minLength: 0)
                         }
@@ -114,7 +61,19 @@ struct RealmsView: View {
                             systemImage: "circle.grid.2x2"
                         )
                         .foregroundStyle(TaggrTheme.secondaryText)
-                        .frame(maxWidth: .infinity)
+                            .frame(maxWidth: .infinity)
+                    }
+                    if showingAllRealms, state.canLoadMoreRealms {
+                        Button {
+                            Task { await state.loadAllRealmsList(reset: false) }
+                        } label: {
+                            Text("More")
+                                .font(.subheadline.weight(.bold))
+                                .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.bordered)
+                        .tint(TaggrTheme.clickable)
+                        .disabled(state.isBusy)
                     }
                     Button {
                         showingAllRealms.toggle()

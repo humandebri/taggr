@@ -205,7 +205,7 @@ private struct NotificationPostPreview: View {
     @Environment(TaggrAppCoordinator.self) private var state
     let postId: Int
     @State private var post: TaggrPost?
-    @State private var loading = false
+    @State private var isLoading = true
 
     var body: some View {
         Group {
@@ -213,7 +213,7 @@ private struct NotificationPostPreview: View {
                 PostRow(post: post) {
                     state.navigateToPost(post.id)
                 }
-            } else if loading {
+            } else if isLoading {
                 HStack(spacing: 8) {
                     ProgressView()
                         .tint(.white)
@@ -222,21 +222,27 @@ private struct NotificationPostPreview: View {
                         .foregroundStyle(TaggrTheme.secondaryText)
                 }
                 .padding(.vertical, 8)
+            } else {
+                Text("Post unavailable")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(TaggrTheme.secondaryText)
+                    .padding(.vertical, 8)
             }
         }
-        .task {
+        .task(id: postId) {
             await load()
         }
     }
 
     private func load() async {
-        guard post == nil, !loading else { return }
-        loading = true
+        guard post == nil else { return }
+        isLoading = true
+        defer { isLoading = false }
         do {
             post = try await state.loadNotificationPost(postId)
         } catch {
+            guard !state.isCancellation(error) else { return }
             state.errorMessage = error.localizedDescription
         }
-        loading = false
     }
 }

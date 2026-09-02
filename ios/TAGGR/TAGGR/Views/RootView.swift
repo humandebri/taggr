@@ -1,21 +1,24 @@
 import SwiftUI
+import UIKit
 
 struct RootView: View {
     @Environment(TaggrAppCoordinator.self) private var state
+    @State private var feedScrollToTopRevision = 0
 
     var body: some View {
         TabView(selection: Binding(
             get: { tab },
             set: { next in
                 let route = next == .feed
-                    ? Self.feedRoute(returnFeedMode: state.returnFeedMode)
+                    ? Self.feedRoute(lastHomeFeedMode: state.lastHomeFeedMode)
                     : next.route
                 state.selectRootRoute(route)
             }
         )) {
             NavigationStack {
-                FeedRouteView()
+                FeedRouteView(scrollToTopRevision: feedScrollToTopRevision)
             }
+            .background(FeedTabReselectionObserver(action: handleFeedTabReselection))
             .tabItem { Label("Feed", systemImage: "list.bullet") }
             .tag(RootTab.feed)
 
@@ -89,9 +92,32 @@ struct RootView: View {
         return false
     }
 
-    static func feedRoute(returnFeedMode: TaggrFeedMode) -> TaggrRoute {
-        .feed(returnFeedMode)
+    static func feedRoute(lastHomeFeedMode: TaggrFeedMode) -> TaggrRoute {
+        .feed(lastHomeFeedMode)
     }
+
+    static func feedTabReselectionAction(for route: TaggrRoute) -> FeedTabReselectionAction {
+        switch route {
+        case .feed(.hot), .feed(.latest), .feed(.personal):
+            return .scrollToTop
+        default:
+            return .returnToHomeFeed
+        }
+    }
+
+    private func handleFeedTabReselection() {
+        switch Self.feedTabReselectionAction(for: state.route) {
+        case .returnToHomeFeed:
+            state.navigateToHomeFeed()
+        case .scrollToTop:
+            feedScrollToTopRevision &+= 1
+        }
+    }
+}
+
+enum FeedTabReselectionAction: Equatable {
+    case returnToHomeFeed
+    case scrollToTop
 }
 
 private struct RouteLoadKey: Hashable {
@@ -101,6 +127,7 @@ private struct RouteLoadKey: Hashable {
 
 private struct FeedRouteView: View {
     @Environment(TaggrAppCoordinator.self) private var state
+    let scrollToTopRevision: Int
 
     var body: some View {
         switch state.route {
@@ -115,7 +142,98 @@ private struct FeedRouteView: View {
                 backRoute: .profile(handle)
             )
         default:
-            FeedView()
+            FeedView(scrollToTopRevision: scrollToTopRevision)
+        }
+    }
+}
+
+private struct FeedTabReselectionObserver: UIViewControllerRepresentable {
+    let action: @MainActor () -> Void
+
+    func makeUIViewController(context: Context) -> ObserverViewController {
+        ObserverViewController(action: action)
+    }
+
+    func updateUIViewController(_ viewController: ObserverViewController, context: Context) {
+        viewController.action = action
+        viewController.installIfPossible()
+    }
+
+    static func dismantleUIViewController(_ viewController: ObserverViewController, coordinator: ()) {
+        viewController.uninstall()
+    }
+
+    final class ObserverViewController: UIViewController, UITabBarControllerDelegate {
+        var action: @MainActor () -> Void
+        private weak var observedTabViewController: UIViewController?
+        private weak var installedTabBarController: UITabBarController?
+        private weak var forwardedDelegate: (any UITabBarControllerDelegate)?
+
+        init(action: @escaping @MainActor () -> Void) {
+            self.action = action
+            super.init(nibName: nil, bundle: nil)
+            view.isUserInteractionEnabled = false
+        }
+
+        @available(*, unavailable)
+        required init?(coder: NSCoder) {
+            fatalError("init(coder:) has not been implemented")
+        }
+
+        override func viewDidAppear(_ animated: Bool) {
+            super.viewDidAppear(animated)
+            installIfPossible()
+        }
+
+        func installIfPossible() {
+            guard let tabBarController else { return }
+            observedTabViewController = rootTabViewController(in: tabBarController)
+
+            guard tabBarController.delegate !== self else { return }
+            forwardedDelegate = tabBarController.delegate
+            tabBarController.delegate = self
+            installedTabBarController = tabBarController
+        }
+
+        func uninstall() {
+            guard let installedTabBarController,
+                  installedTabBarController.delegate === self else { return }
+            installedTabBarController.delegate = forwardedDelegate
+        }
+
+        func tabBarController(
+            _ tabBarController: UITabBarController,
+            shouldSelect viewController: UIViewController
+        ) -> Bool {
+            let shouldSelect = forwardedDelegate?.tabBarController?(
+                tabBarController,
+                shouldSelect: viewController
+            ) ?? true
+            if shouldSelect,
+               tabBarController.selectedViewController === viewController,
+               observedTabViewController === viewController {
+                DispatchQueue.main.async { [action] in action() }
+            }
+            return shouldSelect
+        }
+
+        override func responds(to selector: Selector!) -> Bool {
+            super.responds(to: selector) || forwardedDelegate?.responds(to: selector) == true
+        }
+
+        override func forwardingTarget(for selector: Selector!) -> Any? {
+            if forwardedDelegate?.responds(to: selector) == true {
+                return forwardedDelegate
+            }
+            return super.forwardingTarget(for: selector)
+        }
+
+        private func rootTabViewController(in tabBarController: UITabBarController) -> UIViewController? {
+            var candidate: UIViewController? = self
+            while let current = candidate, current.parent !== tabBarController {
+                candidate = current.parent
+            }
+            return candidate
         }
     }
 }

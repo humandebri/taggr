@@ -2,16 +2,75 @@ import Foundation
 import ICNativeClient
 import Observation
 
+struct RealmPostingScope: Hashable {
+    let canisterID: String
+    let userID: Int
+}
+
+struct RealmPostingPreferences {
+    private static let keyPrefix = "taggr.realm-posting-history"
+    private static let maxDestinations = 100
+
+    private let defaults: UserDefaults
+
+    init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
+    }
+
+    func recentDestinations(scope: RealmPostingScope) -> [String] {
+        defaults.stringArray(forKey: storageKey(scope: scope)) ?? []
+    }
+
+    func record(destination: String?, scope: RealmPostingScope) {
+        let destination = destination?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        var destinations = recentDestinations(scope: scope)
+        destinations.removeAll { $0.caseInsensitiveCompare(destination) == .orderedSame }
+        destinations.insert(destination, at: 0)
+        defaults.set(Array(destinations.prefix(Self.maxDestinations)), forKey: storageKey(scope: scope))
+    }
+
+    func validDestinations(scope: RealmPostingScope, availableRealms: [String]) -> [String] {
+        recentDestinations(scope: scope).compactMap { destination in
+            guard !destination.isEmpty else { return "" }
+            return availableRealms.first {
+                $0.caseInsensitiveCompare(destination) == .orderedSame
+            }
+        }
+    }
+
+    func orderedRealms(scope: RealmPostingScope, availableRealms: [String]) -> [String] {
+        let recentRealms = validDestinations(scope: scope, availableRealms: availableRealms)
+            .filter { !$0.isEmpty }
+        return recentRealms + availableRealms.filter { realm in
+            !recentRealms.contains { $0.caseInsensitiveCompare(realm) == .orderedSame }
+        }
+    }
+
+    private func storageKey(scope: RealmPostingScope) -> String {
+        "\(Self.keyPrefix).\(scope.canisterID).\(scope.userID)"
+    }
+}
+
 @MainActor
 @Observable
 final class NavigationStore {
     var route: TaggrRoute = .feed(.hot)
     var returnFeedMode: TaggrFeedMode = .hot
+    var lastHomeFeedMode: TaggrFeedMode = .hot
     var profileReturnRoute: TaggrRoute = .feed(.hot)
     var routeLoadRevision = 0
 
     func setReturnFeedMode(_ mode: TaggrFeedMode) {
         returnFeedMode = mode
+    }
+
+    func rememberHomeFeedMode(_ mode: TaggrFeedMode) {
+        switch mode {
+        case .hot, .latest, .personal:
+            lastHomeFeedMode = mode
+        case .realm, .tags:
+            break
+        }
     }
 
     func setProfileReturnRoute(_ route: TaggrRoute) {
@@ -53,45 +112,7 @@ final class FeedStore {
     var repliesByPostID: [Int: [TaggrPost]] = [:]
     var loadingReplyPostIDs: Set<Int> = []
     var canLoadMoreFeed = false
-    var authorProfilesByUserID: [Int: TaggrUser] = [:]
     var authorNamesByUserID: [Int: String] = [:]
-    var loadingAuthorProfileIDs: Set<Int> = []
-    var authorProfileRetryAfter: [Int: Date] = [:]
-
-    func setCanLoadMoreFeed(_ value: Bool) {
-        canLoadMoreFeed = value
-    }
-
-    func setAuthorProfile(_ profile: TaggrUser?, userID: Int) {
-        authorProfilesByUserID[userID] = profile
-    }
-
-    func setAuthorName(_ name: String?, userID: Int) {
-        authorNamesByUserID[userID] = name
-    }
-
-    func setAuthorProfileLoading(_ loading: Bool, userID: Int) {
-        if loading {
-            loadingAuthorProfileIDs.insert(userID)
-        } else {
-            loadingAuthorProfileIDs.remove(userID)
-        }
-    }
-
-    func setAuthorProfileRetryDate(_ date: Date?, userID: Int) {
-        authorProfileRetryAfter[userID] = date
-    }
-
-    func removeAllAuthorProfileRetryDates() {
-        authorProfileRetryAfter.removeAll()
-    }
-
-    func clearAuthorCaches() {
-        authorProfilesByUserID.removeAll()
-        authorNamesByUserID.removeAll()
-        loadingAuthorProfileIDs.removeAll()
-        authorProfileRetryAfter.removeAll()
-    }
 }
 
 @MainActor
@@ -100,6 +121,8 @@ final class ContentStore {
     var focusedPost: TaggrPost?
     var profile: TaggrUser?
     var realms: [TaggrRealm] = []
+    var nextAllRealmsPage = 0
+    var canLoadMoreRealms = false
 }
 
 @MainActor

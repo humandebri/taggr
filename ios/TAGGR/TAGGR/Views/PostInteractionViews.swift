@@ -34,7 +34,6 @@ struct PostEngagementBar: View {
                 .accessibilityLabel(showingActionPanel ? "Hide post actions" : "Show post actions")
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.leading, TimelineLayout.avatarSize + TimelineLayout.avatarContentGap)
 
             if showingActionPanel {
                 PostInlineActionPanel(
@@ -335,6 +334,11 @@ struct PostInlineActionPanel: View {
                     }
                 }
                 .padding(.vertical, 2)
+            }
+
+            if !post.reactions.isEmpty {
+                PostReactionDetailsView(post: post)
+                    .environment(state)
             }
         }
         .padding(10)

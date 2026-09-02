@@ -89,9 +89,6 @@ struct SettingsView: View {
                     }
                     if state.authSession != nil {
                         if let user = state.currentUser {
-                            SettingsPanel(title: "Icon") {
-                                AccountAvatarSettingsPanel(user: user)
-                            }
                             SettingsPanel(title: "Storage") {
                                 StorageSettingsPanel(user: user)
                             }

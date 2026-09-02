@@ -5,7 +5,71 @@ import UIKit
 import ICNativeClient
 @testable import TAGGR
 
+private func realmListJSON(_ names: [String]) -> Data {
+    let rows = names.map {
+        "[\"\($0)\",{\"description\":\"Builders\",\"label_color\":\"#123456\",\"num_members\":2,\"num_posts\":3}]"
+    }
+    return Data("[\(rows.joined(separator: ","))]".utf8)
+}
+
 extension TaggrTests {
+    func testRealmPostingPreferencesKeepScopedRecentDestinations() {
+        let suiteName = "RealmPostingPreferencesTests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let preferences = RealmPostingPreferences(defaults: defaults)
+        let aliceMainnet = RealmPostingScope(canisterID: "mainnet", userID: 7)
+        let aliceStaging = RealmPostingScope(canisterID: "staging", userID: 7)
+        let bobMainnet = RealmPostingScope(canisterID: "mainnet", userID: 8)
+
+        preferences.record(destination: "DEV", scope: aliceMainnet)
+        preferences.record(destination: "ART", scope: aliceMainnet)
+        preferences.record(destination: "dev", scope: aliceMainnet)
+        preferences.record(destination: nil, scope: aliceMainnet)
+
+        XCTAssertEqual(preferences.recentDestinations(scope: aliceMainnet), ["", "dev", "ART"])
+        XCTAssertEqual(
+            preferences.validDestinations(scope: aliceMainnet, availableRealms: ["DEV", "OTHER"]),
+            ["", "DEV"]
+        )
+        XCTAssertEqual(
+            preferences.orderedRealms(scope: aliceMainnet, availableRealms: ["OTHER", "DEV"]),
+            ["DEV", "OTHER"]
+        )
+        XCTAssertTrue(preferences.recentDestinations(scope: aliceStaging).isEmpty)
+        XCTAssertTrue(preferences.recentDestinations(scope: bobMainnet).isEmpty)
+    }
+
+    @MainActor
+    func testPostingRealmSelectionUsesContextThenRecentDestination() throws {
+        let suiteName = "PostingRealmSelectionTests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let preferences = RealmPostingPreferences(defaults: defaults)
+        let state = TaggrAppCoordinator(realmPostingPreferences: preferences)
+        state.currentUser = TaggrUser(
+            id: 7,
+            name: "alice",
+            about: "",
+            principal: nil,
+            realms: ["OTHER", "DEV"],
+            followees: [],
+            followers: [],
+            blacklist: [],
+            mode: nil
+        )
+        let scope = try XCTUnwrap(state.realmPostingScope)
+        preferences.record(destination: "DEV", scope: scope)
+
+        XCTAssertEqual(state.initialPostingRealm(for: .hot), "DEV")
+        XCTAssertEqual(state.initialPostingRealm(for: .realm("ART")), "ART")
+        XCTAssertEqual(state.orderedPostingRealms(targetRealm: nil), ["DEV", "OTHER"])
+        XCTAssertEqual(state.orderedPostingRealms(targetRealm: "ART"), ["ART", "DEV", "OTHER"])
+
+        preferences.record(destination: nil, scope: scope)
+        XCTAssertEqual(state.initialPostingRealm(for: .latest), "")
+    }
+
     func testLoadRealmsListUsesCurrentUserJoinedRealms() async throws {
         var calls: [(method: String, arg: Data)] = []
         let api = makeStubbedAPI { request in
@@ -13,7 +77,7 @@ extension TaggrTests {
                 calls.append(call)
             }
             let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
-            return (response, Self.queryReply(Data(##"[{"name":"DEV","description":"Builders","label_color":"#123456","num_members":2,"num_posts":3}]"##.utf8)))
+            return (response, Self.queryReply(Data(##"[{"description":"Builders","label_color":"#123456","num_members":2,"num_posts":3}]"##.utf8)))
         }
         let state = TaggrAppCoordinator(api: api)
         state.currentUser = TaggrUser(
@@ -56,6 +120,227 @@ extension TaggrTests {
         XCTAssertEqual(calls.first?.arg, try TaggrCandid.jsonArguments([TaggrRuntimeConfig.productionDomain, "popularity", 0]))
         XCTAssertEqual(state.realms.map(\.name), ["DEV"])
         XCTAssertEqual(state.realms.first?.description, "Builders")
+        XCTAssertEqual(state.nextAllRealmsPage, 1)
+        XCTAssertFalse(state.canLoadMoreRealms)
+    }
+
+    @MainActor
+    func testLoadAllRealmsListAppendsNextPageWithoutDuplicatesAndResets() async throws {
+        let pageSize = 20
+        let firstPageNames = (0 ..< pageSize).map { "REALM\($0)" }
+        var calls: [(method: String, arg: Data)] = []
+        let api = makeStubbedAPI { request in
+            if let call = self.requestMethodAndArg(from: request) {
+                calls.append(call)
+            }
+            let names = switch calls.count {
+            case 1: firstPageNames
+            case 2: ["REALM19", "REALM20"]
+            default: ["REFRESHED"]
+            }
+            let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
+            return (response, Self.queryReply(realmListJSON(names)))
+        }
+        let state = TaggrAppCoordinator(api: api)
+
+        await state.loadAllRealmsList()
+
+        XCTAssertEqual(state.realms.count, pageSize)
+        XCTAssertEqual(state.nextAllRealmsPage, 1)
+        XCTAssertTrue(state.canLoadMoreRealms)
+
+        await state.loadAllRealmsList(reset: false)
+
+        let secondCall = try XCTUnwrap(calls.dropFirst().first)
+        XCTAssertEqual(secondCall.arg, try TaggrCandid.jsonArguments([TaggrRuntimeConfig.productionDomain, "popularity", 1]))
+        XCTAssertEqual(state.realms.count, 21)
+        XCTAssertEqual(state.realms.last?.name, "REALM20")
+        XCTAssertEqual(state.nextAllRealmsPage, 2)
+        XCTAssertFalse(state.canLoadMoreRealms)
+
+        await state.loadAllRealmsList()
+
+        let thirdCall = try XCTUnwrap(calls.dropFirst(2).first)
+        XCTAssertEqual(thirdCall.arg, try TaggrCandid.jsonArguments([TaggrRuntimeConfig.productionDomain, "popularity", 0]))
+        XCTAssertEqual(state.realms.map(\.name), ["REFRESHED"])
+        XCTAssertEqual(state.nextAllRealmsPage, 1)
+        XCTAssertFalse(state.canLoadMoreRealms)
+
+        state.nextAllRealmsPage = 4
+        state.canLoadMoreRealms = true
+        await state.loadRealmsList()
+
+        XCTAssertEqual(state.nextAllRealmsPage, 0)
+        XCTAssertFalse(state.canLoadMoreRealms)
+    }
+
+    @MainActor
+    func testRealmAccessPolicyUsesJoinedAndControlledRealms() {
+        let state = TaggrAppCoordinator()
+        state.currentUser = TaggrUser(
+            id: 7,
+            name: "alice",
+            about: "",
+            principal: nil,
+            realms: ["DEV"],
+            followees: [],
+            followers: [],
+            blacklist: [],
+            controlledRealms: ["MODS"],
+            mode: nil
+        )
+
+        XCTAssertTrue(state.isJoinedRealm("dev"))
+        XCTAssertFalse(state.isJoinedRealm("MODS"))
+        XCTAssertTrue(state.canManageRealm("mods"))
+        XCTAssertFalse(state.canManageRealm("DEV"))
+    }
+
+    @MainActor
+    func testRealmMembershipOperationRejectsConcurrentRequest() async {
+        var calls: [String] = []
+        let api = makeStubbedAPI { request in
+            if let call = self.requestMethodAndArg(from: request) {
+                calls.append(call.method)
+            }
+            let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
+            return (response, Self.queryReply(Data("true".utf8)))
+        }
+        let state = TaggrAppCoordinator(api: api)
+        state.realmMembershipOperation = "OTHER"
+
+        let result = await state.setRealmMembership(name: "DEV", joined: true)
+        XCTAssertFalse(result)
+        XCTAssertTrue(calls.isEmpty)
+    }
+
+    @MainActor
+    func testJoinRealmRefreshesUserAndRealmMetadata() async {
+        var calls: [String] = []
+        let api = makeStubbedAPI { request in
+            let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
+            guard let call = self.requestMethodAndArg(from: request) else {
+                return (response, Self.queryReply(Data("null".utf8)))
+            }
+            calls.append(call.method)
+            switch call.method {
+            case "toggle_realm_membership":
+                return (response, Self.queryReply(Data("true".utf8)))
+            case "user":
+                return (response, Self.queryReply(Self.realmUserFixture(realms: ["DEV"])))
+            case "realms":
+                return (response, Self.queryReply(Data(##"[{"description":"Builders","num_members":1}]"##.utf8)))
+            default:
+                return (response, Self.queryReply(Data("null".utf8)))
+            }
+        }
+        let state = TaggrAppCoordinator(api: api)
+        state.authSession = makeAuthSession(privateKey: Curve25519.Signing.PrivateKey())
+        state.currentUser = try? JSONDecoder.taggr.decode(TaggrUser.self, from: Self.realmUserFixture(realms: []))
+        state.realms = [
+            TaggrRealm(name: "DEV", description: "Builders", labelColor: nil, logo: nil, numMembers: 0, numPosts: 0)
+        ]
+
+        let result = await state.setRealmMembership(name: "DEV", joined: true)
+
+        XCTAssertTrue(result)
+        XCTAssertTrue(state.isJoinedRealm("DEV"))
+        XCTAssertEqual(state.realms.first?.numMembers, 1)
+        XCTAssertEqual(calls, ["toggle_realm_membership", "user", "realms"])
+    }
+
+    @MainActor
+    func testLeaveRealmStaysOnRealmAndRefreshesMembership() async {
+        var calls: [String] = []
+        let api = makeStubbedAPI { request in
+            let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
+            guard let call = self.requestMethodAndArg(from: request) else {
+                return (response, Self.queryReply(Data("null".utf8)))
+            }
+            calls.append(call.method)
+            switch call.method {
+            case "toggle_realm_membership":
+                return (response, Self.queryReply(Data("false".utf8)))
+            case "user":
+                return (response, Self.queryReply(Self.realmUserFixture(realms: [])))
+            case "realms":
+                return (response, Self.queryReply(Data(##"[{"description":"Builders","num_members":0}]"##.utf8)))
+            default:
+                return (response, Self.queryReply(Data("null".utf8)))
+            }
+        }
+        let state = TaggrAppCoordinator(api: api)
+        state.authSession = makeAuthSession(privateKey: Curve25519.Signing.PrivateKey())
+        state.currentUser = try? JSONDecoder.taggr.decode(TaggrUser.self, from: Self.realmUserFixture(realms: ["DEV"]))
+        state.route = .realm("DEV")
+
+        let result = await state.setRealmMembership(name: "DEV", joined: false)
+
+        XCTAssertTrue(result)
+        XCTAssertFalse(state.isJoinedRealm("DEV"))
+        XCTAssertEqual(state.route, .realm("DEV"))
+        XCTAssertEqual(calls, ["toggle_realm_membership", "user", "realms"])
+    }
+
+    nonisolated static func realmUserFixture(realms: [String]) -> Data {
+        let realmJSON = realms.map { "\"\($0)\"" }.joined(separator: ",")
+        return Data(
+            """
+            {
+              "id": 7,
+              "name": "alice",
+              "about": "",
+              "principal": null,
+              "realms": [\(realmJSON)],
+              "followees": [],
+              "followers": [],
+              "blacklist": [],
+              "settings": {},
+              "controlled_realms": [],
+              "mode": null
+            }
+            """.utf8
+        )
+    }
+
+    @MainActor
+    func testPostingRealmColorsDoNotMutateRealmOrFeedState() async throws {
+        let api = makeStubbedAPI { request in
+            let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
+            return (response, Self.queryReply(Data(##"[{"name":"DEV","description":"","label_color":"#123456"}]"##.utf8)))
+        }
+        let state = TaggrAppCoordinator(api: api)
+        let existingRealm = TaggrRealm(
+            name: "OLD",
+            description: "",
+            labelColor: nil,
+            logo: nil,
+            numMembers: nil,
+            numPosts: nil
+        )
+        state.realms = [existingRealm]
+        state.feed = [samplePost(id: 42, body: "hello", files: [:])]
+
+        let colors = await state.postingRealmColors(["DEV"])
+
+        XCTAssertEqual(colors, ["DEV": "#123456"])
+        XCTAssertEqual(state.realms, [existingRealm])
+        XCTAssertEqual(state.feed.map(\.id), [42])
+        XCTAssertNil(state.errorMessage)
+    }
+
+    @MainActor
+    func testPostingRealmColorFailureFallsBackWithoutGlobalError() async {
+        let api = makeStubbedAPI { request in
+            let response = HTTPURLResponse(url: request.url!, statusCode: 500, httpVersion: nil, headerFields: nil)!
+            return (response, Data())
+        }
+        let state = TaggrAppCoordinator(api: api)
+
+        let colors = await state.postingRealmColors(["DEV"])
+
+        XCTAssertEqual(colors, [:])
+        XCTAssertNil(state.errorMessage)
     }
 
     @MainActor
@@ -111,8 +396,14 @@ extension TaggrTests {
             }
             return (response, Self.queryReply(Self.candidResultOkNat64(42)))
         }
-        let state = TaggrAppCoordinator(api: api)
+        let suiteName = "SubmitPostRealmPreferencesTests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let preferences = RealmPostingPreferences(defaults: defaults)
+        let state = TaggrAppCoordinator(api: api, realmPostingPreferences: preferences)
         state.authSession = makeAuthSession(privateKey: Curve25519.Signing.PrivateKey())
+        state.currentUser = try JSONDecoder.taggr.decode(TaggrUser.self, from: Self.currentUserFixture())
+        let postingScope = try XCTUnwrap(state.realmPostingScope)
         state.route = .feed(.realm("DEV"))
 
         await state.submitPost(text: "hello", realm: "DEV", reloadMode: .realm("DEV"))
@@ -123,6 +414,7 @@ extension TaggrTests {
         XCTAssertEqual(calls.last?.arg, try TaggrCandid.jsonArguments([TaggrRuntimeConfig.productionDomain, "DEV", 0, 0, true]))
         XCTAssertEqual(state.route, .feed(.realm("DEV")))
         XCTAssertEqual(state.currentUser?.name, "alice")
+        XCTAssertEqual(preferences.recentDestinations(scope: postingScope), ["DEV"])
     }
 
     @MainActor
@@ -141,8 +433,14 @@ extension TaggrTests {
             }
             return (response, Self.queryReply(Self.candidResultOkNat64(42)))
         }
-        let state = TaggrAppCoordinator(api: api)
+        let suiteName = "SubmitPostTaggrPreferencesTests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let preferences = RealmPostingPreferences(defaults: defaults)
+        let state = TaggrAppCoordinator(api: api, realmPostingPreferences: preferences)
         state.authSession = makeAuthSession(privateKey: Curve25519.Signing.PrivateKey())
+        state.currentUser = try JSONDecoder.taggr.decode(TaggrUser.self, from: Self.currentUserFixture())
+        let postingScope = try XCTUnwrap(state.realmPostingScope)
 
         await state.submitPost(text: "hello")
 
@@ -150,6 +448,46 @@ extension TaggrTests {
         XCTAssertEqual(calls.map(\.method), ["add_post", "user", "hot_posts"])
         XCTAssertEqual(calls.last?.arg, try TaggrCandid.jsonArguments([TaggrRuntimeConfig.productionDomain, "", 0, 0, true]))
         XCTAssertEqual(state.route, .feed(.hot))
+        XCTAssertEqual(preferences.recentDestinations(scope: postingScope), [""])
+    }
+
+    @MainActor
+    func testFailedAndReplyPostsDoNotUpdateRealmPostingPreferences() async throws {
+        let suiteName = "UntrackedPostRealmPreferencesTests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let preferences = RealmPostingPreferences(defaults: defaults)
+        let user = try JSONDecoder.taggr.decode(TaggrUser.self, from: Self.currentUserFixture())
+        let scope = RealmPostingScope(canisterID: TaggrRuntimeConfig.productionCanisterId, userID: user.id)
+        preferences.record(destination: "ART", scope: scope)
+
+        let failingAPI = makeStubbedAPI { request in
+            let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
+            return (response, Self.queryReply(Self.candidResultErr("denied")))
+        }
+        let failingState = TaggrAppCoordinator(api: failingAPI, realmPostingPreferences: preferences)
+        failingState.authSession = makeAuthSession(privateKey: Curve25519.Signing.PrivateKey())
+        failingState.currentUser = user
+
+        await failingState.submitPost(text: "hello", realm: "DEV")
+        XCTAssertEqual(preferences.recentDestinations(scope: scope), ["ART"])
+
+        let replyAPI = makeStubbedAPI { request in
+            let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
+            if request.url?.path.hasSuffix("/query") == true {
+                if self.requestMethodAndArg(from: request)?.method == "user" {
+                    return (response, Self.queryReply(Self.currentUserFixture()))
+                }
+                return (response, Self.queryReply(Data("[]".utf8)))
+            }
+            return (response, Self.queryReply(Self.candidResultOkNat64(42)))
+        }
+        let replyState = TaggrAppCoordinator(api: replyAPI, realmPostingPreferences: preferences)
+        replyState.authSession = makeAuthSession(privateKey: Curve25519.Signing.PrivateKey())
+        replyState.currentUser = user
+
+        await replyState.submitPost(text: "reply", parent: 42, realm: "DEV")
+        XCTAssertEqual(preferences.recentDestinations(scope: scope), ["ART"])
     }
 
     @MainActor
@@ -231,8 +569,15 @@ extension TaggrTests {
             }
             return (response, Self.queryReply(Self.candidResultOkNat64(42)))
         }
-        let state = TaggrAppCoordinator(api: api)
+        let suiteName = "EditPostRealmPreferencesTests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let preferences = RealmPostingPreferences(defaults: defaults)
+        let state = TaggrAppCoordinator(api: api, realmPostingPreferences: preferences)
         state.authSession = makeAuthSession(privateKey: Curve25519.Signing.PrivateKey())
+        state.currentUser = try JSONDecoder.taggr.decode(TaggrUser.self, from: Self.currentUserFixture())
+        let postingScope = try XCTUnwrap(state.realmPostingScope)
+        preferences.record(destination: "ART", scope: postingScope)
         state.route = .post(42)
         let post = samplePost(id: 42, user: 7, body: "hello", files: [:], realm: "DEV")
 
@@ -245,6 +590,7 @@ extension TaggrTests {
             calls.first?.arg,
             TaggrCandid.encodeEditPost(id: 42, text: "updated", refs: [], patch: patch, realm: "DEV")
         )
+        XCTAssertEqual(preferences.recentDestinations(scope: postingScope), ["ART"])
     }
 
     @MainActor
@@ -557,258 +903,21 @@ extension TaggrTests {
     }
 
     @MainActor
-    func testAvatarUpdateSendsMergedSettingsAndRefreshesUser() async throws {
-        var calls: [(method: String, arg: Data)] = []
-        let api = makeStubbedAPI { request in
-            if let call = self.requestMethodAndArg(from: request) {
-                calls.append(call)
-            }
-            let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
-            if request.url?.path.hasSuffix("/query") == true, calls.last?.method == "user" {
-                return (
-                    response,
-                    Self.queryReply(Data(#"{"id":7,"name":"alice","about":"","principal":null,"realms":[],"followees":[],"followers":[],"blacklist":[],"settings":{"tap_and_hold":"350","avatar_url":"https://example.com/icon.png"},"controlled_realms":[],"mode":null}"#.utf8))
-                )
-            }
-            return (response, Self.queryReply(Data("null".utf8)))
-        }
-        let state = TaggrAppCoordinator(api: api)
-        state.authSession = makeAuthSession(privateKey: Curve25519.Signing.PrivateKey())
-        state.currentUser = TaggrUser(
-            id: 7,
-            name: "alice",
-            about: "",
-            principal: nil,
-            realms: [],
-            followees: [],
-            followers: [],
-            blacklist: [],
-            settings: ["tap_and_hold": "350"],
-            mode: nil
-        )
-
-        await state.updateCurrentUserAvatarURL(" https://example.com/icon.png ")
-
-        let update = try XCTUnwrap(calls.first { $0.method == "update_user_settings" })
-        let settings = try XCTUnwrap(JSONSerialization.jsonObject(with: update.arg) as? [String: String])
-        XCTAssertEqual(settings["tap_and_hold"], "350")
-        XCTAssertEqual(settings[TaggrAvatar.settingKey], "https://example.com/icon.png")
-        XCTAssertEqual(state.currentUser?.avatarURLString, "https://example.com/icon.png")
-        let authoredPost = samplePost(id: 42, user: 7, body: "hello", files: [:])
-        XCTAssertEqual(state.avatarURLString(for: authoredPost), "https://example.com/icon.png")
-        XCTAssertNil(state.errorMessage)
-    }
-
-    @MainActor
-    func testAuthorAvatarUsesCachedProfileWhenPostMetaAvatarMissing() async throws {
-        var calls: [(method: String, arg: Data)] = []
-        let api = makeStubbedAPI { request in
-            if let call = self.requestMethodAndArg(from: request) {
-                calls.append(call)
-            }
-            let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
-            if calls.last?.method == "user" {
-                return (response, Self.queryReply(Self.userFixture(avatarURL: "https://example.com/alice.png")))
-            }
-            return (response, Self.queryReply(Data("null".utf8)))
-        }
-        let state = TaggrAppCoordinator(api: api)
-        let post = samplePost(id: 42, user: 7, body: "hello", files: [:])
-
-        XCTAssertNil(state.avatarURLString(for: post))
-        await state.prefetchAuthorProfile(for: post)
-
-        XCTAssertEqual(state.avatarURLString(for: post), "https://example.com/alice.png")
-        XCTAssertEqual(calls.map(\.method), ["user"])
-        XCTAssertNil(state.errorMessage)
-    }
-
-    @MainActor
-    func testAuthorProfilePrefetchDeduplicatesCachedUsers() async throws {
-        var calls: [(method: String, arg: Data)] = []
-        let api = makeStubbedAPI { request in
-            if let call = self.requestMethodAndArg(from: request) {
-                calls.append(call)
-            }
-            let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
-            if calls.last?.method == "user" {
-                return (response, Self.queryReply(Self.userFixture(avatarURL: "https://example.com/alice.png")))
-            }
-            return (response, Self.queryReply(Data("null".utf8)))
-        }
-        let state = TaggrAppCoordinator(api: api)
-        let first = samplePost(id: 1, user: 7, body: "hello", files: [:])
-        let second = samplePost(id: 2, user: 7, body: "again", files: [:])
-
-        await state.prefetchAuthorProfile(for: first)
-        await state.prefetchAuthorProfile(for: second)
-
-        XCTAssertEqual(calls.filter { $0.method == "user" }.count, 1)
-        XCTAssertEqual(state.avatarURLString(for: second), "https://example.com/alice.png")
-        XCTAssertNil(state.errorMessage)
-    }
-
-    @MainActor
-    func testAuthorProfilePrefetchDeduplicatesUsersWithoutAvatars() async throws {
-        var calls: [(method: String, arg: Data)] = []
-        let api = makeStubbedAPI { request in
-            if let call = self.requestMethodAndArg(from: request) {
-                calls.append(call)
-            }
-            let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
-            if calls.last?.method == "user" {
-                return (response, Self.queryReply(Self.userFixture()))
-            }
-            return (response, Self.queryReply(Data("null".utf8)))
-        }
-        let state = TaggrAppCoordinator(api: api)
-        let first = samplePost(id: 1, user: 7, body: "hello", files: [:])
-        let second = samplePost(id: 2, user: 7, body: "again", files: [:])
-
-        await state.prefetchAuthorProfile(for: first)
-        await state.prefetchAuthorProfile(for: second)
-
-        XCTAssertEqual(calls.filter { $0.method == "user" }.count, 1)
-        XCTAssertEqual(state.authorDisplayName(for: second), "alice")
-        XCTAssertNil(state.avatarURLString(for: second))
-        XCTAssertNil(state.errorMessage)
-    }
-
-    @MainActor
-    func testAuthorProfilePrefetchResolvesMissingAuthorNameWithUsersData() async throws {
-        var calls: [(method: String, arg: Data)] = []
-        let api = makeStubbedAPI { request in
-            if let call = self.requestMethodAndArg(from: request) {
-                calls.append(call)
-            }
-            let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
-            switch calls.last?.method {
-            case "users_data":
-                return (response, Self.queryReply(Data(#"{"7":"alice"}"#.utf8)))
-            case "user":
-                return (response, Self.queryReply(Self.userFixture(avatarURL: "https://example.com/alice.png")))
-            default:
-                return (response, Self.queryReply(Data("null".utf8)))
-            }
-        }
-        let state = TaggrAppCoordinator(api: api)
-        let post = samplePost(
-            id: 42,
-            user: 7,
+    func testAuthorDisplayNameUsesPostMetadataAndFallsBackToUserID() {
+        let state = TaggrAppCoordinator()
+        let named = samplePost(id: 1, user: 7, body: "hello", files: [:])
+        let missing = samplePost(
+            id: 2,
+            user: 8,
             body: "hello",
             files: [:],
             meta: TaggrPostMeta(authorName: nil, realmColor: nil, nsfw: false, viewerBlocked: false)
         )
 
-        await state.prefetchAuthorProfile(for: post)
-
-        XCTAssertEqual(calls.map(\.method), ["users_data", "user"])
-        XCTAssertEqual(state.authorDisplayName(for: post), "alice")
-        XCTAssertEqual(state.avatarURLString(for: post), "https://example.com/alice.png")
-        XCTAssertNil(state.errorMessage)
-    }
-
-    @MainActor
-    func testAuthorProfilePrefetchFailureRecordsRetryWithoutBanner() async throws {
-        var calls: [(method: String, arg: Data)] = []
-        let api = makeStubbedAPI { request in
-            if let call = self.requestMethodAndArg(from: request) {
-                calls.append(call)
-            }
-            let status = calls.last?.method == "user" ? 500 : 200
-            let response = HTTPURLResponse(url: request.url!, statusCode: status, httpVersion: nil, headerFields: nil)!
-            return (response, Self.queryReply(Data("null".utf8)))
-        }
-        let state = TaggrAppCoordinator(api: api)
-        let post = samplePost(id: 42, user: 7, body: "hello", files: [:])
-
-        await state.prefetchAuthorProfile(for: post)
-        await state.prefetchAuthorProfile(for: post)
-
-        XCTAssertNil(state.avatarURLString(for: post))
-        XCTAssertNil(state.errorMessage)
-        XCTAssertNotNil(state.authorProfileRetryAfter[7])
-        XCTAssertEqual(calls.filter { $0.method == "user" }.count, 1)
-    }
-
-    @MainActor
-    func testAuthorProfileCacheEvictsOldEntriesAtLimit() async throws {
-        var userQueryCount = 0
-        let api = makeStubbedAPI { request in
-            let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
-            if self.requestMethodAndArg(from: request)?.method == "user" {
-                userQueryCount += 1
-                return (
-                    response,
-                    Self.queryReply(Self.userFixture(
-                        id: userQueryCount,
-                        name: "user\(userQueryCount)",
-                        avatarURL: "https://example.com/\(userQueryCount).png"
-                    ))
-                )
-            }
-            return (response, Self.queryReply(Data("null".utf8)))
-        }
-        let state = TaggrAppCoordinator(api: api)
-
-        for userID in 1...501 {
-            let post = samplePost(
-                id: userID,
-                user: userID,
-                body: "hello",
-                files: [:],
-                meta: TaggrPostMeta(authorName: "user\(userID)", realmColor: nil, nsfw: false, viewerBlocked: false)
-            )
-            await state.prefetchAuthorProfile(for: post)
-        }
-
-        let evicted = samplePost(
-            id: 1,
-            user: 1,
-            body: "hello",
-            files: [:],
-            meta: TaggrPostMeta(authorName: "user1", realmColor: nil, nsfw: false, viewerBlocked: false)
-        )
-        let newest = samplePost(
-            id: 501,
-            user: 501,
-            body: "hello",
-            files: [:],
-            meta: TaggrPostMeta(authorName: "user501", realmColor: nil, nsfw: false, viewerBlocked: false)
-        )
-
-        XCTAssertEqual(state.authorProfilesByUserID.count, 500)
-        XCTAssertEqual(state.authorNamesByUserID.count, 500)
-        XCTAssertNil(state.avatarURLString(for: evicted))
-        XCTAssertEqual(state.avatarURLString(for: newest), "https://example.com/501.png")
-    }
-
-    @MainActor
-    func testAuthorProfileRetryCacheEvictsOldFailuresAtLimit() async throws {
-        let api = makeStubbedAPI { request in
-            let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
-            if self.requestMethodAndArg(from: request)?.method == "user" {
-                return (response, Self.queryReply(Self.userFixture(id: 999_999, name: "wrong")))
-            }
-            return (response, Self.queryReply(Data("null".utf8)))
-        }
-        let state = TaggrAppCoordinator(api: api)
-
-        for userID in 1...501 {
-            let post = samplePost(
-                id: userID,
-                user: userID,
-                body: "hello",
-                files: [:],
-                meta: TaggrPostMeta(authorName: "user\(userID)", realmColor: nil, nsfw: false, viewerBlocked: false)
-            )
-            await state.prefetchAuthorProfile(for: post)
-        }
-
-        XCTAssertEqual(state.authorProfileRetryAfter.count, 500)
-        XCTAssertEqual(state.authorNamesByUserID.count, 500)
-        XCTAssertNil(state.authorProfileRetryAfter[1])
-        XCTAssertNotNil(state.authorProfileRetryAfter[501])
+        XCTAssertEqual(state.authorDisplayName(for: named), "alice")
+        XCTAssertEqual(state.authorProfileHandle(for: named), "alice")
+        XCTAssertEqual(state.authorDisplayName(for: missing), "@8")
+        XCTAssertNil(state.authorProfileHandle(for: missing))
     }
 
     @MainActor

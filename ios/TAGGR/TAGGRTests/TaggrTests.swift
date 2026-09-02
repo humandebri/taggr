@@ -882,7 +882,6 @@ final class TaggrTests: XCTestCase {
         XCTAssertEqual(post.post.children, [])
         XCTAssertEqual(post.post.reactions, [:])
         XCTAssertEqual(post.post.meta.authorName, "alice")
-        XCTAssertNil(post.post.meta.authorAvatarURL)
         XCTAssertEqual(post.post.meta.realmColor, "#123456")
         XCTAssertEqual(post.post.meta.viewerBlocked, false)
         XCTAssertEqual(post.post.encrypted, false)
@@ -893,7 +892,6 @@ final class TaggrTests: XCTestCase {
     func testPostEnvelopeAllowsMissingAuthorNameFallback() throws {
         let post = try JSONDecoder.taggr.decode(TaggrPostEnvelope.self, from: postEnvelopeWithoutAuthorFixture())
         XCTAssertNil(post.post.meta.authorName)
-        XCTAssertNil(post.post.meta.authorAvatarURL)
         XCTAssertEqual(post.post.user, 7)
     }
 
@@ -911,16 +909,6 @@ final class TaggrTests: XCTestCase {
         XCTAssertEqual(posts.count, 1)
         XCTAssertEqual(posts[0].meta.authorName, "alice")
         XCTAssertEqual(posts[0].body, "hello")
-    }
-
-    func testAvatarURLNormalization() throws {
-        XCTAssertEqual(TaggrAvatar.normalizedURLString(" https://example.com/avatar.png "), "https://example.com/avatar.png")
-        XCTAssertEqual(TaggrAvatar.normalizedURLString("http://localhost/avatar.png"), "http://localhost/avatar.png")
-        XCTAssertEqual(TaggrAvatar.urlString(from: [TaggrAvatar.settingKey: "https://example.com/avatar.png"]), "https://example.com/avatar.png")
-        XCTAssertNil(TaggrAvatar.normalizedURLString("javascript:alert(1)"))
-        XCTAssertNil(TaggrAvatar.normalizedURLString("http://example.com/avatar.png"))
-        XCTAssertNil(try TaggrAvatar.validatedURLString("  "))
-        XCTAssertThrowsError(try TaggrAvatar.validatedURLString("http://example.com/avatar.png"))
     }
 
     func testConfigDecodesReactions() throws {

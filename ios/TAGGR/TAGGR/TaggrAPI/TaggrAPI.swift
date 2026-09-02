@@ -129,6 +129,23 @@ actor TaggrAPI {
         return response
     }
 
+    func setRealmMembership(name: String, joined: Bool, identity: ICAuthSession?) async throws {
+        let response = try await updateJSON("toggle_realm_membership", args: [name], identity: identity)
+        let actualState: Bool
+        do {
+            actualState = try JSONDecoder().decode(Bool.self, from: response)
+        } catch {
+            throw TaggrAPIError.invalidResponse("toggle_realm_membership: \(error.localizedDescription)")
+        }
+        guard actualState == joined else {
+            throw TaggrAPIError.rejected("Realm membership could not be updated.")
+        }
+    }
+
+    func editRealm(name: String, payload: sending [String: Any], identity: ICAuthSession?) async throws {
+        _ = try await updateJSON("edit_realm", args: [name, payload], identity: identity)
+    }
+
     func createUser(name: String, invite: String, identity: ICAuthSession?) async throws -> Data {
         try await updateJSON("create_user", args: [name, invite], identity: identity)
     }

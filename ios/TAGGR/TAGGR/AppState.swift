@@ -80,6 +80,9 @@ final class TaggrAppCoordinator {
         get { navigationStore.returnFeedMode }
         set { navigationStore.returnFeedMode = newValue }
     }
+    var lastHomeFeedMode: TaggrFeedMode {
+        navigationStore.lastHomeFeedMode
+    }
     var profileReturnRoute: TaggrRoute {
         get { navigationStore.profileReturnRoute }
         set { navigationStore.profileReturnRoute = newValue }
@@ -136,21 +139,9 @@ final class TaggrAppCoordinator {
         get { feedStore.canLoadMoreFeed }
         set { feedStore.canLoadMoreFeed = newValue }
     }
-    var authorProfilesByUserID: [Int: TaggrUser] {
-        get { feedStore.authorProfilesByUserID }
-        set { feedStore.authorProfilesByUserID = newValue }
-    }
     var authorNamesByUserID: [Int: String] {
         get { feedStore.authorNamesByUserID }
         set { feedStore.authorNamesByUserID = newValue }
-    }
-    var loadingAuthorProfileIDs: Set<Int> {
-        get { feedStore.loadingAuthorProfileIDs }
-        set { feedStore.loadingAuthorProfileIDs = newValue }
-    }
-    var authorProfileRetryAfter: [Int: Date] {
-        get { feedStore.authorProfileRetryAfter }
-        set { feedStore.authorProfileRetryAfter = newValue }
     }
     var focusedPost: TaggrPost? {
         get { contentStore.focusedPost }
@@ -163,6 +154,14 @@ final class TaggrAppCoordinator {
     var realms: [TaggrRealm] {
         get { contentStore.realms }
         set { contentStore.realms = newValue }
+    }
+    var nextAllRealmsPage: Int {
+        get { contentStore.nextAllRealmsPage }
+        set { contentStore.nextAllRealmsPage = newValue }
+    }
+    var canLoadMoreRealms: Bool {
+        get { contentStore.canLoadMoreRealms }
+        set { contentStore.canLoadMoreRealms = newValue }
     }
     var icpInvoice: TaggrICPInvoice? {
         get { walletStorageStore.icpInvoice }
@@ -189,8 +188,9 @@ final class TaggrAppCoordinator {
     var identityStore: ICIdentityStore
     var identityAuthenticator: ICInternetIdentityAuthenticator
     let postDraftStore: PostDraftStore
-    static let authorProfileRetryInterval: TimeInterval = 5 * 60
-    static let maxAuthorProfileCacheEntries = 500
+    let realmPostingPreferences: RealmPostingPreferences
+    static let maxAuthorNameCacheEntries = 500
+    static let allRealmsPageSize = 20
     enum RequestScope: Hashable, Sendable {
         case feed
         case post
@@ -205,12 +205,13 @@ final class TaggrAppCoordinator {
         let route: TaggrRoute
     }
 
-    var authorProfileCacheOrder: [Int] = []
+    var authorNameCacheOrder: [Int] = []
     var runtimeGeneration = 0
     var requestSequences: [RequestScope: Int] = [:]
     var requestTasks: [RequestScope: Task<Void, Never>] = [:]
     var activeOperationIDs: Set<UUID> = []
     var latestOperationID: UUID?
+    var realmMembershipOperation: String?
     var tagCostCache: [[String]: Int] = [:]
     var tagCostRequestSequence = 0
     var tagCostTask: Task<Int, Error>?
@@ -224,6 +225,7 @@ final class TaggrAppCoordinator {
         identityStore: ICIdentityStore? = nil,
         identityAuthenticator: ICInternetIdentityAuthenticator? = nil,
         postDraftStore: PostDraftStore = PostDraftStore(),
+        realmPostingPreferences: RealmPostingPreferences = RealmPostingPreferences(),
         buildConfig: TaggrRuntimeConfig = .current,
         initialNetwork: TaggrRuntimeNetwork? = nil,
         persistRuntimeNetwork: @escaping (TaggrRuntimeNetwork) -> Void = { _ in },
@@ -257,6 +259,39 @@ final class TaggrAppCoordinator {
         self.identityStore = identityStore ?? identityStoreFactory(config)
         self.identityAuthenticator = identityAuthenticator ?? identityAuthenticatorFactory(config)
         self.postDraftStore = postDraftStore
+        self.realmPostingPreferences = realmPostingPreferences
+    }
+
+    var realmPostingScope: RealmPostingScope? {
+        currentUser.map {
+            RealmPostingScope(canisterID: runtimeConfig.canisterId, userID: $0.id)
+        }
+    }
+
+    func initialPostingRealm(for mode: TaggrFeedMode) -> String {
+        if case .realm(let name) = mode {
+            return name
+        }
+        guard let scope = realmPostingScope else { return "" }
+        return realmPostingPreferences.validDestinations(
+            scope: scope,
+            availableRealms: currentUser?.realms ?? []
+        ).first ?? ""
+    }
+
+    func orderedPostingRealms(targetRealm: String?) -> [String] {
+        let availableRealms = currentUser?.realms ?? []
+        var realms = if let scope = realmPostingScope {
+            realmPostingPreferences.orderedRealms(scope: scope, availableRealms: availableRealms)
+        } else {
+            availableRealms
+        }
+        if let targetRealm,
+           !targetRealm.isEmpty,
+           !realms.contains(where: { $0.caseInsensitiveCompare(targetRealm) == .orderedSame }) {
+            realms.insert(targetRealm, at: 0)
+        }
+        return realms
     }
 
     var isStagingNetwork: Bool {
@@ -384,9 +419,7 @@ final class TaggrAppCoordinator {
         let request = beginRequest(.feed)
         let activeAPI = api
         returnFeedMode = mode
-        if reset {
-            authorProfileRetryAfter.removeAll()
-        }
+        navigationStore.rememberHomeFeedMode(mode)
         await executeRequest(request) {
             await self.runBusy(validWhile: { self.isCurrentRequest(request) }) {
                 let pageSize = self.cache?.config?.feedPageSize ?? 30
@@ -430,8 +463,13 @@ final class TaggrAppCoordinator {
 
     func navigateToFeed(_ mode: TaggrFeedMode) {
         returnFeedMode = mode
+        navigationStore.rememberHomeFeedMode(mode)
         focusedPost = nil
         route = .feed(mode)
+    }
+
+    func navigateToHomeFeed() {
+        navigateToFeed(lastHomeFeedMode)
     }
 
     func navigateToRealm(_ name: String) {
@@ -551,7 +589,7 @@ final class TaggrAppCoordinator {
                 guard self.isCurrentRequest(request) else { return }
                 self.profile = loadedProfile
                 if let loadedProfile {
-                    self.cacheAuthorProfile(loadedProfile)
+                    self.cacheAuthorName(loadedProfile.name, userID: loadedProfile.id)
                 }
             }
         }
@@ -565,22 +603,9 @@ final class TaggrAppCoordinator {
         try await loadPostEnvelopes("journal", args: [api.domain, handle, page, offset], identity: nil)
     }
 
-    func avatarURLString(for post: TaggrPost) -> String? {
-        if let authorAvatarURL = post.meta.authorAvatarURL {
-            return authorAvatarURL
-        }
-        if currentUser?.id == post.user {
-            return currentUser?.avatarURLString
-        }
-        return authorProfilesByUserID[post.user]?.avatarURLString
-    }
-
     func authorDisplayName(for post: TaggrPost) -> String {
         if let authorName = post.meta.authorName, !authorName.isEmpty {
             return authorName
-        }
-        if let profile = authorProfilesByUserID[post.user] {
-            return profile.name
         }
         if let authorName = authorNamesByUserID[post.user] {
             return authorName
@@ -592,81 +617,26 @@ final class TaggrAppCoordinator {
         if let authorName = post.meta.authorName, !authorName.isEmpty {
             return authorName
         }
-        if let profile = authorProfilesByUserID[post.user] {
-            return profile.name
-        }
         if let authorName = authorNamesByUserID[post.user] {
             return authorName
         }
         return nil
     }
 
-    func prefetchAuthorProfile(for post: TaggrPost) async {
-        let generation = runtimeGeneration
-        let activeAPI = api
-        guard avatarURLString(for: post) == nil else { return }
-        guard authorProfilesByUserID[post.user] == nil else { return }
-        guard !loadingAuthorProfileIDs.contains(post.user) else { return }
-        if let retryAfter = authorProfileRetryAfter[post.user], retryAfter > Date.now {
-            return
+    func authorProfileHandle(for userID: Int) -> String? {
+        if currentUser?.id == userID, let name = currentUser?.name, !name.isEmpty {
+            return name
         }
-        if let currentUser, currentUser.id == post.user {
-            cacheAuthorProfile(currentUser)
-            return
-        }
-
-        loadingAuthorProfileIDs.insert(post.user)
-        defer { loadingAuthorProfileIDs.remove(post.user) }
-
-        do {
-            guard let handle = try await resolveAuthorName(for: post, generation: generation, api: activeAPI) else {
-                guard isCurrentRuntimeGeneration(generation) else { return }
-                delayAuthorProfileRetry(for: post.user)
-                return
-            }
-            guard let profile = try await activeAPI.query("user", args: [activeAPI.domain, [handle]], as: TaggrUser.self),
-                  profile.id == post.user else {
-                guard isCurrentRuntimeGeneration(generation) else { return }
-                delayAuthorProfileRetry(for: post.user)
-                return
-            }
-            guard isCurrentRuntimeGeneration(generation) else { return }
-            cacheAuthorProfile(profile)
-        } catch {
-            guard isCurrentRuntimeGeneration(generation) else { return }
-            guard !isCancellation(error) else { return }
-            NSLog("TAGGR author profile prefetch failed: %@", error.localizedDescription)
-            delayAuthorProfileRetry(for: post.user)
-        }
-    }
-
-    func updateCurrentUserAvatarURL(_ rawURL: String?) async {
-        await runBusy {
-            guard let currentUser else {
-                throw TaggrAPIError.rejected("Create a TAGGR user before setting an icon.")
-            }
-            let normalized = try TaggrAvatar.validatedURLString(rawURL ?? "")
-            var settings = currentUser.settings
-            if let normalized {
-                settings[TaggrAvatar.settingKey] = normalized
-            } else {
-                settings.removeValue(forKey: TaggrAvatar.settingKey)
-            }
-            _ = try await api.updateJSON("update_user_settings", args: [settings], identity: authSession)
-            try await loadCurrentUserIfNeeded()
-            if profile?.id == currentUser.id {
-                profile = self.currentUser
-            }
-            if let refreshedUser = self.currentUser {
-                cacheAuthorProfile(refreshedUser)
-            }
-        }
+        guard let name = authorNamesByUserID[userID], !name.isEmpty else { return nil }
+        return name
     }
 
     func loadRealmsList() async {
         let request = beginRequest(.realm)
         let generation = request.runtimeGeneration
         let activeAPI = api
+        nextAllRealmsPage = 0
+        canLoadMoreRealms = false
         await executeRequest(request) {
             await self.runBusy(validWhile: { self.isCurrentRequest(request) }) {
                 if self.authSession != nil && self.currentUser == nil {
@@ -681,24 +651,38 @@ final class TaggrAppCoordinator {
                 }
                 let values = try await activeAPI.query("realms", args: [ids], as: [TaggrRealm].self) ?? []
                 guard self.isCurrentRuntimeGeneration(generation) else { return }
-                self.realms = values
+                self.realms = zip(ids, values).map { id, realm in
+                    realm.renamed(realm.name.isEmpty ? id : realm.name)
+                }
                 self.feed = []
             }
         }
     }
 
-    func loadAllRealmsList() async {
+    func loadAllRealmsList(reset: Bool = true) async {
+        guard reset || canLoadMoreRealms else { return }
         let request = beginRequest(.realm)
         let activeAPI = api
+        let page = reset ? 0 : nextAllRealmsPage
         await executeRequest(request) {
             await self.runBusy(validWhile: { self.isCurrentRequest(request) }) {
                 let values = try await activeAPI.query(
                     "all_realms",
-                    args: [activeAPI.domain, "popularity", 0],
+                    args: [activeAPI.domain, "popularity", page],
                     as: [TaggrRealmListEntry].self
                 ) ?? []
                 guard self.isCurrentRequest(request) else { return }
-                self.realms = values.map(\.namedRealm)
+                let loadedRealms = values.map(\.namedRealm)
+                if reset {
+                    self.realms = loadedRealms
+                } else {
+                    var existingNames = Set(self.realms.map { $0.name.lowercased() })
+                    self.realms.append(contentsOf: loadedRealms.filter {
+                        existingNames.insert($0.name.lowercased()).inserted
+                    })
+                }
+                self.nextAllRealmsPage = page + 1
+                self.canLoadMoreRealms = values.count >= Self.allRealmsPageSize
                 self.feed = []
             }
         }
@@ -720,14 +704,7 @@ final class TaggrAppCoordinator {
                 let posts = try await self.loadPostEnvelopes("last_posts", args: [activeAPI.domain, normalized, 0, 0, true], identity: nil, api: activeAPI)
                 guard self.isCurrentRequest(request) else { return }
                 self.realms = values.map { realm in
-                    TaggrRealm(
-                        name: realm.name.isEmpty ? normalized : realm.name,
-                        description: realm.description,
-                        labelColor: realm.labelColor,
-                        logo: realm.logo,
-                        numMembers: realm.numMembers,
-                        numPosts: realm.numPosts
-                    )
+                    realm.renamed(realm.name.isEmpty ? normalized : realm.name)
                 }
                 self.feed = posts
             }

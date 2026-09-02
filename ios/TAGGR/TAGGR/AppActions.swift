@@ -8,7 +8,11 @@ extension TaggrAppCoordinator {
         await runBusy {
             let body = text.trimmingCharacters(in: .whitespacesAndNewlines)
             let refs = try await uploadBlobs(referencedNewBlobs(in: body, draftImages: images, existingBlobIDs: []))
+            let postingScope = realmPostingScope
             _ = try await api.addPost(text: body, refs: refs, parent: parent, realm: realm, identity: authSession)
+            if parent == nil, let postingScope {
+                realmPostingPreferences.record(destination: realm, scope: postingScope)
+            }
             if let parent {
                 repliesByPostID[parent] = nil
                 await updateCurrentUserIfPossible()
@@ -63,6 +67,27 @@ extension TaggrAppCoordinator {
             }
         }
         return TaggrPostCreditCost.estimate(body: body, baseCost: baseCost, tagCost: tagCost)
+    }
+
+    func postingRealmColors(_ names: [String]) async -> [String: String] {
+        guard !names.isEmpty else { return [:] }
+        let generation = runtimeGeneration
+        let activeAPI = api
+        do {
+            let values = try await activeAPI.query("realms", args: [names], as: [TaggrRealm].self) ?? []
+            guard isCurrentRuntimeGeneration(generation) else { return [:] }
+            return values.enumerated().reduce(into: [String: String]()) { colors, entry in
+                let (index, realm) = entry
+                guard let color = realm.labelColor else { return }
+                let name = realm.name.isEmpty && names.indices.contains(index) ? names[index] : realm.name
+                guard !name.isEmpty else { return }
+                colors[name.uppercased()] = color
+            }
+        } catch {
+            guard !isCancellation(error) else { return [:] }
+            NSLog("TAGGR posting realm metadata refresh failed: %@", error.localizedDescription)
+            return [:]
+        }
     }
 
     func editPost(post: TaggrPost, text: String, images: [TaggrDraftImage] = [], reloadMode: TaggrFeedMode? = nil) async {
@@ -528,7 +553,7 @@ extension TaggrAppCoordinator {
             // This signed canister query is the practical verifier before the II delegation is saved.
             currentUser = try await api.signedQuery("user", args: [api.domain, []], identity: session, as: Optional<TaggrUser>.self) ?? nil
             if let currentUser {
-                cacheAuthorProfile(currentUser)
+                cacheAuthorName(currentUser.name, userID: currentUser.id)
             }
             try identityStore.save(session)
             authSession = session
@@ -545,7 +570,7 @@ extension TaggrAppCoordinator {
         icpInvoice = nil
         profile = nil
         focusedPost = nil
-        clearAuthorProfileCache()
+        clearAuthorNameCache()
         if case .feed(.personal) = route {
             feed = []
         }
@@ -669,7 +694,7 @@ extension TaggrAppCoordinator {
         currentUser = loadedUser
         storageCreationState = Self.storageCreationState(from: loadedUser?.settings)
         if let loadedUser {
-            cacheAuthorProfile(loadedUser)
+            cacheAuthorName(loadedUser.name, userID: loadedUser.id)
         }
     }
 
@@ -682,6 +707,77 @@ extension TaggrAppCoordinator {
             guard isCurrentRuntimeGeneration(generation) else { return }
             guard !isCancellation(error) else { return }
             NSLog("TAGGR current user refresh failed: %@", error.localizedDescription)
+        }
+    }
+
+    func setRealmMembership(name: String, joined: Bool) async -> Bool {
+        let normalized = normalizedRealmName(name)
+        guard !normalized.isEmpty, realmMembershipOperation == nil else { return false }
+        guard authSession != nil, currentUser != nil else {
+            errorMessage = TaggrAPIError.signInRequiredMessage
+            return false
+        }
+        let isJoined = currentUser?.realms.contains {
+            $0.caseInsensitiveCompare(normalized) == .orderedSame
+        } == true
+        guard isJoined != joined else { return true }
+
+        realmMembershipOperation = normalized
+        defer { realmMembershipOperation = nil }
+        return await runBusy {
+            try await api.setRealmMembership(name: normalized, joined: joined, identity: authSession)
+            try await loadCurrentUserIfNeeded()
+            let refreshedMembership = currentUser?.realms.contains {
+                $0.caseInsensitiveCompare(normalized) == .orderedSame
+            } == true
+            guard refreshedMembership == joined else {
+                throw TaggrAPIError.invalidResponse("Realm membership did not refresh to the requested state")
+            }
+            try await refreshRealmMetadata(normalized)
+        }
+    }
+
+    func isJoinedRealm(_ name: String) -> Bool {
+        currentUser?.realms.contains {
+            $0.caseInsensitiveCompare(name) == .orderedSame
+        } == true
+    }
+
+    func canManageRealm(_ name: String) -> Bool {
+        currentUser?.controlledRealms.contains {
+            $0.caseInsensitiveCompare(name) == .orderedSame
+        } == true
+    }
+
+    func saveRealmSettings(_ draft: TaggrRealmSettingsDraft, realm: TaggrRealm) async -> Bool {
+        await runBusy {
+            guard canManageRealm(realm.name) else {
+                throw TaggrAPIError.rejected("You are not a controller of this realm.")
+            }
+            let payload = try draft.payload(
+                for: realm,
+                maxCleanupPenalty: cache?.config?.maxRealmCleanupPenalty,
+                maxLogoLength: cache?.config?.maxRealmLogoLen
+            )
+            try await api.editRealm(name: realm.name, payload: payload, identity: authSession)
+            try await refreshRealmMetadata(realm.name)
+        }
+    }
+
+    func refreshRealmMetadata(_ name: String) async throws {
+        let generation = runtimeGeneration
+        let activeAPI = api
+        let values = try await activeAPI.query("realms", args: [[name]], as: [TaggrRealm].self) ?? []
+        guard isCurrentRuntimeGeneration(generation), let realm = values.first else {
+            throw TaggrAPIError.invalidResponse("Realm metadata was not returned")
+        }
+        let refreshed = realm.renamed(realm.name.isEmpty ? name : realm.name)
+        if let index = realms.firstIndex(where: {
+            $0.name.caseInsensitiveCompare(name) == .orderedSame
+        }) {
+            realms[index] = refreshed
+        } else {
+            realms = [refreshed]
         }
     }
 
@@ -803,18 +899,6 @@ extension TaggrAppCoordinator {
             request.route == route
     }
 
-    func resolveAuthorName(for post: TaggrPost, generation: Int, api: TaggrAPI) async throws -> String? {
-        if let authorName = post.meta.authorName, !authorName.isEmpty {
-            cacheAuthorName(authorName, userID: post.user)
-            return authorName
-        }
-        if let authorName = authorNamesByUserID[post.user] {
-            return authorName
-        }
-        let names = try await loadAuthorNames(userIDs: [post.user], generation: generation, api: api)
-        return names[post.user]
-    }
-
     func loadAuthorNames(userIDs: [Int], generation: Int, api: TaggrAPI) async throws -> [Int: String] {
         let rows = try await api.query("users_data", args: [userIDs], as: [String: String].self) ?? [:]
         let names = rows.reduce(into: [Int: String]()) { partial, entry in
@@ -828,47 +912,27 @@ extension TaggrAppCoordinator {
         return names
     }
 
-    func cacheAuthorProfile(_ user: TaggrUser) {
-        authorProfilesByUserID[user.id] = user
-        cacheAuthorName(user.name, userID: user.id)
-        authorProfileRetryAfter[user.id] = nil
-    }
-
     func cacheAuthorName(_ name: String, userID: Int) {
         authorNamesByUserID[userID] = name
-        markAuthorProfileCacheAccess(userID)
+        markAuthorNameCacheAccess(userID)
     }
 
-    func delayAuthorProfileRetry(for userID: Int) {
-        authorProfileRetryAfter[userID] = Date.now.addingTimeInterval(Self.authorProfileRetryInterval)
-        markAuthorProfileCacheAccess(userID)
+    func markAuthorNameCacheAccess(_ userID: Int) {
+        authorNameCacheOrder.removeAll { $0 == userID }
+        authorNameCacheOrder.append(userID)
+        trimAuthorNameCache()
     }
 
-    func markAuthorProfileCacheAccess(_ userID: Int) {
-        authorProfileCacheOrder.removeAll { $0 == userID }
-        authorProfileCacheOrder.append(userID)
-        trimAuthorProfileCache()
-    }
-
-    func trimAuthorProfileCache() {
-        while authorProfileCacheOrder.count > Self.maxAuthorProfileCacheEntries {
-            let evictedUserID = authorProfileCacheOrder.removeFirst()
-            if evictedUserID == currentUser?.id {
-                authorProfileCacheOrder.append(evictedUserID)
-                continue
-            }
-            authorProfilesByUserID[evictedUserID] = nil
+    func trimAuthorNameCache() {
+        while authorNameCacheOrder.count > Self.maxAuthorNameCacheEntries {
+            let evictedUserID = authorNameCacheOrder.removeFirst()
             authorNamesByUserID[evictedUserID] = nil
-            authorProfileRetryAfter[evictedUserID] = nil
         }
     }
 
-    func clearAuthorProfileCache() {
-        authorProfilesByUserID.removeAll()
+    func clearAuthorNameCache() {
         authorNamesByUserID.removeAll()
-        loadingAuthorProfileIDs.removeAll()
-        authorProfileRetryAfter.removeAll()
-        authorProfileCacheOrder.removeAll()
+        authorNameCacheOrder.removeAll()
     }
 
     func normalizedRealmName(_ name: String) -> String {

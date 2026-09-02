@@ -57,20 +57,6 @@ extension TaggrTests {
         XCTAssertEqual(calls.first?.arg, try TaggrCandid.jsonArguments([7, "misbehavior"]))
     }
 
-    func testStatsAndRealmDecodeSnakeCaseFields() throws {
-        let stats = try JSONDecoder.taggr.decode(TaggrStats.self, from: Data(#"{"canister_id":"6qfxa-ryaaa-aaaai-qbhsq-cai"}"#.utf8))
-        let realm = try JSONDecoder.taggr.decode(TaggrRealm.self, from: Data(##"{"name":"DEV","description":"Builders","label_color":"#123456","num_members":2,"num_posts":3}"##.utf8))
-        let unnamedRealm = try JSONDecoder.taggr.decode(TaggrRealm.self, from: Data(##"{"description":"Builders"}"##.utf8))
-        let realmEntry = try JSONDecoder.taggr.decode(TaggrRealmListEntry.self, from: Data(##"["DEV",{"description":"Builders","label_color":"#123456","num_members":2,"num_posts":3}]"##.utf8))
-        XCTAssertEqual(stats.canisterId, "6qfxa-ryaaa-aaaai-qbhsq-cai")
-        XCTAssertEqual(realm.labelColor, "#123456")
-        XCTAssertEqual(realm.numMembers, 2)
-        XCTAssertEqual(realm.numPosts, 3)
-        XCTAssertEqual(unnamedRealm.name, "")
-        XCTAssertEqual(realmEntry.namedRealm.name, "DEV")
-        XCTAssertEqual(realmEntry.namedRealm.labelColor, "#123456")
-    }
-
     func testUserDecodesEngagementState() throws {
         let data = Data(
             #"""
@@ -85,7 +71,7 @@ extension TaggrTests {
               "blacklist": [3],
               "bookmarks": [42],
               "pinned_posts": [43],
-              "settings": {"tap_and_hold": "350", "avatar_url": "https://example.com/alice.jpg"},
+              "settings": {"tap_and_hold": "350"},
               "controlled_realms": ["DEV"],
               "bucket": "aaaaa-aa",
               "num_posts": 9,
@@ -99,7 +85,6 @@ extension TaggrTests {
         XCTAssertEqual(user.bookmarks, [42])
         XCTAssertEqual(user.pinnedPosts, [43])
         XCTAssertEqual(user.settings["tap_and_hold"], "350")
-        XCTAssertEqual(user.avatarURLString, "https://example.com/alice.jpg")
         XCTAssertEqual(user.controlledRealms, ["DEV"])
         XCTAssertEqual(user.bucket, "aaaaa-aa")
         XCTAssertEqual(user.numPosts, 9)
@@ -150,6 +135,67 @@ extension TaggrTests {
         XCTAssertEqual(TaggrReactionIcon.emoji(for: 11), "👍")
         XCTAssertEqual(TaggrReactionIcon.emoji(for: 12), "😢")
         XCTAssertNil(TaggrReactionIcon.emoji(for: 999))
+    }
+
+    func testReactionGroupsPreserveUsersAndUseConfiguredOrder() {
+        let groups = TaggrReactionGroup.groups(
+            reactions: ["53": [7], "11": [2, 3], "999": [4]],
+            order: [11, 53]
+        )
+
+        XCTAssertEqual(
+            groups,
+            [
+                TaggrReactionGroup(id: 11, emoji: "👍", userIDs: [2, 3]),
+                TaggrReactionGroup(id: 53, emoji: "🚀", userIDs: [7]),
+            ]
+        )
+    }
+
+    @MainActor
+    func testLoadAuthorNamesCachesReactionUsersInOneQuery() async throws {
+        var calls: [(method: String, arg: Data)] = []
+        let api = makeStubbedAPI { request in
+            if let call = self.requestMethodAndArg(from: request) {
+                calls.append(call)
+            }
+            let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
+            return (response, Self.queryReply(Data(#"{"2":"bob","3":"carol"}"#.utf8)))
+        }
+        let state = TaggrAppCoordinator(api: api)
+
+        let names = try await state.loadAuthorNames(
+            userIDs: [2, 3],
+            generation: state.runtimeGeneration,
+            api: state.api
+        )
+
+        XCTAssertEqual(calls.map(\.method), ["users_data"])
+        XCTAssertEqual(calls.first?.arg, try TaggrCandid.jsonArguments([[2, 3]]))
+        XCTAssertEqual(names, [2: "bob", 3: "carol"])
+        XCTAssertEqual(state.authorNamesByUserID, [2: "bob", 3: "carol"])
+    }
+
+    @MainActor
+    func testAuthorProfileHandleUsesCurrentUserAndCachedNamesOnly() {
+        let state = TaggrAppCoordinator()
+        state.currentUser = TaggrUser(
+            id: 7,
+            name: "alice",
+            about: "",
+            principal: nil,
+            realms: [],
+            followees: [],
+            followers: [],
+            blacklist: [],
+            mode: nil
+        )
+        state.authorNamesByUserID = [2: "bob", 3: ""]
+
+        XCTAssertEqual(state.authorProfileHandle(for: 7), "alice")
+        XCTAssertEqual(state.authorProfileHandle(for: 2), "bob")
+        XCTAssertNil(state.authorProfileHandle(for: 3))
+        XCTAssertNil(state.authorProfileHandle(for: 99))
     }
 
     func testPostAddingReactionAppendsUserOnce() {
@@ -702,7 +748,7 @@ extension TaggrTests {
         let restoredSession = PostDraftSession(
             context: .newPost,
             initialText: "",
-            initialRealm: ""
+            initialRealm: "OTHER"
         )
         await restoredSession.load(store: store, namespace: namespace)
         XCTAssertEqual(restoredSession.text, "saved text")
@@ -736,10 +782,33 @@ extension TaggrTests {
         XCTAssertNil(FeedView.feedMode(from: .realm("DEV")))
     }
 
-    func testFeedTabRestoresSelectedMode() {
-        XCTAssertEqual(RootView.feedRoute(returnFeedMode: .hot), .feed(.hot))
-        XCTAssertEqual(RootView.feedRoute(returnFeedMode: .latest), .feed(.latest))
-        XCTAssertEqual(RootView.feedRoute(returnFeedMode: .personal), .feed(.personal))
+    @MainActor
+    func testFeedTabRestoresLastHomeMode() {
+        let state = TaggrAppCoordinator()
+
+        state.navigateToFeed(.personal)
+        XCTAssertEqual(state.lastHomeFeedMode, .personal)
+        state.navigateToFeed(.hot)
+        XCTAssertEqual(state.lastHomeFeedMode, .hot)
+        state.navigateToFeed(.latest)
+        state.navigateToPost(42, from: .latest)
+        state.navigateToHomeFeed()
+        XCTAssertEqual(state.route, .feed(.latest))
+        state.navigateToFeed(.tags(["TAGGR"]))
+        state.navigateToHomeFeed()
+
+        XCTAssertEqual(state.lastHomeFeedMode, .latest)
+        XCTAssertEqual(state.route, .feed(.latest))
+        XCTAssertEqual(RootView.feedRoute(lastHomeFeedMode: state.lastHomeFeedMode), .feed(.latest))
+    }
+
+    func testFeedTabReselectionActions() {
+        XCTAssertEqual(RootView.feedTabReselectionAction(for: .feed(.hot)), .scrollToTop)
+        XCTAssertEqual(RootView.feedTabReselectionAction(for: .feed(.latest)), .scrollToTop)
+        XCTAssertEqual(RootView.feedTabReselectionAction(for: .feed(.personal)), .scrollToTop)
+        XCTAssertEqual(RootView.feedTabReselectionAction(for: .feed(.tags(["TAGGR"]))), .returnToHomeFeed)
+        XCTAssertEqual(RootView.feedTabReselectionAction(for: .feed(.realm("DEV"))), .returnToHomeFeed)
+        XCTAssertEqual(RootView.feedTabReselectionAction(for: .post(42)), .returnToHomeFeed)
     }
 
     func testQueryRejectedResponseSurfacesRejectedError() async throws {

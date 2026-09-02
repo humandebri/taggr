@@ -560,7 +560,6 @@ enum TaggrPostImages {
 
 struct TaggrPostMeta: Codable, Equatable, Sendable {
     let authorName: String?
-    let authorAvatarURL: String?
     let realmColor: String?
     let nsfw: Bool?
     let viewerBlocked: Bool?
@@ -568,7 +567,6 @@ struct TaggrPostMeta: Codable, Equatable, Sendable {
 
     enum CodingKeys: String, CodingKey {
         case authorName
-        case authorAvatarURL = "authorAvatarUrl"
         case realmColor
         case nsfw
         case viewerBlocked
@@ -577,14 +575,12 @@ struct TaggrPostMeta: Codable, Equatable, Sendable {
 
     init(
         authorName: String?,
-        authorAvatarURL: String? = nil,
         realmColor: String?,
         nsfw: Bool?,
         viewerBlocked: Bool?,
         maxDownvotesReached: Bool? = nil
     ) {
         self.authorName = authorName
-        self.authorAvatarURL = authorAvatarURL
         self.realmColor = realmColor
         self.nsfw = nsfw
         self.viewerBlocked = viewerBlocked
@@ -948,120 +944,6 @@ struct TaggrUser: Codable, Identifiable, Equatable, Sendable {
         )
     }
 
-    var avatarURLString: String? {
-        TaggrAvatar.urlString(from: settings)
-    }
-}
-
-enum TaggrAvatar {
-    static let settingKey = "avatar_url"
-
-    static func urlString(from settings: [String: String]) -> String? {
-        normalizedURLString(settings[settingKey])
-    }
-
-    static func normalizedURLString(_ rawValue: String?) -> String? {
-        guard let rawValue else { return nil }
-        let trimmed = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return nil }
-        guard let components = URLComponents(string: trimmed),
-              let scheme = components.scheme?.lowercased(),
-              let host = components.host?.lowercased(),
-              components.url != nil else {
-            return nil
-        }
-        if scheme == "https" {
-            return trimmed
-        }
-        if scheme == "http", host == "localhost" || host == "127.0.0.1" || host.hasSuffix(".localhost") {
-            return trimmed
-        }
-        return nil
-    }
-
-    static func validatedURLString(_ rawValue: String) throws -> String? {
-        let trimmed = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return nil }
-        guard let normalized = normalizedURLString(trimmed) else {
-            throw TaggrAvatarError.invalidURL
-        }
-        return normalized
-    }
-}
-
-enum TaggrAvatarError: LocalizedError {
-    case invalidURL
-
-    var errorDescription: String? {
-        "Use an HTTPS image URL or a localhost image URL for development."
-    }
-}
-
-struct TaggrRealm: Codable, Identifiable, Equatable, Sendable {
-    var id: String { name }
-    let name: String
-    let description: String
-    let labelColor: String?
-    let logo: String?
-    let numMembers: Int?
-    let numPosts: Int?
-
-    enum CodingKeys: String, CodingKey {
-        case name
-        case description
-        case labelColor
-        case logo
-        case numMembers
-        case numPosts
-    }
-
-    init(
-        name: String,
-        description: String,
-        labelColor: String?,
-        logo: String?,
-        numMembers: Int?,
-        numPosts: Int?
-    ) {
-        self.name = name
-        self.description = description
-        self.labelColor = labelColor
-        self.logo = logo
-        self.numMembers = numMembers
-        self.numPosts = numPosts
-    }
-
-    init(from decoder: Decoder) throws {
-        let values = try decoder.container(keyedBy: CodingKeys.self)
-        name = try values.decodeIfPresent(String.self, forKey: .name) ?? ""
-        description = try values.decodeIfPresent(String.self, forKey: .description) ?? ""
-        labelColor = try values.decodeIfPresent(String.self, forKey: .labelColor)
-        logo = try values.decodeIfPresent(String.self, forKey: .logo)
-        numMembers = try values.decodeIfPresent(Int.self, forKey: .numMembers)
-        numPosts = try values.decodeIfPresent(Int.self, forKey: .numPosts)
-    }
-}
-
-struct TaggrRealmListEntry: Decodable, Equatable, Sendable {
-    let name: String
-    let realm: TaggrRealm
-
-    var namedRealm: TaggrRealm {
-        TaggrRealm(
-            name: realm.name.isEmpty ? name : realm.name,
-            description: realm.description,
-            labelColor: realm.labelColor,
-            logo: realm.logo,
-            numMembers: realm.numMembers,
-            numPosts: realm.numPosts
-        )
-    }
-
-    init(from decoder: Decoder) throws {
-        var values = try decoder.unkeyedContainer()
-        name = try values.decode(String.self)
-        realm = try values.decode(TaggrRealm.self)
-    }
 }
 
 struct TaggrStats: Codable, Equatable, Sendable {
@@ -1104,6 +986,8 @@ struct TaggrConfig: Codable, Equatable, Sendable {
     let maxTagLength: Int?
     let maxBlobSizeBytes: Int?
     let maxReportLength: Int?
+    let maxRealmCleanupPenalty: Int?
+    let maxRealmLogoLen: Int?
     let reactions: [[Int]]?
     let feedPageSize: Int?
     let pollRevoteDeadlineHours: Int?
@@ -1118,6 +1002,8 @@ struct TaggrConfig: Codable, Equatable, Sendable {
         case maxTagLength
         case maxBlobSizeBytes
         case maxReportLength
+        case maxRealmCleanupPenalty
+        case maxRealmLogoLen
         case reactions
         case feedPageSize
         case pollRevoteDeadlineHours

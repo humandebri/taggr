@@ -72,20 +72,16 @@ struct ProfileView: View {
     }
 
     private func profileHeader(_ user: TaggrUser) -> some View {
-        HStack(alignment: .top, spacing: 14) {
-            AvatarView(name: user.name, avatarURLString: user.avatarURLString)
-            VStack(alignment: .leading, spacing: 8) {
-                Text(user.name)
-                    .font(.title2.weight(.black))
+        VStack(alignment: .leading, spacing: 8) {
+            Text(user.name)
+                .font(.title2.weight(.black))
+                .foregroundStyle(TaggrTheme.text)
+            if !user.about.isEmpty {
+                TaggrMarkdownText(text: user.about)
+                    .font(.body)
                     .foregroundStyle(TaggrTheme.text)
-                if !user.about.isEmpty {
-                    TaggrMarkdownText(text: user.about)
-                        .font(.body)
-                        .foregroundStyle(TaggrTheme.text)
-                        .textSelection(.enabled)
-                }
+                    .textSelection(.enabled)
             }
-            Spacer(minLength: 0)
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)

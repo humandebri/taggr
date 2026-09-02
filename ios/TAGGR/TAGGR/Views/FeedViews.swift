@@ -5,8 +5,6 @@ import SwiftUI
 enum TimelineLayout {
     static let rowHorizontalPadding: CGFloat = 12
     static let rowVerticalPadding: CGFloat = 14
-    static let avatarSize: CGFloat = 40
-    static let avatarContentGap: CGFloat = 10
 }
 
 enum TimelinePostContent {
@@ -18,45 +16,58 @@ struct FeedView: View {
     @StateObject private var imagePrefetcher = PostImagePrefetcher()
     @State private var selectedMode = TaggrFeedMode.hot
     @State private var showingComposer = false
+    let scrollToTopRevision: Int
+
+    init(scrollToTopRevision: Int = 0) {
+        self.scrollToTopRevision = scrollToTopRevision
+    }
 
     var body: some View {
         ZStack {
             TaggrTheme.background.ignoresSafeArea()
-            ScrollView {
-                LazyVStack(alignment: .leading, spacing: 0) {
-                    FeedHeader(
-                        selectedMode: selectedMode,
-                        changeMode: changeMode,
-                        backAction: selectedMode.isFiltered ? { changeMode(.hot) } : nil
-                    )
-                    if state.feed.isEmpty {
-                        EmptyFeedView()
-                    } else {
-                        ForEach(state.feed) { post in
-                            PostRow(post: post, onVisible: {
-                                prefetchVisibleResources(around: post)
-                            }) {
-                                state.navigateToPost(post.id, from: selectedMode)
+            ScrollViewReader { scrollProxy in
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: 0) {
+                        FeedHeader(
+                            selectedMode: selectedMode,
+                            changeMode: changeMode,
+                            backAction: selectedMode.isFiltered ? { changeMode(.hot) } : nil
+                        )
+                        .id(FeedScrollAnchor.top)
+                        if state.feed.isEmpty {
+                            EmptyFeedView()
+                        } else {
+                            ForEach(state.feed) { post in
+                                PostRow(post: post, onVisible: {
+                                    prefetchVisibleResources(around: post)
+                                }) {
+                                    state.navigateToPost(post.id, from: selectedMode)
+                                }
                             }
-                        }
-                        if state.canLoadMoreFeed {
-                            Button {
-                                Task { await state.loadMoreFeed(mode: selectedMode) }
-                            } label: {
-                                Text("More")
-                                    .font(.subheadline.weight(.bold))
-                                    .foregroundStyle(TaggrTheme.text)
-                                    .frame(maxWidth: .infinity)
-                                    .frame(height: 44)
-                                    .background(TaggrTheme.panelRaised)
-                                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                            if state.canLoadMoreFeed {
+                                Button {
+                                    Task { await state.loadMoreFeed(mode: selectedMode) }
+                                } label: {
+                                    Text("More")
+                                        .font(.subheadline.weight(.bold))
+                                        .foregroundStyle(TaggrTheme.text)
+                                        .frame(maxWidth: .infinity)
+                                        .frame(height: 44)
+                                        .background(TaggrTheme.panelRaised)
+                                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                                }
+                                .buttonStyle(.plain)
+                                .padding(16)
                             }
-                            .buttonStyle(.plain)
-                            .padding(16)
                         }
                     }
+                    .padding(.bottom, 8)
                 }
-                .padding(.bottom, 8)
+                .onChange(of: scrollToTopRevision) { _, _ in
+                    withAnimation {
+                        scrollProxy.scrollTo(FeedScrollAnchor.top, anchor: .top)
+                    }
+                }
             }
             if state.authSession != nil {
                 VStack {
@@ -92,7 +103,10 @@ struct FeedView: View {
         .taggrRefreshable()
         .taggrBusyOverlay(state.isBusy)
         .fullScreenCover(isPresented: $showingComposer) {
-            ComposePostView(mode: .newPost(selectedMode: selectedMode)) {
+            ComposePostView(
+                mode: .newPost(selectedMode: selectedMode),
+                initialRealm: state.initialPostingRealm(for: selectedMode)
+            ) {
                 showingComposer = false
             }
                 .environment(state)
@@ -136,8 +150,11 @@ struct FeedView: View {
             config: state.runtimeConfig
         )
         imagePrefetcher.prefetch(attachments, api: state.api, config: state.runtimeConfig)
-        Task { await state.prefetchAuthorProfile(for: post) }
     }
+}
+
+private enum FeedScrollAnchor: Hashable {
+    case top
 }
 
 extension TaggrFeedMode {
@@ -401,88 +418,63 @@ struct PostRow: View {
 
     var postRowContent: some View {
         VStack(alignment: .leading, spacing: 0) {
-            HStack(alignment: .top, spacing: TimelineLayout.avatarContentGap) {
-                Button(action: openAuthorProfile) {
-                    AvatarView(
-                        name: state.authorDisplayName(for: post),
-                        avatarURLString: state.avatarURLString(for: post),
-                        size: TimelineLayout.avatarSize
-                    )
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Open profile for \(authorLabel)")
-                VStack(alignment: .leading, spacing: 8) {
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack(spacing: 8) {
-                            Button(action: openAuthorProfile) {
-                                Text(authorLabel)
-                                    .font(.subheadline.weight(.bold))
-                                    .foregroundStyle(TaggrTheme.clickable)
-                                    .lineLimit(1)
-                                    .truncationMode(.tail)
-                            }
-                            .buttonStyle(.plain)
-                            PostTimestampLabel(timestamp: post.timestamp)
-                            Spacer(minLength: 8)
-                            if let realm = post.realm, !realm.isEmpty {
-                                Button {
-                                    openRealm(realm)
-                                } label: {
-                                    PostRealmBadge(name: realm, colorHex: post.meta.realmColor)
-                                }
-                                .buttonStyle(.plain)
-                                .accessibilityLabel("Open realm \(realm)")
-                            }
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 8) {
+                    Button(action: openAuthorProfile) {
+                        Text(authorLabel)
+                            .font(.subheadline.weight(.bold))
+                            .foregroundStyle(TaggrTheme.clickable)
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+                    }
+                    .buttonStyle(.plain)
+                    PostTimestampLabel(timestamp: post.timestamp)
+                    Spacer(minLength: 8)
+                    if let realm = post.realm, !realm.isEmpty {
+                        Button {
+                            openRealm(realm)
+                        } label: {
+                            PostRealmBadge(name: realm, colorHex: post.meta.realmColor)
                         }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        if let notice = safetyNotice {
-                            PostSafetyNotice(notice: notice) {
-                                revealSensitive = true
-                            }
-                        } else {
-                            if !visibleDisplayBody.isEmpty {
-                                postBodyText
-                                inlineTranslationView
-                            }
-                            if isShortened {
-                                Button(action: showFullPost) {
-                                    Label("Show full post", systemImage: "chevron.down")
-                                        .font(.caption.weight(.bold))
-                                        .foregroundStyle(TaggrTheme.clickable)
-                                }
-                                .buttonStyle(.plain)
-                            }
-                            let attachments = TaggrPostPresentationCache.attachments(
-                                for: post,
-                                config: state.runtimeConfig,
-                                bodyText: visibleRawBody
-                            )
-                            if !attachments.isEmpty {
-                                PostImageGridView(attachments: attachments) { attachment in
-                                    previewImage = attachment
-                                }
-                            }
-                            ForEach(TaggrYouTubePreview.previews(in: visibleRawBody)) { preview in
-                                YouTubePreviewView(preview: preview)
-                            }
-                            PostExtensionView(post: post)
-                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Open realm \(realm)")
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
-            }
-            .overlay(alignment: .leading) {
-                // Keep the avatar itself as a profile button, but route the empty rail below it to the post.
-                VStack(spacing: 0) {
-                    Color.clear
-                        .frame(width: TimelineLayout.avatarSize, height: TimelineLayout.avatarSize)
-                        .allowsHitTesting(false)
-                    Color.clear
-                        .frame(width: TimelineLayout.avatarSize)
-                        .contentShape(Rectangle())
-                        .onTapGesture(perform: open)
+                if let notice = safetyNotice {
+                    PostSafetyNotice(notice: notice) {
+                        revealSensitive = true
+                    }
+                } else {
+                    if !visibleDisplayBody.isEmpty {
+                        postBodyText
+                        inlineTranslationView
+                    }
+                    if isShortened {
+                        Button(action: showFullPost) {
+                            Label("Show full post", systemImage: "chevron.down")
+                                .font(.caption.weight(.bold))
+                                .foregroundStyle(TaggrTheme.clickable)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    let attachments = TaggrPostPresentationCache.attachments(
+                        for: post,
+                        config: state.runtimeConfig,
+                        bodyText: visibleRawBody
+                    )
+                    if !attachments.isEmpty {
+                        PostImageGridView(attachments: attachments) { attachment in
+                            previewImage = attachment
+                        }
+                    }
+                    ForEach(TaggrYouTubePreview.previews(in: visibleRawBody)) { preview in
+                        YouTubePreviewView(preview: preview)
+                    }
+                    PostExtensionView(post: post)
                 }
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, TimelineLayout.rowHorizontalPadding)
             .padding(.top, TimelineLayout.rowVerticalPadding)
             postEngagementBar

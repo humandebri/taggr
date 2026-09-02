@@ -12,18 +12,19 @@ struct ComposePostView: View {
     @StateObject private var draft: PostDraftSession
     @State private var selectedPhotos: [PhotosPickerItem] = []
     @State private var creditCost: Int?
+    @State private var realmColors: [String: String] = [:]
     @State private var isSubmitting = false
     @State private var discardConfirmationPresented = false
     @FocusState private var isTextEditorFocused: Bool
 
-    init(mode: PostComposerMode, dismiss: @escaping () -> Void) {
+    init(mode: PostComposerMode, initialRealm: String? = nil, dismiss: @escaping () -> Void) {
         self.mode = mode
         self.dismiss = dismiss
         _draft = StateObject(
             wrappedValue: PostDraftSession(
                 context: mode.draftContext,
                 initialText: mode.initialText,
-                initialRealm: mode.targetRealm ?? ""
+                initialRealm: initialRealm ?? mode.targetRealm ?? ""
             )
         )
     }
@@ -41,6 +42,7 @@ struct ComposePostView: View {
                     realmName: $draft.realm,
                     appName: appRealmName,
                     availableRealms: selectableRealms,
+                    realmColors: realmColors,
                     showsRealmPicker: showsRealmPicker,
                     showsDiscard: draft.hasChanges,
                     cancel: close,
@@ -112,6 +114,10 @@ struct ComposePostView: View {
         .task(id: creditCostRefreshKey) {
             await refreshCreditCost()
         }
+        .task(id: realmMetadataKey) {
+            guard showsRealmPicker else { return }
+            realmColors = await state.postingRealmColors(selectableRealms)
+        }
         .confirmationDialog(
             "Discard this draft?",
             isPresented: $discardConfirmationPresented,
@@ -172,11 +178,11 @@ struct ComposePostView: View {
     }
 
     private var selectableRealms: [String] {
-        var values = state.currentUser?.realms ?? []
-        if let target = mode.targetRealm, !target.isEmpty, !values.contains(where: { $0.caseInsensitiveCompare(target) == .orderedSame }) {
-            values.insert(target, at: 0)
-        }
-        return values
+        state.orderedPostingRealms(targetRealm: mode.targetRealm)
+    }
+
+    private var realmMetadataKey: String {
+        selectableRealms.map { $0.uppercased() }.joined(separator: "|")
     }
 
     private var imageWarning: String? {
@@ -313,6 +319,7 @@ private struct ComposePostToolbar: View {
     @Binding var realmName: String
     let appName: String
     let availableRealms: [String]
+    let realmColors: [String: String]
     let showsRealmPicker: Bool
     let showsDiscard: Bool
     let cancel: () -> Void
@@ -330,7 +337,8 @@ private struct ComposePostToolbar: View {
                 ComposeRealmPicker(
                     selection: $realmName,
                     appName: appName,
-                    realms: availableRealms
+                    realms: availableRealms,
+                    realmColors: realmColors
                 )
             }
             Spacer()
@@ -364,19 +372,17 @@ private struct ComposeRealmPicker: View {
     @Binding var selection: String
     let appName: String
     let realms: [String]
+    let realmColors: [String: String]
+    @State private var isPresented = false
 
     var body: some View {
-        Menu {
-            Button(appName) {
-                selection = ""
-            }
-            ForEach(realms, id: \.self) { realm in
-                Button(realm) {
-                    selection = realm
-                }
-            }
+        Button {
+            isPresented = true
         } label: {
             HStack(spacing: 6) {
+                Circle()
+                    .fill(selection.isEmpty ? TaggrTheme.accent : realmColor(for: selection))
+                    .frame(width: 8, height: 8)
                 Text(selection.isEmpty ? appName : selection)
                     .font(.subheadline.weight(.bold))
                     .lineLimit(1)
@@ -390,6 +396,57 @@ private struct ComposeRealmPicker: View {
             .background(TaggrTheme.darkPanel)
             .clipShape(RoundedRectangle(cornerRadius: 8))
         }
+        .buttonStyle(.plain)
+        .popover(isPresented: $isPresented, attachmentAnchor: .rect(.bounds), arrowEdge: .top) {
+            ScrollView {
+                LazyVStack(spacing: 0) {
+                    realmOption(name: appName, value: "", color: TaggrTheme.accent)
+                    ForEach(realms, id: \.self) { realm in
+                        realmOption(name: realm, value: realm, color: realmColor(for: realm))
+                    }
+                }
+                .padding(.vertical, 8)
+            }
+            .scrollIndicators(.visible)
+            .frame(width: 220, height: min(CGFloat(realms.count + 1) * 44 + 16, 360))
+            .background(TaggrTheme.darkPanel)
+            .presentationCompactAdaptation(.popover)
+        }
+    }
+
+    private func realmOption(name: String, value: String, color: Color) -> some View {
+        Button {
+            selection = value
+            isPresented = false
+        } label: {
+            HStack(spacing: 10) {
+                Circle()
+                    .fill(color)
+                    .frame(width: 10, height: 10)
+                Text(name)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(TaggrTheme.text)
+                    .lineLimit(1)
+                Spacer()
+                if selection.caseInsensitiveCompare(value) == .orderedSame {
+                    Image(systemName: "checkmark")
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(TaggrTheme.clickable)
+                }
+            }
+            .padding(.horizontal, 14)
+            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(name)
+        .accessibilityAddTraits(
+            selection.caseInsensitiveCompare(value) == .orderedSame ? .isSelected : []
+        )
+    }
+
+    private func realmColor(for name: String) -> Color {
+        Color(hex: realmColors[name.uppercased()]) ?? TaggrTheme.accent
     }
 }
 

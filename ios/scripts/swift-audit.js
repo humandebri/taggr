@@ -17,7 +17,6 @@ const required = [
     "ios/TAGGR/TAGGR/Views/SharedViews.swift",
     "ios/TAGGR/TAGGR/Views/UserImageLibraryView.swift",
     "ios/TAGGR/TAGGR/Views/AccountImagePagerView.swift",
-    "ios/TAGGR/TAGGR/Views/AvatarSettingsViews.swift",
     "ios/TAGGR/TAGGR/TaggrModels/TaggrAccountImage.swift",
     "ios/TAGGR/TAGGR/TAGGR.entitlements",
 ];
@@ -132,9 +131,6 @@ const userImageLibrary = read(
 const accountImagePager = read(
     "ios/TAGGR/TAGGR/Views/AccountImagePagerView.swift",
 );
-const avatarSettingsViews = read(
-    "ios/TAGGR/TAGGR/Views/AvatarSettingsViews.swift",
-);
 const viewSources = swiftFiles("ios/TAGGR/TAGGR/Views").map(read).join("\n");
 if (/Task\s*\{\s*await state\.loadPost\(/.test(viewSources)) {
     failures.push(
@@ -233,31 +229,15 @@ if (
     failures.push("native profile details and stats must be present");
 }
 if (
-    !settingsViews.includes("AccountAvatarSettingsPanel") ||
-    !avatarSettingsViews.includes('TextField("https://example.com/icon.jpg"') ||
-    !avatarSettingsViews.includes("AvatarImagePickerSheet") ||
-    !avatarSettingsViews.includes("updateCurrentUserAvatarURL") ||
-    !appState.includes('updateJSON("update_user_settings"') ||
-    !models.includes('static let settingKey = "avatar_url"') ||
-    !models.includes("let authorAvatarURL: String?") ||
-    !feedViews.includes("AsyncImage(url: avatarURL)") ||
-    feedViews.includes("initials(for:")
+    settingsViews.includes("AccountAvatarSettingsPanel") ||
+    models.includes('static let settingKey = "avatar_url"') ||
+    models.includes("let authorAvatarURL: String?") ||
+    feedViews.includes("AvatarView") ||
+    appState.includes("func prefetchAuthorProfile") ||
+    appState.includes("func updateCurrentUserAvatarURL")
 ) {
     failures.push(
-        "native avatar icons must use avatar_url settings, posted-image selection, update_user_settings, and image-based AvatarView without text initials",
-    );
-}
-if (
-    !appState.includes("authorProfilesByUserID") ||
-    !appState.includes("loadingAuthorProfileIDs") ||
-    !appState.includes("authorProfileRetryAfter") ||
-    !appState.includes('api.query("users_data"') ||
-    !appState.includes("func prefetchAuthorProfile") ||
-    !feedViews.includes("state.avatarURLString(for: post)") ||
-    !feedViews.includes("state.prefetchAuthorProfile(for: post)")
-) {
-    failures.push(
-        "native feed avatars must resolve author profiles with an iOS-only in-memory cache instead of relying on post meta avatar fields",
+        "unsupported native user avatar functionality must remain removed",
     );
 }
 

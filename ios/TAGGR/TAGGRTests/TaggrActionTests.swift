@@ -546,8 +546,7 @@ extension TaggrTests {
         Data(#"{"id":7,"name":"alice","about":"","principal":null,"realms":[],"followees":[],"followers":[],"blacklist":[],"bookmarks":[42],"pinned_posts":[],"settings":{},"controlled_realms":[],"mode":null}"#.utf8)
     }
 
-    nonisolated static func userFixture(id: Int = 7, name: String = "alice", avatarURL: String? = nil) -> Data {
-        let settings = avatarURL.map { #""avatar_url":"\#($0)""# } ?? ""
+    nonisolated static func userFixture(id: Int = 7, name: String = "alice") -> Data {
         return Data(
             """
             {
@@ -561,7 +560,7 @@ extension TaggrTests {
               "blacklist": [],
               "bookmarks": [],
               "pinned_posts": [],
-              "settings": {\(settings)},
+              "settings": {},
               "controlled_realms": [],
               "mode": null
             }

@@ -1,0 +1,256 @@
+import CryptoKit
+import XCTest
+@testable import TAGGR
+
+extension TaggrTests {
+    func testStatsAndRealmDecodeSnakeCaseFields() throws {
+        let stats = try JSONDecoder.taggr.decode(TaggrStats.self, from: Data(#"{"canister_id":"6qfxa-ryaaa-aaaai-qbhsq-cai"}"#.utf8))
+        let realm = try JSONDecoder.taggr.decode(TaggrRealm.self, from: Data(##"{"name":"DEV","description":"Builders","label_color":"#123456","num_members":2,"num_posts":3}"##.utf8))
+        let unnamedRealm = try JSONDecoder.taggr.decode(TaggrRealm.self, from: Data(##"{"description":"Builders"}"##.utf8))
+        let realmEntry = try JSONDecoder.taggr.decode(TaggrRealmListEntry.self, from: Data(##"["DEV",{"description":"Builders","label_color":"#123456","num_members":2,"num_posts":3}]"##.utf8))
+        XCTAssertEqual(stats.canisterId, "6qfxa-ryaaa-aaaai-qbhsq-cai")
+        XCTAssertEqual(realm.labelColor, "#123456")
+        XCTAssertEqual(realm.numMembers, 2)
+        XCTAssertEqual(realm.numPosts, 3)
+        XCTAssertEqual(unnamedRealm.name, "")
+        XCTAssertEqual(realmEntry.namedRealm.name, "DEV")
+        XCTAssertEqual(realmEntry.namedRealm.labelColor, "#123456")
+    }
+
+    func testRealmFeedDoesNotReplaceLastHomeMode() {
+        let state = TaggrAppCoordinator()
+
+        state.navigateToFeed(.personal)
+        state.navigateToRealm("DEV")
+        state.navigateToHomeFeed()
+
+        XCTAssertEqual(state.lastHomeFeedMode, .personal)
+        XCTAssertEqual(state.route, .feed(.personal))
+    }
+
+    func testRealmSettingsDecodeAndEditPayloadPreserveUneditedFields() throws {
+        let realm = try JSONDecoder.taggr.decode(
+            TaggrRealm.self,
+            from: Data(
+                ##"""
+                {
+                  "cleanup_penalty": 10,
+                  "controllers": [7, 8],
+                  "description": "Builders",
+                  "filter": {"age_days": 30, "safe": true, "balance": 50, "num_followers": 3},
+                  "label_color": "#123456",
+                  "last_setting_update": 11,
+                  "last_update": 12,
+                  "logo": "b2xk",
+                  "max_downvotes": 4,
+                  "num_members": 2,
+                  "num_posts": 3,
+                  "revenue": 99,
+                  "theme": "{\"accent\":\"red\"}",
+                  "whitelist": [9],
+                  "created": 1,
+                  "posts": [42],
+                  "adult_content": false,
+                  "comments_filtering": true
+                }
+                """##.utf8
+            )
+        )
+        var draft = TaggrRealmSettingsDraft(realm: realm)
+        draft.description = "Updated"
+        draft.labelColor = "#abcdef"
+        draft.cleanupPenalty = 20
+
+        let payload = try draft.payload(for: realm, maxCleanupPenalty: 500, maxLogoLength: 16_384)
+
+        XCTAssertTrue(realm.hasCompleteSettings)
+        XCTAssertEqual(realm.controllers, [7, 8])
+        XCTAssertEqual(realm.filter.ageDays, 30)
+        XCTAssertEqual(payload["description"] as? String, "Updated")
+        XCTAssertEqual(payload["label_color"] as? String, "#ABCDEF")
+        XCTAssertEqual(payload["controllers"] as? [Int], [7, 8])
+        XCTAssertEqual(payload["whitelist"] as? [Int], [9])
+        XCTAssertEqual(payload["theme"] as? String, "{\"accent\":\"red\"}")
+        XCTAssertEqual((payload["filter"] as? [String: Any])?["age_days"] as? Int, 30)
+    }
+
+    func testRealmSettingsValidationRejectsInvalidValues() throws {
+        let realm = try JSONDecoder.taggr.decode(
+            TaggrRealm.self,
+            from: Data(
+                ##"{"cleanup_penalty":10,"controllers":[7],"description":"Builders","filter":{},"label_color":"#123456","whitelist":[]}"##.utf8
+            )
+        )
+        var draft = TaggrRealmSettingsDraft(realm: realm)
+        draft.description = " "
+        XCTAssertThrowsError(try draft.payload(for: realm, maxCleanupPenalty: 500, maxLogoLength: 16_384))
+        draft.description = "Valid"
+        draft.labelColor = "red"
+        XCTAssertThrowsError(try draft.payload(for: realm, maxCleanupPenalty: 500, maxLogoLength: 16_384))
+        draft.labelColor = "#123456"
+        draft.cleanupPenalty = 501
+        XCTAssertThrowsError(try draft.payload(for: realm, maxCleanupPenalty: 500, maxLogoLength: 16_384))
+
+        draft.cleanupPenalty = 10
+        draft.maxDownvotes = -1
+        XCTAssertThrowsError(try draft.payload(for: realm, maxCleanupPenalty: 500, maxLogoLength: 16_384))
+        draft.maxDownvotes = 1
+        draft.description = String(repeating: "a", count: 2_001)
+        XCTAssertThrowsError(try draft.payload(for: realm, maxCleanupPenalty: 500, maxLogoLength: 16_384))
+        draft.description = "Valid"
+        draft.logo = String(repeating: "a", count: 17)
+        XCTAssertThrowsError(try draft.payload(for: realm, maxCleanupPenalty: 500, maxLogoLength: 16))
+    }
+
+    func testJoinRealmRequiresAuthenticationWithoutCallingAPI() async {
+        var callCount = 0
+        let api = makeStubbedAPI { request in
+            callCount += 1
+            let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
+            return (response, Self.queryReply(Data("true".utf8)))
+        }
+        let state = TaggrAppCoordinator(api: api)
+
+        let result = await state.setRealmMembership(name: "DEV", joined: true)
+
+        XCTAssertFalse(result)
+        XCTAssertEqual(callCount, 0)
+        XCTAssertEqual(state.errorMessage, TaggrAPIError.signInRequiredMessage)
+    }
+
+    func testJoinRealmRejectsUnexpectedToggleResultWithoutChangingState() async throws {
+        var calls: [String] = []
+        let api = makeStubbedAPI { request in
+            if let call = self.requestMethodAndArg(from: request) {
+                calls.append(call.method)
+            }
+            let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
+            return (response, Self.queryReply(Data("false".utf8)))
+        }
+        let state = realmCoordinator(api: api, realms: [], controlledRealms: [])
+
+        let result = await state.setRealmMembership(name: "DEV", joined: true)
+
+        XCTAssertFalse(result)
+        XCTAssertFalse(state.isJoinedRealm("DEV"))
+        XCTAssertEqual(calls, ["toggle_realm_membership"])
+        XCTAssertNotNil(state.errorMessage)
+    }
+
+    func testJoinRealmRejectsRefreshedMembershipMismatch() async throws {
+        var calls: [String] = []
+        let api = makeStubbedAPI { request in
+            let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
+            guard let call = self.requestMethodAndArg(from: request) else {
+                return (response, Self.queryReply(Data("null".utf8)))
+            }
+            calls.append(call.method)
+            if call.method == "toggle_realm_membership" {
+                return (response, Self.queryReply(Data("true".utf8)))
+            }
+            return (response, Self.queryReply(Self.realmUserFixture(realms: [])))
+        }
+        let state = realmCoordinator(api: api, realms: [], controlledRealms: [])
+
+        let result = await state.setRealmMembership(name: "DEV", joined: true)
+
+        XCTAssertFalse(result)
+        XCTAssertFalse(state.isJoinedRealm("DEV"))
+        XCTAssertEqual(calls, ["toggle_realm_membership", "user"])
+        XCTAssertNotNil(state.errorMessage)
+    }
+
+    func testRealmMembershipAPIFailureKeepsDisplayedState() async throws {
+        let api = makeStubbedAPI { _ in
+            throw URLError(.cannotConnectToHost)
+        }
+        let state = realmCoordinator(api: api, realms: [], controlledRealms: [])
+
+        let result = await state.setRealmMembership(name: "DEV", joined: true)
+
+        XCTAssertFalse(result)
+        XCTAssertFalse(state.isJoinedRealm("DEV"))
+        XCTAssertNotNil(state.errorMessage)
+        XCTAssertNil(state.realmMembershipOperation)
+    }
+
+    func testRealmSettingsSaveRefreshesRealm() async throws {
+        var calls: [String] = []
+        let api = makeStubbedAPI { request in
+            let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
+            guard let call = self.requestMethodAndArg(from: request) else {
+                return (response, Self.queryReply(Data("null".utf8)))
+            }
+            calls.append(call.method)
+            if call.method == "realms" {
+                return (response, Self.queryReply(Self.completeRealmFixture(description: "Updated")))
+            }
+            return (response, Self.queryReply(Data("null".utf8)))
+        }
+        let state = realmCoordinator(api: api, realms: [], controlledRealms: ["DEV"])
+        let realm = try XCTUnwrap(
+            JSONDecoder.taggr.decode([TaggrRealm].self, from: Self.completeRealmFixture()).first
+        )
+        var draft = TaggrRealmSettingsDraft(realm: realm)
+        draft.description = "Updated"
+
+        let result = await state.saveRealmSettings(draft, realm: realm)
+
+        XCTAssertTrue(result)
+        XCTAssertEqual(calls, ["edit_realm", "realms"])
+        XCTAssertEqual(state.realms.first?.description, "Updated")
+        XCTAssertNil(state.errorMessage)
+    }
+
+    func testRealmSettingsSaveSurfacesBackendRejection() async throws {
+        var calls: [String] = []
+        let api = makeStubbedAPI { request in
+            if let call = self.requestMethodAndArg(from: request) {
+                calls.append(call.method)
+            }
+            let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
+            return (response, Self.queryReply(Data(#"{"Err":"denied"}"#.utf8)))
+        }
+        let state = realmCoordinator(api: api, realms: [], controlledRealms: ["DEV"])
+        let realm = try XCTUnwrap(
+            JSONDecoder.taggr.decode([TaggrRealm].self, from: Self.completeRealmFixture()).first
+        )
+        var draft = TaggrRealmSettingsDraft(realm: realm)
+        draft.description = "Updated"
+
+        let result = await state.saveRealmSettings(draft, realm: realm)
+
+        XCTAssertFalse(result)
+        XCTAssertEqual(calls, ["edit_realm"])
+        XCTAssertEqual(state.errorMessage, "denied")
+        XCTAssertTrue(state.realms.isEmpty)
+    }
+
+    private func realmCoordinator(
+        api: TaggrAPI,
+        realms: [String],
+        controlledRealms: [String]
+    ) -> TaggrAppCoordinator {
+        let state = TaggrAppCoordinator(api: api)
+        state.authSession = makeAuthSession(privateKey: Curve25519.Signing.PrivateKey())
+        state.currentUser = TaggrUser(
+            id: 7,
+            name: "alice",
+            about: "",
+            principal: nil,
+            realms: realms,
+            followees: [],
+            followers: [],
+            blacklist: [],
+            controlledRealms: controlledRealms,
+            mode: nil
+        )
+        return state
+    }
+
+    nonisolated private static func completeRealmFixture(description: String = "Builders") -> Data {
+        Data(
+            ##"[{"name":"DEV","cleanup_penalty":10,"controllers":[7],"description":"\##(description)","filter":{},"label_color":"#123456","max_downvotes":4,"whitelist":[],"adult_content":false,"comments_filtering":true}]"##.utf8
+        )
+    }
+}
