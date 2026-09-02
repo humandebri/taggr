@@ -6,15 +6,11 @@ struct TAGGRApp: App {
     @State private var state: TaggrAppCoordinator
 
     init() {
-        let preferences = TaggrRuntimeNetworkPreferences()
         let postDraftStore = PostDraftStore()
-        let buildConfig = TaggrRuntimeConfig.current
         _state = State(
             initialValue: TaggrAppCoordinator(
                 postDraftStore: postDraftStore,
-                buildConfig: buildConfig,
-                initialNetwork: preferences.load(),
-                persistRuntimeNetwork: preferences.save
+                buildConfig: .current
             )
         )
     }

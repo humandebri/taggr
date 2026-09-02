@@ -51,61 +51,8 @@ final class TaggrTests: XCTestCase {
         XCTAssertEqual(config.derivationOrigin, TaggrRuntimeConfig.productionDerivationOrigin)
     }
 
-    func testRuntimeNetworkBuildsMainnetAndStagingConfigs() {
-        let mainnet = TaggrRuntimeConfig.config(for: .mainnet)
-        XCTAssertEqual(mainnet.canisterId, TaggrRuntimeConfig.productionCanisterId)
-        XCTAssertEqual(mainnet.apiBaseURL, TaggrRuntimeConfig.productionAPIBaseURL)
-        XCTAssertEqual(mainnet.domain, TaggrRuntimeConfig.productionDomain)
-        XCTAssertEqual(mainnet.callbackDomain, TaggrRuntimeConfig.productionDomain)
-        XCTAssertEqual(
-            mainnet.identityURL.absoluteString,
-            "https://id.ai/authorize"
-        )
-        XCTAssertEqual(mainnet.derivationOrigin, TaggrRuntimeConfig.productionDerivationOrigin)
-        XCTAssertEqual(TaggrRuntimeNetwork.from(config: mainnet), .mainnet)
-
-        let staging = TaggrRuntimeConfig.config(for: .staging)
-        XCTAssertEqual(staging.canisterId, TaggrRuntimeConfig.stagingCanisterId)
-        XCTAssertEqual(staging.apiBaseURL, TaggrRuntimeConfig.productionAPIBaseURL)
-        XCTAssertEqual(staging.domain, TaggrRuntimeConfig.stagingDomain)
-        XCTAssertEqual(staging.callbackDomain, TaggrRuntimeConfig.stagingDomain)
-        XCTAssertEqual(
-            staging.identityURL.absoluteString,
-            "https://id.ai/authorize"
-        )
-        XCTAssertEqual(staging.derivationOrigin, TaggrRuntimeConfig.stagingDerivationOrigin)
-        XCTAssertEqual(TaggrRuntimeNetwork.from(config: staging), .staging)
-    }
-
-    func testRuntimeNetworkPreferencesPersistValidSelectionAndIgnoreInvalidValues() {
-        let suiteName = "TaggrRuntimeNetworkPreferencesTests.\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: suiteName)!
-        defer { defaults.removePersistentDomain(forName: suiteName) }
-        let preferences = TaggrRuntimeNetworkPreferences(defaults: defaults)
-
-        XCTAssertNil(preferences.load())
-        defaults.set("invalid", forKey: TaggrRuntimeNetworkPreferences.key)
-        XCTAssertNil(preferences.load())
-
-        preferences.save(.staging)
-        XCTAssertEqual(preferences.load(), .staging)
-        preferences.save(.mainnet)
-        XCTAssertEqual(preferences.load(), .mainnet)
-    }
-
     @MainActor
-    func testRuntimeNetworkInitialSelectionOverridesBuildConfig() {
-        let state = TaggrAppCoordinator(
-            buildConfig: TaggrRuntimeConfig.config(for: .mainnet),
-            initialNetwork: .staging
-        )
-
-        XCTAssertEqual(state.runtimeNetwork, .staging)
-        XCTAssertEqual(state.runtimeConfig, TaggrRuntimeConfig.config(for: .staging))
-    }
-
-    @MainActor
-    func testCustomBuildConfigOverridesPersistedNetworkSelection() {
+    func testCustomBuildConfigIsUsedAtLaunch() {
         let customConfig = TaggrRuntimeConfig.from(info: [
             "TAGGR_CANISTER_ID": "bkyz2-fmaaa-aaaaa-qaaaq-cai",
             "TAGGR_API_BASE_URL": "https://taggr.trycloudflare.com",
@@ -114,63 +61,40 @@ final class TaggrTests: XCTestCase {
             "TAGGR_II_URL": "https://identity.trycloudflare.com/authorize",
             "TAGGR_DERIVATION_ORIGIN": "https://taggr.trycloudflare.com",
         ])
+        var apiConfig: TaggrRuntimeConfig?
+        var identityStoreConfig: TaggrRuntimeConfig?
+        var authenticatorConfig: TaggrRuntimeConfig?
+        let identityService = testIdentityService()
 
         let state = TaggrAppCoordinator(
             buildConfig: customConfig,
-            initialNetwork: .staging
+            apiFactory: { config in
+                apiConfig = config
+                return TaggrAPI(config: config)
+            },
+            identityStoreFactory: { config in
+                identityStoreConfig = config
+                return self.makeTestIdentityStore(config: config, service: identityService)
+            },
+            identityAuthenticatorFactory: { config in
+                authenticatorConfig = config
+                return ICInternetIdentityAuthenticator(
+                    configuration: config.icClientConfiguration,
+                    callbackDomain: config.callbackDomain
+                )
+            }
         )
 
         XCTAssertEqual(state.runtimeConfig, customConfig)
-        XCTAssertEqual(state.runtimeNetwork, .mainnet)
+        XCTAssertEqual(apiConfig, customConfig)
+        XCTAssertEqual(identityStoreConfig, customConfig)
+        XCTAssertEqual(authenticatorConfig, customConfig)
         XCTAssertEqual(state.runtimeConfig.canisterId, "bkyz2-fmaaa-aaaaa-qaaaq-cai")
         XCTAssertEqual(state.runtimeConfig.apiBaseURL.absoluteString, "https://taggr.trycloudflare.com")
         XCTAssertEqual(state.runtimeConfig.domain, "taggr.trycloudflare.com")
         XCTAssertEqual(state.runtimeConfig.callbackDomain, "callback.trycloudflare.com")
         XCTAssertEqual(state.runtimeConfig.identityURL.absoluteString, "https://identity.trycloudflare.com/authorize")
         XCTAssertEqual(state.runtimeConfig.derivationOrigin, "https://taggr.trycloudflare.com")
-    }
-
-    @MainActor
-    func testRuntimeNetworkSwitchPersistsMainnetSelection() async {
-        var persistedNetworks: [TaggrRuntimeNetwork] = []
-        let identityService = testIdentityService()
-        let identityStoreFactory: @MainActor @Sendable (TaggrRuntimeConfig) -> ICIdentityStore = {
-            self.makeTestIdentityStore(config: $0, service: identityService)
-        }
-        let handler: (URLRequest) throws -> (HTTPURLResponse, Data) = { request in
-            let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
-            switch self.requestMethodAndArg(from: request)?.method {
-            case "stats":
-                return (response, Self.queryReply(Data(#"{"canister_id":"\#(TaggrRuntimeConfig.productionCanisterId)"}"#.utf8)))
-            case "config":
-                return (response, Self.queryReply(Data(#"{"feed_page_size":30}"#.utf8)))
-            default:
-                return (response, Self.queryReply(Data("null".utf8)))
-            }
-        }
-        let state = TaggrAppCoordinator(
-            identityStore: identityStoreFactory(
-                TaggrRuntimeConfig.config(for: .staging)
-            ),
-            initialNetwork: .staging,
-            persistRuntimeNetwork: { persistedNetworks.append($0) },
-            apiFactory: { config in self.makeStubbedAPI(handler, config: config) },
-            identityStoreFactory: identityStoreFactory
-        )
-
-        state.setStagingNetworkEnabled(false)
-        for _ in 0..<20 {
-            if state.cache?.stats?.canisterId == TaggrRuntimeConfig.productionCanisterId {
-                break
-            }
-            try? await Task.sleep(for: .milliseconds(50))
-        }
-
-        XCTAssertEqual(state.runtimeNetwork, .mainnet)
-        XCTAssertEqual(state.runtimeConfig, TaggrRuntimeConfig.config(for: .mainnet))
-        XCTAssertEqual(persistedNetworks, [.mainnet])
-        XCTAssertEqual(state.cache?.stats?.canisterId, TaggrRuntimeConfig.productionCanisterId)
-        XCTAssertGreaterThan(state.routeLoadRevision, 0)
     }
 
     func testRuntimeConfigReadsInfoOverrides() {

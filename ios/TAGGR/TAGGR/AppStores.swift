@@ -91,16 +91,9 @@ final class SessionStore {
     var isBusy = false
     var errorMessage: String?
     var isAuthenticatingIdentity = false
-    var runtimeNetwork: TaggrRuntimeNetwork
-    var runtimeConfig: TaggrRuntimeConfig
+    let runtimeConfig: TaggrRuntimeConfig
 
-    init(network: TaggrRuntimeNetwork, config: TaggrRuntimeConfig) {
-        runtimeNetwork = network
-        runtimeConfig = config
-    }
-
-    func setRuntime(network: TaggrRuntimeNetwork, config: TaggrRuntimeConfig) {
-        runtimeNetwork = network
+    init(config: TaggrRuntimeConfig) {
         runtimeConfig = config
     }
 }

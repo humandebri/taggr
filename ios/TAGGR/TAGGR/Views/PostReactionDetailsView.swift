@@ -48,34 +48,16 @@ struct PostReactionDetailsView: View {
                         .font(.subheadline.weight(.bold))
                         .foregroundStyle(TaggrTheme.text)
 
-                    ForEach(group.userIDs, id: \.self) { userID in
-                        let profileHandle = state.authorProfileHandle(for: userID)
-                        Button {
-                            openProfile(userID)
-                        } label: {
-                            HStack(spacing: 8) {
-                                Image(systemName: "person.crop.circle")
-                                    .foregroundStyle(TaggrTheme.secondaryText)
-                                Text(displayName(for: userID))
-                                    .font(.subheadline.weight(.semibold))
-                                    .foregroundStyle(
-                                        profileHandle == nil ? TaggrTheme.secondaryText : TaggrTheme.clickable
-                                    )
-                                Spacer(minLength: 0)
+                    Text(userList(for: group))
+                        .font(.subheadline.weight(.semibold))
+                        .fixedSize(horizontal: false, vertical: true)
+                        .environment(\.openURL, OpenURLAction { url in
+                            guard url.scheme == "taggr-profile", let userID = Int(url.host ?? "") else {
+                                return .systemAction
                             }
-                            .padding(.horizontal, 10)
-                            .frame(minHeight: 40)
-                            .background(TaggrTheme.darkPanel)
-                            .clipShape(RoundedRectangle(cornerRadius: 7))
-                        }
-                        .buttonStyle(.plain)
-                        .disabled(profileHandle == nil)
-                        .accessibilityLabel(
-                            profileHandle == nil
-                                ? "Profile unavailable for \(displayName(for: userID))"
-                                : "Open profile for \(displayName(for: userID))"
-                        )
-                    }
+                            openProfile(userID)
+                            return .handled
+                        })
                 }
             }
         }
@@ -103,6 +85,23 @@ struct PostReactionDetailsView: View {
             return name
         }
         return state.authorNamesByUserID[userID] ?? "@\(userID)"
+    }
+
+    func userList(for group: TaggrReactionGroup) -> AttributedString {
+        group.userIDs.enumerated().reduce(into: AttributedString()) { result, entry in
+            if entry.offset > 0 {
+                result.append(AttributedString(", "))
+            }
+            let userID = entry.element
+            var name = AttributedString(displayName(for: userID))
+            if state.authorProfileHandle(for: userID) != nil {
+                name.foregroundColor = TaggrTheme.clickable
+                name.link = URL(string: "taggr-profile://\(userID)")
+            } else {
+                name.foregroundColor = TaggrTheme.secondaryText
+            }
+            result.append(name)
+        }
     }
 
     func openProfile(_ userID: Int) {

@@ -164,10 +164,9 @@ The uploaded app starts on the production TAGGR canister by default:
 
 -   `6qfxa-ryaaa-aaaai-qbhsq-cai.icp0.io`
 
-Use the in-app `Settings > Network` toggle to switch a TestFlight install to
-the staging canister:
-
--   `e4i5g-biaaa-aaaao-ai7ja-cai.icp0.io`
+The uploaded TestFlight app is fixed to the production canister. For optional
+staging-device verification, use the dedicated build documented in
+`ios/docs/device_verification.md` instead of the distribution build.
 
 After `Upload succeeded`, wait for App Store Connect processing to complete
 before adding the build to internal or external TestFlight testing.

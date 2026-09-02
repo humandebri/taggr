@@ -886,113 +886,6 @@ extension TaggrTests {
     }
 
     @MainActor
-    func testRuntimeNetworkDoesNotChangeWhileBusy() async throws {
-        let requestStarted = expectation(description: "feed request started")
-        let releaseRequest = DispatchSemaphore(value: 0)
-        var persistedNetworks: [TaggrRuntimeNetwork] = []
-        let identityService = testIdentityService()
-        let api = makeStubbedAPI { request in
-            requestStarted.fulfill()
-            _ = releaseRequest.wait(timeout: .now() + 5)
-            let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
-            return (response, Self.queryReply(Data("[]".utf8)))
-        }
-        let state = TaggrAppCoordinator(
-            api: api,
-            identityStore: makeTestIdentityStore(
-                config: TaggrRuntimeConfig.config(for: .mainnet),
-                service: identityService
-            ),
-            persistRuntimeNetwork: { persistedNetworks.append($0) },
-            identityStoreFactory: {
-                self.makeTestIdentityStore(config: $0, service: identityService)
-            }
-        )
-
-        let loadTask = Task { await state.loadFeed(mode: .hot, reset: true) }
-        await fulfillment(of: [requestStarted], timeout: 1)
-        XCTAssertTrue(state.isBusy)
-
-        state.setStagingNetworkEnabled(true)
-
-        XCTAssertEqual(state.runtimeNetwork, .mainnet)
-        XCTAssertEqual(state.runtimeConfig, TaggrRuntimeConfig.config(for: .mainnet))
-        XCTAssertTrue(persistedNetworks.isEmpty)
-        releaseRequest.signal()
-        await loadTask.value
-        XCTAssertFalse(state.isBusy)
-    }
-
-    @MainActor
-    func testRuntimeNetworkSwitchIgnoresOldCacheResponse() async throws {
-        let oldRequestsStarted = expectation(description: "old cache requests started")
-        let oldRequestLock = NSLock()
-        var oldRequestFulfilled = false
-        let releaseOldRequests = DispatchSemaphore(value: 0)
-        let handler: (URLRequest) throws -> (HTTPURLResponse, Data) = { request in
-            let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
-            let isStaging = request.url?.absoluteString.contains(TaggrRuntimeConfig.stagingCanisterId) == true
-            let method = self.requestMethodAndArg(from: request)?.method ?? ""
-            if !isStaging {
-                oldRequestLock.lock()
-                if !oldRequestFulfilled {
-                    oldRequestFulfilled = true
-                    oldRequestsStarted.fulfill()
-                }
-                oldRequestLock.unlock()
-                _ = releaseOldRequests.wait(timeout: .now() + 5)
-            }
-            switch method {
-            case "stats":
-                let canister = isStaging ? TaggrRuntimeConfig.stagingCanisterId : TaggrRuntimeConfig.productionCanisterId
-                return (response, Self.queryReply(Data(#"{"canister_id":"\#(canister)"}"#.utf8)))
-            case "config":
-                let pageSize = isStaging ? 17 : 3
-                return (response, Self.queryReply(Data(#"{"feed_page_size":\#(pageSize)}"#.utf8)))
-            case "hot_posts":
-                return (response, Self.queryReply(Data("[]".utf8)))
-            default:
-                return (response, Self.queryReply(Data("null".utf8)))
-            }
-        }
-        let mainnetAPI = makeStubbedAPI(handler, config: TaggrRuntimeConfig.config(for: .mainnet))
-        var persistedNetworks: [TaggrRuntimeNetwork] = []
-        let identityService = testIdentityService()
-        let identityStoreFactory: @MainActor @Sendable (TaggrRuntimeConfig) -> ICIdentityStore = {
-            self.makeTestIdentityStore(config: $0, service: identityService)
-        }
-        let state = TaggrAppCoordinator(
-            api: mainnetAPI,
-            identityStore: identityStoreFactory(
-                TaggrRuntimeConfig.config(for: .mainnet)
-            ),
-            persistRuntimeNetwork: { persistedNetworks.append($0) },
-            apiFactory: { config in self.makeStubbedAPI(handler, config: config) },
-            identityStoreFactory: identityStoreFactory
-        )
-
-        async let oldReloadTask: Void = state.reloadCache()
-        await fulfillment(of: [oldRequestsStarted], timeout: 5)
-
-        state.setStagingNetworkEnabled(true)
-        releaseOldRequests.signal()
-        releaseOldRequests.signal()
-        await oldReloadTask
-
-        for _ in 0..<20 {
-            if state.cache?.stats?.canisterId == TaggrRuntimeConfig.stagingCanisterId {
-                break
-            }
-            try await Task.sleep(nanoseconds: 50_000_000)
-        }
-
-        XCTAssertEqual(state.runtimeNetwork, .staging)
-        XCTAssertEqual(persistedNetworks, [.staging])
-        XCTAssertEqual(state.cache?.stats?.canisterId, TaggrRuntimeConfig.stagingCanisterId)
-        XCTAssertEqual(state.cache?.config?.feedPageSize, 17)
-    }
-
-    @MainActor
     func testNewerFeedRequestWinsWhenOlderResponseFinishesLast() async {
         let firstRequestStarted = expectation(description: "first feed request started")
         let releaseFirstRequest = DispatchSemaphore(value: 0)
@@ -1153,7 +1046,7 @@ extension TaggrTests {
     @MainActor
     func testChildStoresKeepUnrelatedStateIndependent() {
         let navigation = NavigationStore()
-        let session = SessionStore(network: .mainnet, config: .config(for: .mainnet))
+        let session = SessionStore(config: .from(info: [:]))
         let feed = FeedStore()
         let content = ContentStore()
         let wallet = WalletStorageStore()

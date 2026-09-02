@@ -115,13 +115,8 @@ final class TaggrAppCoordinator {
         get { sessionStore.isAuthenticatingIdentity }
         set { sessionStore.isAuthenticatingIdentity = newValue }
     }
-    var runtimeNetwork: TaggrRuntimeNetwork {
-        get { sessionStore.runtimeNetwork }
-        set { sessionStore.runtimeNetwork = newValue }
-    }
     var runtimeConfig: TaggrRuntimeConfig {
-        get { sessionStore.runtimeConfig }
-        set { sessionStore.runtimeConfig = newValue }
+        sessionStore.runtimeConfig
     }
     var feed: [TaggrPost] {
         get { feedStore.feed }
@@ -184,9 +179,9 @@ final class TaggrAppCoordinator {
         set { walletStorageStore.storageCreationState = newValue }
     }
 
-    var api: TaggrAPI
-    var identityStore: ICIdentityStore
-    var identityAuthenticator: ICInternetIdentityAuthenticator
+    let api: TaggrAPI
+    let identityStore: ICIdentityStore
+    let identityAuthenticator: ICInternetIdentityAuthenticator
     let postDraftStore: PostDraftStore
     let realmPostingPreferences: RealmPostingPreferences
     static let maxAuthorNameCacheEntries = 500
@@ -215,10 +210,6 @@ final class TaggrAppCoordinator {
     var tagCostCache: [[String]: Int] = [:]
     var tagCostRequestSequence = 0
     var tagCostTask: Task<Int, Error>?
-    let apiFactory: @MainActor (TaggrRuntimeConfig) -> TaggrAPI
-    let identityStoreFactory: @MainActor (TaggrRuntimeConfig) -> ICIdentityStore
-    let identityAuthenticatorFactory: @MainActor (TaggrRuntimeConfig) -> ICInternetIdentityAuthenticator
-    let persistRuntimeNetwork: (TaggrRuntimeNetwork) -> Void
 
     init(
         api: TaggrAPI? = nil,
@@ -227,37 +218,24 @@ final class TaggrAppCoordinator {
         postDraftStore: PostDraftStore = PostDraftStore(),
         realmPostingPreferences: RealmPostingPreferences = RealmPostingPreferences(),
         buildConfig: TaggrRuntimeConfig = .current,
-        initialNetwork: TaggrRuntimeNetwork? = nil,
-        persistRuntimeNetwork: @escaping (TaggrRuntimeNetwork) -> Void = { _ in },
-        apiFactory: @escaping @MainActor (TaggrRuntimeConfig) -> TaggrAPI = { TaggrAPI(config: $0) },
-        identityStoreFactory: @escaping @MainActor (TaggrRuntimeConfig) -> ICIdentityStore = { runtimeConfig in
+        apiFactory: @MainActor (TaggrRuntimeConfig) -> TaggrAPI = { TaggrAPI(config: $0) },
+        identityStoreFactory: @MainActor (TaggrRuntimeConfig) -> ICIdentityStore = { runtimeConfig in
             ICIdentityStore(
                 configuration: runtimeConfig.icClientConfiguration,
                 service: TaggrAppCoordinator.identityStoreService
             )
         },
-        identityAuthenticatorFactory: @escaping @MainActor (TaggrRuntimeConfig) -> ICInternetIdentityAuthenticator = { runtimeConfig in
+        identityAuthenticatorFactory: @MainActor (TaggrRuntimeConfig) -> ICInternetIdentityAuthenticator = { runtimeConfig in
             ICInternetIdentityAuthenticator(
                 configuration: runtimeConfig.icClientConfiguration,
                 callbackDomain: runtimeConfig.callbackDomain
             )
         }
     ) {
-        let restoredNetwork = buildConfig.canonicalNetworkPreset == nil ? nil : initialNetwork
-        let config = if let restoredNetwork {
-            TaggrRuntimeConfig.config(for: restoredNetwork)
-        } else {
-            buildConfig
-        }
-        let network = restoredNetwork ?? TaggrRuntimeNetwork.from(config: config) ?? .mainnet
-        self.sessionStore = SessionStore(network: network, config: config)
-        self.apiFactory = apiFactory
-        self.identityStoreFactory = identityStoreFactory
-        self.identityAuthenticatorFactory = identityAuthenticatorFactory
-        self.persistRuntimeNetwork = persistRuntimeNetwork
-        self.api = api ?? apiFactory(config)
-        self.identityStore = identityStore ?? identityStoreFactory(config)
-        self.identityAuthenticator = identityAuthenticator ?? identityAuthenticatorFactory(config)
+        self.sessionStore = SessionStore(config: buildConfig)
+        self.api = api ?? apiFactory(buildConfig)
+        self.identityStore = identityStore ?? identityStoreFactory(buildConfig)
+        self.identityAuthenticator = identityAuthenticator ?? identityAuthenticatorFactory(buildConfig)
         self.postDraftStore = postDraftStore
         self.realmPostingPreferences = realmPostingPreferences
     }
@@ -292,39 +270,6 @@ final class TaggrAppCoordinator {
             realms.insert(targetRealm, at: 0)
         }
         return realms
-    }
-
-    var isStagingNetwork: Bool {
-        runtimeNetwork == .staging
-    }
-
-    var canChangeRuntimeNetwork: Bool {
-        !isBusy && !isAuthenticatingIdentity
-    }
-
-    func setStagingNetworkEnabled(_ enabled: Bool) {
-        let nextNetwork: TaggrRuntimeNetwork = enabled ? .staging : .mainnet
-        let nextConfig = TaggrRuntimeConfig.config(for: nextNetwork)
-        guard runtimeNetwork != nextNetwork || runtimeConfig != nextConfig else { return }
-        guard canChangeRuntimeNetwork else { return }
-        runtimeGeneration += 1
-        requestTasks.values.forEach { $0.cancel() }
-        requestTasks.removeAll()
-        tagCostRequestSequence += 1
-        tagCostTask?.cancel()
-        tagCostTask = nil
-        tagCostCache.removeAll()
-        signOut()
-        runtimeNetwork = nextNetwork
-        runtimeConfig = nextConfig
-        api = apiFactory(nextConfig)
-        identityStore = identityStoreFactory(nextConfig)
-        identityAuthenticator = identityAuthenticatorFactory(nextConfig)
-        persistRuntimeNetwork(nextNetwork)
-        Task {
-            await reloadCache()
-            routeLoadRevision += 1
-        }
     }
 
     func bootstrap() async {

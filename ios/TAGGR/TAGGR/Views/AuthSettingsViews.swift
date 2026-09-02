@@ -8,31 +8,11 @@ struct SettingsView: View {
     @State private var sendICPPresented = false
     @State private var mintConfirmationPresented = false
 
-    private var stagingNetworkBinding: Binding<Bool> {
-        Binding(
-            get: { state.isStagingNetwork },
-            set: { state.setStagingNetworkEnabled($0) }
-        )
-    }
-
     var body: some View {
         ZStack {
             TaggrTheme.background.ignoresSafeArea()
             ScrollView {
                 VStack(alignment: .leading, spacing: 18) {
-                    SettingsPanel(title: "Network") {
-                        Toggle(isOn: stagingNetworkBinding) {
-                            Label(state.runtimeNetwork.title, systemImage: "network")
-                                .font(.subheadline.weight(.bold))
-                        }
-                        .toggleStyle(.switch)
-                        .tint(TaggrTheme.clickable)
-                        .disabled(!state.canChangeRuntimeNetwork)
-                        Text(state.runtimeConfig.domain)
-                            .font(.footnote.monospaced())
-                            .foregroundStyle(TaggrTheme.secondaryText)
-                            .textSelection(.enabled)
-                    }
                     SettingsPanel(title: "Identity") {
                         if let message = state.errorMessage {
                             Text(message)

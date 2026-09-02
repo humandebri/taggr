@@ -12,6 +12,8 @@
     -   Open `Links > Privacy policy`.
     -   Open `Links > HELP Realm`.
 -   Account-required review path:
+    -   In Internet Identity, choose **Passkey** for the review sign-in. Do not
+        use the Apple sign-in option for the review procedure.
     -   Provide App Review with an active demo account or an invite code with
         enough credits to create an account.
     -   Use the signed-in account to verify reporting and blocking from profile
@@ -47,6 +49,9 @@ Review access:
 
 -   Use the public demo path without login for feed, public posts, realms,
     profiles, token pages, transaction pages, privacy, and support links.
+-   For sign-in, open Internet Identity and choose **Passkey**. Passkey is the
+    recommended and supported App Review path; do not select the Apple sign-in
+    option during review.
 -   To test report and block flows, create a reviewer account through the invite
     code flow. Fill the production invite code in App Store Connect after the
     production follow-up deploy.
