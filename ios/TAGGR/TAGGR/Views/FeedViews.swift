@@ -1100,13 +1100,6 @@ struct PostRepliesAccordion: View {
                 }
             }
         }
-        .overlay(alignment: .leading) {
-            Rectangle()
-                .fill(TaggrTheme.panelRaised)
-                .frame(width: 2)
-                .padding(.leading, 34)
-                .padding(.vertical, 8)
-        }
     }
 }
 
