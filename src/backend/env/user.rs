@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 
 pub type UserId = u64;
 
-#[derive(Default, Serialize, Deserialize)]
+#[derive(Clone, Default, Serialize, Deserialize)]
 pub struct Filters {
     pub users: BTreeSet<UserId>,
     pub tags: BTreeSet<String>,
@@ -57,7 +57,7 @@ impl UserFilter {
     }
 }
 
-#[derive(Default, Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Default, Debug, Serialize, Deserialize, PartialEq)]
 pub enum Mode {
     #[default]
     Mining,
@@ -65,7 +65,7 @@ pub enum Mode {
     Credits,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct User {
     pub id: UserId,
     pub name: String,

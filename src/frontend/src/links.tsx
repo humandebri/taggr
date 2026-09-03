@@ -38,6 +38,11 @@ export const LinksPage = ({}) => {
             <h2>Community-maintained resources</h2>
             <ul>
                 <li>
+                    <a target="_blank" href="#/privacy">
+                        Privacy policy
+                    </a>
+                </li>
+                <li>
                     <a target="_blank" href={`#/realm/000_WELCOME_TO_TAGGR`}>
                         Welcome to Taggr Realm
                     </a>{" "}

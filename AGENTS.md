@@ -30,4 +30,31 @@ Read the [whitepaper](./src/frontend/assets/WHITEPAPER.md) for more details.
 
 ## Code
 
+-   Use ICP CLI for Internet Computer commands; do not use dfx.
 -   Always apply formatting (make format) and cargo check.
+
+## iOS Native Auth
+
+-   Native sign-in flow is:
+    iOS `ASWebAuthenticationSession` -> Internet Identity `/authorize` ICRC-167
+    URL -> `/ios-auth-callback` fragment response -> iOS app.
+-   The public callback domain must be controlled by the app, serve a valid
+    AASA response, appear in the app entitlements, and be declared by the
+    derivation origin at `/.well-known/ii-auth-callbacks`.
+-   Production and staging callbacks use their respective canister
+    `<canister-id>.icp0.io` hosts. Do not add user-owned custom domains to the
+    callback declaration.
+-   For physical-device local canister auth before production AASA is deployed,
+    use the active TAGGR HTTPS tunnel as the iOS callback domain:
+    `TAGGR_CALLBACK_DOMAIN=<active-taggr-tunnel-host>`. The tunnel must serve a
+    valid AASA response, declare only its own callback URL, and appear in the
+    app entitlements.
+-   A working physical-device build must satisfy all of these at the same time:
+    `TAGGR_DERIVATION_ORIGIN` points to the active TAGGR HTTPS tunnel,
+    `TAGGR_II_URL` points to an ICRC-167 Internet Identity `/authorize` URL,
+    `TAGGR_CALLBACK_DOMAIN` points to the active callback domain that serves
+    valid AASA and `/.well-known/ii-auth-callbacks`, and the callback URL exactly matches the
+    `ASWebAuthenticationSession.Callback.https` matcher.
+-   If sign-in looks inert, first check for stale `SafariViewService` /
+    `ASWebAuthenticationSession` state, dead quick-tunnel DNS, and whether the
+    device is locked before changing code.

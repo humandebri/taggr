@@ -1,0 +1,85 @@
+import Foundation
+import ICNativeClient
+
+struct TaggrRuntimeConfig: Equatable, Sendable {
+    static let productionCanisterId = "6qfxa-ryaaa-aaaai-qbhsq-cai"
+    static let productionAPIBaseURL = URL(string: "https://ic0.app")!
+    static let productionDomain = "6qfxa-ryaaa-aaaai-qbhsq-cai.icp0.io"
+    static let productionIdentityURL = URL(string: "https://id.ai/authorize")!
+    static let productionDerivationOrigin = "https://6qfxa-ryaaa-aaaai-qbhsq-cai.icp0.io"
+
+    let canisterId: String
+    let apiBaseURL: URL
+    let domain: String
+    let callbackDomain: String
+    let identityURL: URL
+    let derivationOrigin: String
+
+    static var current: TaggrRuntimeConfig {
+        from(info: Bundle.main.infoDictionary ?? [:])
+    }
+
+    static func from(info: [String: Any]) -> TaggrRuntimeConfig {
+        let canisterId = stringValue("TAGGR_CANISTER_ID", in: info) ?? productionCanisterId
+        let apiBaseURL = urlValue("TAGGR_API_BASE_URL", in: info) ?? productionAPIBaseURL
+        let domain = stringValue("TAGGR_DOMAIN", in: info) ?? productionDomain
+        let callbackDomain = stringValue("TAGGR_CALLBACK_DOMAIN", in: info) ?? domain
+        let identityURL = urlValue("TAGGR_II_URL", in: info) ?? productionIdentityURL
+        let derivationOrigin = httpsStringValue("TAGGR_DERIVATION_ORIGIN", in: info) ?? productionDerivationOrigin
+        return TaggrRuntimeConfig(
+            canisterId: canisterId,
+            apiBaseURL: apiBaseURL,
+            domain: domain,
+            callbackDomain: callbackDomain,
+            identityURL: identityURL,
+            derivationOrigin: derivationOrigin
+        )
+    }
+
+    func apiURL(for requestType: String) -> URL {
+        icClientConfiguration.apiURL(for: requestType)
+    }
+
+    var icClientConfiguration: ICClientConfiguration {
+        ICClientConfiguration(
+            canisterId: canisterId,
+            apiBaseURL: apiBaseURL,
+            identityProvider: identityURL,
+            derivationOrigin: derivationOrigin
+        )
+    }
+
+    var shouldLoadBucketImagesThroughAPI: Bool {
+        apiBaseURL != Self.productionAPIBaseURL
+    }
+
+    private static func urlValue(_ key: String, in info: [String: Any]) -> URL? {
+        guard let value = stringValue(key, in: info) else {
+            return nil
+        }
+        guard let url = URL(string: value), url.scheme == "https" else {
+            return nil
+        }
+        return url
+    }
+
+    private static func httpsStringValue(_ key: String, in info: [String: Any]) -> String? {
+        guard let value = stringValue(key, in: info),
+              let url = URL(string: value),
+              url.scheme == "https" else {
+            return nil
+        }
+        return value
+    }
+
+    private static func stringValue(_ key: String, in info: [String: Any]) -> String? {
+        guard let raw = info[key] as? String else {
+            return nil
+        }
+        let value = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !value.isEmpty, !value.contains("$(") else {
+            return nil
+        }
+        return value
+    }
+}
