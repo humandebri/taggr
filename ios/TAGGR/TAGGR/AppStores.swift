@@ -38,14 +38,6 @@ struct RealmPostingPreferences {
         }
     }
 
-    func orderedRealms(scope: RealmPostingScope, availableRealms: [String]) -> [String] {
-        let recentRealms = validDestinations(scope: scope, availableRealms: availableRealms)
-            .filter { !$0.isEmpty }
-        return recentRealms + availableRealms.filter { realm in
-            !recentRealms.contains { $0.caseInsensitiveCompare(realm) == .orderedSame }
-        }
-    }
-
     private func storageKey(scope: RealmPostingScope) -> String {
         "\(Self.keyPrefix).\(scope.canisterID).\(scope.userID)"
     }

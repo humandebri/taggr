@@ -836,7 +836,7 @@ final class TaggrTests: XCTestCase {
     }
 
     func testConfigDecodesReactions() throws {
-        let data = Data(#"{"name":"TAGGR","token_symbol":"TAGGR","token_decimals":2,"max_post_length":5000,"max_tag_length":30,"max_blob_size_bytes":460800,"max_report_length":1000,"reactions":[[11,1],[10,1],[1,-3]],"feed_page_size":25,"poll_revote_deadline_hours":2,"post_cost":10,"post_deletion_penalty_factor":3}"#.utf8)
+        let data = Data(#"{"name":"TAGGR","token_symbol":"TAGGR","token_decimals":2,"max_post_length":5000,"max_tag_length":30,"max_blob_size_bytes":460800,"max_report_length":1000,"reactions":[[11,1],[10,1],[1,-3]],"feed_page_size":25,"poll_revote_deadline_hours":2,"post_cost":10,"poll_cost":4,"post_deletion_penalty_factor":3}"#.utf8)
         let config = try JSONDecoder.taggr.decode(TaggrConfig.self, from: data)
         XCTAssertEqual(config.reactions, [[11, 1], [10, 1], [1, -3]])
         XCTAssertEqual(config.tokenSymbol, "TAGGR")
@@ -848,6 +848,7 @@ final class TaggrTests: XCTestCase {
         XCTAssertEqual(config.feedPageSize, 25)
         XCTAssertEqual(config.pollRevoteDeadlineHours, 2)
         XCTAssertEqual(config.postCost, 10)
+        XCTAssertEqual(config.pollCost, 4)
         XCTAssertEqual(config.postDeletionPenaltyFactor, 3)
     }
 }

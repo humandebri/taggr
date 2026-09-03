@@ -618,6 +618,7 @@ extension TaggrTests {
     func samplePost(
         id: Int = 1,
         user: Int = 1,
+        parent: Int? = nil,
         body: String,
         reactions: [String: [Int]] = [:],
         children: [Int] = [],
@@ -631,7 +632,7 @@ extension TaggrTests {
     ) -> TaggrPost {
         TaggrPost(
             id: id,
-            parent: nil,
+            parent: parent,
             user: user,
             body: body,
             effBody: nil,

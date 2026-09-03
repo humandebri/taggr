@@ -10,8 +10,11 @@ struct ComposePostView: View {
     let mode: PostComposerMode
     let dismiss: () -> Void
     @StateObject private var draft: PostDraftSession
+    @StateObject private var imageImport = ImageImportCoordinator()
     @State private var selectedPhotos: [PhotosPickerItem] = []
+    @State private var imageImportWarning: String?
     @State private var creditCost: Int?
+    @State private var creditCostUnavailable = false
     @State private var realmColors: [String: String] = [:]
     @State private var isSubmitting = false
     @State private var discardConfirmationPresented = false
@@ -38,6 +41,7 @@ struct ComposePostView: View {
                     canSubmit: canSubmit,
                     isSubmitting: isSubmitting || state.isBusy,
                     cost: shouldShowCreditCost ? creditCost : nil,
+                    costUnavailable: shouldShowCreditCost && creditCostUnavailable,
                     showsCost: shouldShowCreditCost,
                     realmName: $draft.realm,
                     appName: appRealmName,
@@ -59,6 +63,13 @@ struct ComposePostView: View {
                             placeholder: mode.placeholder,
                             isFocused: $isTextEditorFocused
                         )
+                        if let realmWarning {
+                            ComposePostImageWarning(
+                                text: realmWarning,
+                                showCreateStorage: false,
+                                createStorage: {}
+                            )
+                        }
                         if let warning = draft.restorationWarning {
                             ComposePostImageWarning(
                                 text: warning,
@@ -69,6 +80,21 @@ struct ComposePostView: View {
                         if let imageWarning {
                             ComposePostImageWarning(text: imageWarning, showCreateStorage: missingStorageForImages) {
                                 openStorageSettings()
+                            }
+                        }
+                        if let imageImportWarning {
+                            ComposePostImageWarning(
+                                text: imageImportWarning,
+                                showCreateStorage: false,
+                                createStorage: {}
+                            )
+                        }
+                        if !editableImages.isEmpty {
+                            ComposeExistingPostImageList(images: editableImages) { image in
+                                draft.text = TaggrPostImages.removingImageMarkdown(
+                                    image.markdownReferences,
+                                    from: draft.text
+                                )
                             }
                         }
                         if !draft.images.isEmpty {
@@ -84,12 +110,13 @@ struct ComposePostView: View {
                 ComposePostAttachmentBar(
                     text: $draft.text,
                     selectedPhotos: $selectedPhotos,
-                    isSubmitting: state.isBusy || isSubmitting
+                    isSubmitting: state.isBusy || isSubmitting || imageImport.isImporting,
+                    isImagePickerDisabled: state.isBusy || isSubmitting || imageImport.isImporting || !draft.isLoaded
                 )
             }
         }
         .onChange(of: selectedPhotos) { _, items in
-            Task { await loadPhotos(items) }
+            loadPhotos(items)
         }
         .onChange(of: draft.text) { _, _ in
             draft.scheduleSave()
@@ -105,6 +132,7 @@ struct ComposePostView: View {
             isTextEditorFocused = true
         }
         .onDisappear {
+            cancelImageImport()
             Task { await draft.flush() }
         }
         .task(id: draftNamespaceID) {
@@ -124,6 +152,7 @@ struct ComposePostView: View {
             titleVisibility: .visible
         ) {
             Button("Discard Draft", role: .destructive) {
+                cancelImageImport()
                 Task {
                     await draft.discard()
                     dismiss()
@@ -135,11 +164,13 @@ struct ComposePostView: View {
 
     private var canSubmit: Bool {
         guard draft.isLoaded, state.currentUser != nil else { return false }
+        guard !imageImport.isImporting else { return false }
         let body = composedBody
         guard !body.isEmpty else { return false }
         guard imageWarning == nil else { return false }
+        guard realmWarning == nil else { return false }
         guard let editingPost = mode.editingPost else { return true }
-        return body != editingPost.body
+        return body != editingPost.body || selectedTargetRealm != editingPost.realm
     }
 
     private var composedBody: String {
@@ -147,16 +178,18 @@ struct ComposePostView: View {
     }
 
     private var shouldShowCreditCost: Bool {
-        mode.editingPost == nil && !composedBody.isEmpty
+        !composedBody.isEmpty
     }
 
     private var creditCostRefreshKey: String {
         [
             mode.editingPost == nil ? "create" : "edit",
+            composedBody,
             creditCostTags.joined(separator: ","),
             String((composedBody.utf8.count / 1024) + 1),
             state.runtimeConfig.canisterId,
             String(state.cache?.config?.postCost ?? -1),
+            String(state.cache?.config?.pollCost ?? -1),
             String(state.cache?.config?.maxTagLength ?? -1),
         ].joined(separator: "|")
     }
@@ -171,18 +204,40 @@ struct ComposePostView: View {
     }
 
     private var showsRealmPicker: Bool {
-        if case .newPost = mode {
-            return true
+        mode.allowsRealmSelection
+    }
+
+    private var realmWarning: String? {
+        guard let post = mode.editingPost,
+              post.parent == nil,
+              let realm = selectedTargetRealm,
+              !joinedRealm(realm) else {
+            return nil
         }
-        return false
+        return "Choose Global or a realm you've joined before saving."
+    }
+
+    private func joinedRealm(_ realm: String) -> Bool {
+        state.currentUser?.realms.contains {
+            $0.caseInsensitiveCompare(realm) == .orderedSame
+        } == true
+    }
+
+    private var editableImages: [TaggrEditablePostImage] {
+        guard let post = mode.editingPost else { return [] }
+        return post.editableImageAttachments(
+            config: state.runtimeConfig,
+            bodyText: composedBody
+        )
     }
 
     private var selectableRealms: [String] {
-        state.orderedPostingRealms(targetRealm: mode.targetRealm)
+        let selectedRealm = draft.realm.isEmpty || !joinedRealm(draft.realm) ? nil : draft.realm
+        return state.orderedPostingRealms(selectedRealm: selectedRealm)
     }
 
     private var realmMetadataKey: String {
-        selectableRealms.map { $0.uppercased() }.joined(separator: "|")
+        selectableRealms.map { $0.uppercased() }.sorted().joined(separator: "|")
     }
 
     private var imageWarning: String? {
@@ -214,7 +269,13 @@ struct ComposePostView: View {
         isSubmitting = true
         Task {
             if let editingPost = mode.editingPost {
-                await state.editPost(post: editingPost, text: body, images: images, reloadMode: mode.selectedMode)
+                await state.editPost(
+                    post: editingPost,
+                    text: body,
+                    realm: selectedTargetRealm,
+                    images: images,
+                    reloadMode: mode.selectedMode
+                )
             } else {
                 await state.submitPost(
                     text: body,
@@ -226,30 +287,39 @@ struct ComposePostView: View {
             }
             isSubmitting = false
             if state.errorMessage == nil {
+                cancelImageImport()
                 await draft.discard()
                 dismiss()
             }
         }
     }
 
-    @MainActor
-    private func loadPhotos(_ items: [PhotosPickerItem]) async {
-        guard !items.isEmpty else { return }
-        var sourceData: [Data] = []
+    private func loadPhotos(_ items: [PhotosPickerItem]) {
+        guard !items.isEmpty, !imageImport.isImporting else { return }
+        imageImportWarning = nil
         let maxBytes = state.cache?.config?.maxBlobSizeBytes ?? ImageDrafts.maxImageBytes
-        for item in items {
-            if let data = try? await item.loadTransferable(type: Data.self) {
-                sourceData.append(data)
+        imageImport.start(
+            operation: {
+                await ImageDrafts.importPhotos(items, maxBytes: maxBytes)
+            },
+            completion: { result in
+                selectedPhotos = []
+                imageImportWarning = result.warning
+                let loaded = ImageDrafts.uniquedDraftImages(
+                    result.images,
+                    existingIDs: Set(draft.images.map(\.id))
+                )
+                if !loaded.isEmpty {
+                    await draft.addImages(loaded)
+                }
             }
-        }
-        var loaded = await ImageDrafts.draftImages(from: sourceData, maxBytes: maxBytes)
-        guard !loaded.isEmpty else {
-            selectedPhotos = []
-            return
-        }
-        loaded = ImageDrafts.uniquedDraftImages(loaded, existingIDs: Set(draft.images.map(\.id)))
-        await draft.addImages(loaded)
+        )
+    }
+
+    private func cancelImageImport() {
+        imageImport.cancel()
         selectedPhotos = []
+        imageImportWarning = nil
     }
 
     private func removeImage(_ image: TaggrDraftImage) {
@@ -259,26 +329,32 @@ struct ComposePostView: View {
     @MainActor
     private func refreshCreditCost() async {
         let body = composedBody
-        guard mode.editingPost == nil, !body.isEmpty else {
+        guard !body.isEmpty else {
             creditCost = nil
+            creditCostUnavailable = false
             return
         }
+        creditCost = nil
+        creditCostUnavailable = false
         do {
             try await Task.sleep(for: .milliseconds(300))
         } catch {
             return
         }
-        let cost = await state.postCreditCost(for: body)
+        let cost = await state.postCreditCost(for: body, editing: mode.editingPost)
         if body == composedBody {
             creditCost = cost
+            creditCostUnavailable = cost == nil
         }
     }
 
     private var selectedTargetRealm: String? {
-        guard case .newPost = mode else {
+        switch mode {
+        case .reply:
             return mode.targetRealm
+        case .newPost, .edit:
+            return draft.realm.isEmpty ? nil : draft.realm
         }
-        return draft.realm.isEmpty ? nil : draft.realm
     }
 
     private var draftNamespace: PostDraftNamespace? {
@@ -295,6 +371,7 @@ struct ComposePostView: View {
     }
 
     private func close() {
+        cancelImageImport()
         Task {
             await draft.flush()
             dismiss()
@@ -302,6 +379,7 @@ struct ComposePostView: View {
     }
 
     private func openStorageSettings() {
+        cancelImageImport()
         Task {
             await draft.flush()
             state.route = .settings
@@ -315,6 +393,7 @@ private struct ComposePostToolbar: View {
     let canSubmit: Bool
     let isSubmitting: Bool
     let cost: Int?
+    let costUnavailable: Bool
     let showsCost: Bool
     @Binding var realmName: String
     let appName: String
@@ -349,7 +428,7 @@ private struct ComposePostToolbar: View {
                     .frame(width: 36, height: 36)
             }
             if showsCost {
-                ComposePostCreditCostBadge(cost: cost)
+                ComposePostCreditCostBadge(cost: cost, unavailable: costUnavailable)
                     .padding(.trailing, 10)
             }
             Button(submitTitle, action: submit)
@@ -478,16 +557,21 @@ private struct ComposePostTextEditor: View {
 
 private struct ComposePostCreditCostBadge: View {
     let cost: Int?
+    let unavailable: Bool
 
     var body: some View {
         HStack(spacing: 6) {
             ComposeCreditsIcon()
                 .frame(width: 18, height: 18)
-            Text(cost.map { $0.formatted() } ?? "...")
+            Text(unavailable ? "—" : cost.map { $0.formatted() } ?? "...")
                 .font(.title3.weight(.bold))
         }
         .foregroundStyle(TaggrTheme.text)
-        .accessibilityLabel(cost.map { "Cost \($0.formatted()) credits" } ?? "Calculating cost")
+        .accessibilityLabel(
+            unavailable
+                ? "Cost unavailable"
+                : cost.map { "Cost \($0.formatted()) credits" } ?? "Calculating cost"
+        )
     }
 }
 
@@ -543,6 +627,52 @@ struct ComposePostImageWarning: View {
     }
 }
 
+private struct ComposeExistingPostImageList: View {
+    let images: [TaggrEditablePostImage]
+    let removeImage: (TaggrEditablePostImage) -> Void
+
+    var body: some View {
+        LazyVStack(spacing: 12) {
+            ForEach(images) { image in
+                ComposeExistingPostImage(image: image) {
+                    removeImage(image)
+                }
+            }
+        }
+    }
+}
+
+private struct ComposeExistingPostImage: View {
+    let image: TaggrEditablePostImage
+    let remove: () -> Void
+
+    var body: some View {
+        ZStack(alignment: .topTrailing) {
+            TaggrPostImageLoaderView(
+                attachment: image.attachment,
+                contentMode: .fit
+            )
+            .frame(maxWidth: .infinity)
+            .frame(height: 240)
+            .background(TaggrTheme.darkPanel)
+            .clipShape(RoundedRectangle(cornerRadius: 10))
+
+            if image.isRemovable {
+                Button("Remove image", systemImage: "xmark", action: remove)
+                    .labelStyle(.iconOnly)
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(.white)
+                    .frame(width: 30, height: 30)
+                    .background(Color.black.opacity(0.55))
+                    .clipShape(Circle())
+                    .padding(8)
+            }
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel(image.isRemovable ? "Existing post image" : "Legacy post image, preview only")
+    }
+}
+
 struct ComposePostDraftImageList: View {
     let images: [TaggrDraftImage]
     let removeImage: (TaggrDraftImage) -> Void
@@ -591,6 +721,36 @@ enum TaggrPostCreditCost {
         return max(baseCost, 0) * sizeMultiplier + max(tagCost, 0)
     }
 
+    static func estimateEdit(
+        body: String,
+        post: TaggrPost,
+        baseCost: Int,
+        tagCost: Int,
+        pollCost: Int?
+    ) -> Int? {
+        guard let historicalPatchBytes = historicalPatchBytes(in: post) else { return nil }
+        let newPatchBytes = body == post.body
+            ? 0
+            : TaggrEditPatch.fullReplacement(from: body, to: post.body).utf8.count
+        let pollSurcharge: Int
+        if case .poll = post.extensionKind {
+            guard let pollCost else { return nil }
+            pollSurcharge = pollCost
+        } else {
+            pollSurcharge = 0
+        }
+        let sizeMultiplier = ((body.utf8.count + historicalPatchBytes + newPatchBytes) / 1024) + 1
+        return baseCost * sizeMultiplier + tagCost + pollSurcharge
+    }
+
+    private static func historicalPatchBytes(in post: TaggrPost) -> Int? {
+        var total = 0
+        for values in post.patches {
+            guard values.count >= 2, let patch = values[1].stringValue else { return nil }
+            total += patch.utf8.count
+        }
+        return total
+    }
     static func tags(in input: String, maxLength: Int) -> [String] {
         var seen = Set<String>()
         return tokens(in: input, prefixes: ["#", "$"], maxLength: maxLength)
@@ -634,6 +794,7 @@ struct ComposePostAttachmentBar: View {
     @Binding var text: String
     @Binding var selectedPhotos: [PhotosPickerItem]
     let isSubmitting: Bool
+    let isImagePickerDisabled: Bool
     var horizontalPadding: CGFloat = 18
     var verticalPadding: CGFloat = 8
     var itemSpacing: CGFloat = 8
@@ -644,9 +805,10 @@ struct ComposePostAttachmentBar: View {
         HStack {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: itemSpacing) {
-                    PhotosPicker(selection: $selectedPhotos, matching: .images) {
+                    PhotosPicker(selection: $selectedPhotos, selectionBehavior: .ordered, matching: .images) {
                         ComposeMarkdownButtonLabel(kind: .image)
                     }
+                    .disabled(isImagePickerDisabled)
                     .accessibilityLabel("Attach image")
                     ForEach(ComposeMarkdownAction.inlineActions) { action in
                         Button {

@@ -246,29 +246,31 @@ final class TaggrAppCoordinator {
         }
     }
 
+    var recentlyUsedJoinedRealms: [String] {
+        Array((currentUser?.realms ?? []).reversed())
+    }
+
     func initialPostingRealm(for mode: TaggrFeedMode) -> String {
         if case .realm(let name) = mode {
             return name
         }
         guard let scope = realmPostingScope else { return "" }
-        return realmPostingPreferences.validDestinations(
+        let localDestination = realmPostingPreferences.validDestinations(
             scope: scope,
             availableRealms: currentUser?.realms ?? []
-        ).first ?? ""
+        ).first
+        guard localDestination?.isEmpty == false else { return "" }
+        return recentlyUsedJoinedRealms.first ?? ""
     }
 
-    func orderedPostingRealms(targetRealm: String?) -> [String] {
-        let availableRealms = currentUser?.realms ?? []
-        var realms = if let scope = realmPostingScope {
-            realmPostingPreferences.orderedRealms(scope: scope, availableRealms: availableRealms)
-        } else {
-            availableRealms
-        }
-        if let targetRealm,
-           !targetRealm.isEmpty,
-           !realms.contains(where: { $0.caseInsensitiveCompare(targetRealm) == .orderedSame }) {
-            realms.insert(targetRealm, at: 0)
-        }
+    func orderedPostingRealms(selectedRealm: String?) -> [String] {
+        var realms = recentlyUsedJoinedRealms
+        guard let selectedRealm, !selectedRealm.isEmpty else { return realms }
+        let selectedName = realms.first {
+            $0.caseInsensitiveCompare(selectedRealm) == .orderedSame
+        } ?? selectedRealm
+        realms.removeAll { $0.caseInsensitiveCompare(selectedRealm) == .orderedSame }
+        realms.insert(selectedName, at: 0)
         return realms
     }
 
@@ -588,7 +590,7 @@ final class TaggrAppCoordinator {
                     try await self.loadCurrentUserIfNeeded(generation: generation, api: activeAPI)
                 }
                 guard self.isCurrentRequest(request) else { return }
-                let ids = self.currentUser?.realms ?? []
+                let ids = self.recentlyUsedJoinedRealms
                 guard !ids.isEmpty else {
                     self.realms = []
                     self.feed = []

@@ -3,6 +3,56 @@ import XCTest
 @testable import TAGGR
 
 extension TaggrTests {
+    func testHashtagFeedComposerDoesNotPostIntoRealm() {
+        XCTAssertNil(PostComposerMode.newPost(selectedMode: .tags(["tag"])).targetRealm)
+        XCTAssertEqual(PostComposerMode.newPost(selectedMode: .realm("DEV")).targetRealm, "DEV")
+    }
+
+    func testRealmPickerIsAvailableForRootPostButNotReplyEditing() {
+        let root = samplePost(body: "root", files: [:], realm: "DEV")
+        let reply = samplePost(parent: root.id, body: "reply", files: [:], realm: "DEV")
+
+        XCTAssertTrue(PostComposerMode.newPost(selectedMode: .latest).allowsRealmSelection)
+        XCTAssertTrue(PostComposerMode.edit(post: root, selectedMode: .latest).allowsRealmSelection)
+        XCTAssertFalse(PostComposerMode.edit(post: reply, selectedMode: .latest).allowsRealmSelection)
+        XCTAssertFalse(PostComposerMode.reply(parentPost: root, selectedMode: .latest).allowsRealmSelection)
+    }
+
+    func testFeedModeDerivesFromFeedRoute() {
+        XCTAssertEqual(FeedView.feedMode(from: .feed(.realm("DEV"))), .realm("DEV"))
+        XCTAssertEqual(FeedView.feedMode(from: .feed(.tags(["tag"]))), .tags(["tag"]))
+        XCTAssertNil(FeedView.feedMode(from: .realm("DEV")))
+    }
+
+    @MainActor
+    func testFeedTabRestoresLastHomeMode() {
+        let state = TaggrAppCoordinator()
+
+        state.navigateToFeed(.personal)
+        XCTAssertEqual(state.lastHomeFeedMode, .personal)
+        state.navigateToFeed(.hot)
+        XCTAssertEqual(state.lastHomeFeedMode, .hot)
+        state.navigateToFeed(.latest)
+        state.navigateToPost(42, from: .latest)
+        state.navigateToHomeFeed()
+        XCTAssertEqual(state.route, .feed(.latest))
+        state.navigateToFeed(.tags(["TAGGR"]))
+        state.navigateToHomeFeed()
+
+        XCTAssertEqual(state.lastHomeFeedMode, .latest)
+        XCTAssertEqual(state.route, .feed(.latest))
+        XCTAssertEqual(RootView.feedRoute(lastHomeFeedMode: state.lastHomeFeedMode), .feed(.latest))
+    }
+
+    func testFeedTabReselectionActions() {
+        XCTAssertEqual(RootView.feedTabReselectionAction(for: .feed(.hot)), .scrollToTop)
+        XCTAssertEqual(RootView.feedTabReselectionAction(for: .feed(.latest)), .scrollToTop)
+        XCTAssertEqual(RootView.feedTabReselectionAction(for: .feed(.personal)), .scrollToTop)
+        XCTAssertEqual(RootView.feedTabReselectionAction(for: .feed(.tags(["TAGGR"]))), .returnToHomeFeed)
+        XCTAssertEqual(RootView.feedTabReselectionAction(for: .feed(.realm("DEV"))), .returnToHomeFeed)
+        XCTAssertEqual(RootView.feedTabReselectionAction(for: .post(42)), .returnToHomeFeed)
+    }
+
     func testStatsAndRealmDecodeSnakeCaseFields() throws {
         let stats = try JSONDecoder.taggr.decode(TaggrStats.self, from: Data(#"{"canister_id":"6qfxa-ryaaa-aaaai-qbhsq-cai"}"#.utf8))
         let realm = try JSONDecoder.taggr.decode(TaggrRealm.self, from: Data(##"{"name":"DEV","description":"Builders","label_color":"#123456","num_members":2,"num_posts":3}"##.utf8))

@@ -211,16 +211,7 @@ ul.comments {
     margin-bottom: 0.5em;
     padding: 0;
     list-style-type: none;
-    border-left: 2px solid $dark_background;
     border-bottom: 2px solid $dark_background;
-    border-top-left-radius: 10px;
-    border-bottom-left-radius: 10px;
-}
-
-.comments li .post_head:before {
-    content: "—";
-    color: $dark_background;
-    text-indent: -0.7rem;
 }
 
 .comments li {

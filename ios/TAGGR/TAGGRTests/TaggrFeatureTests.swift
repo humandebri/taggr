@@ -30,6 +30,43 @@ extension TaggrTests {
         XCTAssertEqual(TaggrPostCreditCost.tags(in: "read #tag.next", maxLength: 30), ["tag"])
     }
 
+    func testEditPostCreditCostIncludesBodyPatchesTagsAndPoll() {
+        let poll: JSONValue = .object([
+            "Poll": .object([
+                "options": .array([.string("yes")]),
+                "votes": .object([:]),
+                "voters": .array([]),
+                "deadline": .number(0),
+            ]),
+        ])
+        let post = samplePost(
+            body: "old #tag",
+            files: [:],
+            extensionValue: poll,
+            patches: [[.number(1), .string("abc")]]
+        )
+
+        XCTAssertEqual(
+            TaggrPostCreditCost.estimateEdit(
+                body: post.body,
+                post: post,
+                baseCost: 2,
+                tagCost: 4,
+                pollCost: 3
+            ),
+            9
+        )
+
+        let editedBody = String(repeating: "é", count: 510)
+        let newPatchBytes = TaggrEditPatch.fullReplacement(from: editedBody, to: post.body).utf8.count
+        let expected = 2 * ((editedBody.utf8.count + 3 + newPatchBytes) / 1024 + 1) + 4 + 3
+        XCTAssertEqual(
+            TaggrPostCreditCost.estimateEdit(body: editedBody, post: post, baseCost: 2, tagCost: 4, pollCost: 3),
+            expected
+        )
+        XCTAssertNil(TaggrPostCreditCost.estimateEdit(body: post.body, post: post, baseCost: 2, tagCost: 4, pollCost: nil))
+    }
+
     func testTokenAmountFormatsConfiguredDecimals() {
         XCTAssertEqual(TaggrTokenAmount.format(12_345, decimals: 2), "123.45")
         XCTAssertEqual(TaggrTokenAmount.format(12_300, decimals: 2), "123")
@@ -234,6 +271,39 @@ extension TaggrTests {
         XCTAssertNil(post.imageAttachments().last?.bucketId)
     }
 
+    func testEditablePostImagesCanRemoveMarkdownReferences() {
+        let local = "![local](/blob/local)"
+        let remote = "![remote](https://example.com/image.png)"
+        let post = samplePost(
+            body: "before\n\(local)\n\(local)\n\(remote)\nafter",
+            files: ["local@aaaaa-aa": [LosslessInt(12), LosslessInt(34)]]
+        )
+
+        let images = post.editableImageAttachments(bodyText: post.body)
+
+        XCTAssertEqual(images.count, 2)
+        XCTAssertEqual(images[0].markdownReferences, [local, local])
+        XCTAssertTrue(images.allSatisfy(\.isRemovable))
+        let withoutLocal = TaggrPostImages.removingImageMarkdown(images[0].markdownReferences, from: post.body)
+        XCTAssertFalse(withoutLocal.contains(local))
+        XCTAssertTrue(withoutLocal.contains(remote))
+        let withoutImages = TaggrPostImages.removingImageMarkdown(images[1].markdownReferences, from: withoutLocal)
+        XCTAssertEqual(withoutImages, "before\nafter")
+        XCTAssertTrue(post.editableImageAttachments(bodyText: withoutImages).isEmpty)
+    }
+
+    func testLegacyPostImageIsPreviewOnly() throws {
+        let post = samplePost(
+            body: "legacy image",
+            files: ["local@aaaaa-aa": [LosslessInt(12), LosslessInt(34)]]
+        )
+
+        let image = try XCTUnwrap(post.editableImageAttachments(bodyText: post.body).first)
+
+        XCTAssertFalse(image.isRemovable)
+        XCTAssertEqual(image.attachment.url.absoluteString, "https://aaaaa-aa.raw.icp0.io/image?offset=12&len=34")
+    }
+
     func testPostImageAttachmentsSkipUnsafeRemoteMarkdownImages() {
         let post = samplePost(
             body: "![unsafe](javascript:alert(1))\n![data](data:image/png;base64,AAAA)",
@@ -334,6 +404,38 @@ extension TaggrTests {
         XCTAssertTrue(attributed.runs.contains { $0.link?.absoluteString == "https://taggr.link" })
     }
 
+    func testMarkdownTextPreservesUserLineBreaks() {
+        let attributed = TaggrMarkdownText.attributedMarkdown(from: "first line\nsecond line")
+
+        XCTAssertEqual(String(attributed.characters), "first line\nsecond line")
+    }
+
+    func testMarkdownTextDoesNotAlterFencedCodeLineBreaks() {
+        let attributed = TaggrMarkdownText.attributedMarkdown(from: "```\nfirst line\nsecond line\n```")
+
+        XCTAssertEqual(String(attributed.characters), "first line\nsecond line\n")
+    }
+
+    func testMarkdownLineBreakNormalizationPreservesIndentedCode() {
+        let input = "    first line\n    second line\n\ta tab-indented line"
+
+        XCTAssertEqual(TaggrMarkdownText.preservingUserLineBreaks(in: input), input)
+    }
+
+    func testMarkdownLineBreakNormalizationOnlyClosesFenceWithWhitespace() {
+        let input = "```\n```not a closing fence\ncode\n```\nafter\nnext"
+        let expected = "```\n```not a closing fence\ncode\n```\nafter  \nnext"
+
+        XCTAssertEqual(TaggrMarkdownText.preservingUserLineBreaks(in: input), expected)
+    }
+
+    func testMarkdownLineBreakNormalizationSupportsTildeFences() {
+        let input = "~~~swift\nlet value = 1\n~~~~\nafter\nnext"
+        let expected = "~~~swift\nlet value = 1\n~~~~\nafter  \nnext"
+
+        XCTAssertEqual(TaggrMarkdownText.preservingUserLineBreaks(in: input), expected)
+    }
+
     func testMarkdownTextRemovesUnsafeLinks() {
         let attributed = TaggrMarkdownText.attributedMarkdown(from: "[bad](javascript:alert%281%29)")
 
@@ -362,11 +464,6 @@ extension TaggrTests {
         XCTAssertTrue(TaggrMarkdownText.containsInteractiveLink(in: "read #tag"))
         XCTAssertTrue(TaggrMarkdownText.containsInteractiveLink(in: "read [TAGGR](https://taggr.link)"))
         XCTAssertFalse(TaggrMarkdownText.containsInteractiveLink(in: "plain post text"))
-    }
-
-    func testHashtagFeedComposerDoesNotPostIntoRealm() {
-        XCTAssertNil(PostComposerMode.newPost(selectedMode: .tags(["tag"])).targetRealm)
-        XCTAssertEqual(PostComposerMode.newPost(selectedMode: .realm("DEV")).targetRealm, "DEV")
     }
 
     func testPostImageURLUsesRuntimeConfig() {
@@ -590,6 +687,28 @@ extension TaggrTests {
         XCTAssertNil(ImageDrafts.normalizedImageData(data, maxBytes: 1))
     }
 
+    func testImageDraftsDownsamplesImagesAbovePixelLimit() throws {
+        let renderer = UIGraphicsImageRenderer(size: CGSize(width: 32, height: 24))
+        let source = try XCTUnwrap(renderer.image { context in
+            UIColor.red.setFill()
+            context.fill(CGRect(x: 0, y: 0, width: 32, height: 24))
+        }.pngData())
+
+        let normalized = try XCTUnwrap(
+            ImageDrafts.normalizedImageData(source, maxBytes: 50_000, maxPixels: 192)
+        )
+        let image = try XCTUnwrap(UIImage(data: normalized))
+        let width = Int(image.size.width * image.scale)
+        let height = Int(image.size.height * image.scale)
+
+        XCTAssertLessThanOrEqual(width * height, 192)
+        XCTAssertEqual(
+            Double(width) / Double(height),
+            4.0 / 3.0,
+            accuracy: 0.1
+        )
+    }
+
     func testDraftImageMarkdownUsesWebBlobFormatAndStableHashId() {
         let image = TaggrDraftImage(id: "abc12345", data: Data(repeating: 1, count: 1537), width: 320, height: 240)
 
@@ -771,44 +890,13 @@ extension TaggrTests {
             initialRealm: "DEV"
         )
         await editSession.load(store: store, namespace: namespace)
+        XCTAssertFalse(editSession.hasChanges)
+        editSession.realm = "ART"
+        XCTAssertTrue(editSession.hasChanges)
+        editSession.realm = "DEV"
         await editSession.flush()
         let unchangedEdit = await store.load(namespace: namespace, context: .edit(42))
         XCTAssertNil(unchangedEdit.text)
-    }
-
-    func testFeedModeDerivesFromFeedRoute() {
-        XCTAssertEqual(FeedView.feedMode(from: .feed(.realm("DEV"))), .realm("DEV"))
-        XCTAssertEqual(FeedView.feedMode(from: .feed(.tags(["tag"]))), .tags(["tag"]))
-        XCTAssertNil(FeedView.feedMode(from: .realm("DEV")))
-    }
-
-    @MainActor
-    func testFeedTabRestoresLastHomeMode() {
-        let state = TaggrAppCoordinator()
-
-        state.navigateToFeed(.personal)
-        XCTAssertEqual(state.lastHomeFeedMode, .personal)
-        state.navigateToFeed(.hot)
-        XCTAssertEqual(state.lastHomeFeedMode, .hot)
-        state.navigateToFeed(.latest)
-        state.navigateToPost(42, from: .latest)
-        state.navigateToHomeFeed()
-        XCTAssertEqual(state.route, .feed(.latest))
-        state.navigateToFeed(.tags(["TAGGR"]))
-        state.navigateToHomeFeed()
-
-        XCTAssertEqual(state.lastHomeFeedMode, .latest)
-        XCTAssertEqual(state.route, .feed(.latest))
-        XCTAssertEqual(RootView.feedRoute(lastHomeFeedMode: state.lastHomeFeedMode), .feed(.latest))
-    }
-
-    func testFeedTabReselectionActions() {
-        XCTAssertEqual(RootView.feedTabReselectionAction(for: .feed(.hot)), .scrollToTop)
-        XCTAssertEqual(RootView.feedTabReselectionAction(for: .feed(.latest)), .scrollToTop)
-        XCTAssertEqual(RootView.feedTabReselectionAction(for: .feed(.personal)), .scrollToTop)
-        XCTAssertEqual(RootView.feedTabReselectionAction(for: .feed(.tags(["TAGGR"]))), .returnToHomeFeed)
-        XCTAssertEqual(RootView.feedTabReselectionAction(for: .feed(.realm("DEV"))), .returnToHomeFeed)
-        XCTAssertEqual(RootView.feedTabReselectionAction(for: .post(42)), .returnToHomeFeed)
     }
 
     func testQueryRejectedResponseSurfacesRejectedError() async throws {
@@ -1036,11 +1124,14 @@ extension TaggrTests {
             maxConcurrent: 2
         )
 
+        let expectedRed = try XCTUnwrap(ImageDrafts.draftImage(from: red))
+        let expectedBlue = try XCTUnwrap(ImageDrafts.draftImage(from: blue))
         XCTAssertEqual(drafts.map(\.id), [
-            ImageDrafts.blobId(for: red),
-            ImageDrafts.blobId(for: blue),
+            expectedRed.id,
+            expectedBlue.id,
         ])
         XCTAssertTrue(drafts.allSatisfy { $0.data.count <= ImageDrafts.maxImageBytes })
+        XCTAssertTrue(drafts.allSatisfy { String(data: $0.data.prefix(4), encoding: .ascii) == "RIFF" })
     }
 
     @MainActor

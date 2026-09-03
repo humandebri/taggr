@@ -52,6 +52,9 @@
 		01000100000000000000001B /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 01000000000000000000001B /* Assets.xcassets */; };
 		010001000000000000000031 /* ICNativeClient in Frameworks */ = {isa = PBXBuildFile; productRef = 01000D000000000000000001 /* ICNativeClient */; };
 		010001000000000000000032 /* ICNativeClient in Frameworks */ = {isa = PBXBuildFile; productRef = 01000D000000000000000002 /* ICNativeClient */; };
+		010001000000000000000041 /* ImageDraftsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 010000000000000000000041 /* ImageDraftsTests.swift */; };
+		010001000000000000000042 /* Fixtures in Resources */ = {isa = PBXBuildFile; fileRef = 010000000000000000000042 /* Fixtures */; };
+		010001000000000000000040 /* libwebp in Frameworks */ = {isa = PBXBuildFile; productRef = 01000D000000000000000003 /* libwebp */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -107,6 +110,8 @@
 		01000000000000000000003B /* TaggrStateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaggrStateTests.swift; sourceTree = "<group>"; };
 		01000000000000000000003C /* TaggrActionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaggrActionTests.swift; sourceTree = "<group>"; };
 		01000000000000000000001D /* TaggrIdentityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaggrIdentityTests.swift; sourceTree = "<group>"; };
+		010000000000000000000041 /* ImageDraftsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageDraftsTests.swift; sourceTree = "<group>"; };
+		010000000000000000000042 /* Fixtures */ = {isa = PBXFileReference; lastKnownFileType = folder; path = Fixtures; sourceTree = "<group>"; };
 		01000000000000000000000E /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		01000000000000000000000F /* TAGGR.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = TAGGR.entitlements; sourceTree = "<group>"; };
 		01000000000000000000001B /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -115,7 +120,7 @@
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
-		010005000000000000000001 /* Frameworks */ = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (010001000000000000000031,); runOnlyForDeploymentPostprocessing = 0; };
+		010005000000000000000001 /* Frameworks */ = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (010001000000000000000031,010001000000000000000040,); runOnlyForDeploymentPostprocessing = 0; };
 		010005000000000000000002 /* Frameworks */ = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (010001000000000000000032,); runOnlyForDeploymentPostprocessing = 0; };
 /* End PBXFrameworksBuildPhase section */
 
@@ -158,6 +163,8 @@
 				01000000000000000000003B /* TaggrStateTests.swift */,
 				01000000000000000000003C /* TaggrActionTests.swift */,
 				01000000000000000000001D /* TaggrIdentityTests.swift */,
+				010000000000000000000041 /* ImageDraftsTests.swift */,
+				010000000000000000000042 /* Fixtures */,
 			);
 			path = TAGGRTests;
 			sourceTree = "<group>";
@@ -185,7 +192,7 @@
 			buildRules = ();
 			dependencies = ();
 			name = TAGGR;
-			packageProductDependencies = (01000D000000000000000001 /* ICNativeClient */,);
+			packageProductDependencies = (01000D000000000000000001 /* ICNativeClient */,01000D000000000000000003 /* libwebp */,);
 			productName = TAGGR;
 			productReference = 010000000000000000000010 /* TAGGR.app */;
 			productType = "com.apple.product-type.application";
@@ -222,7 +229,7 @@
 			hasScannedForEncodings = 0;
 			knownRegions = (en, Base,);
 			mainGroup = 010006000000000000000001;
-			packageReferences = (01000C000000000000000001 /* XCRemoteSwiftPackageReference "ICNativeClient" */,);
+			packageReferences = (01000C000000000000000001 /* XCRemoteSwiftPackageReference "ICNativeClient" */,01000C000000000000000002 /* XCRemoteSwiftPackageReference "libwebp-Xcode" */,);
 			productRefGroup = 010006000000000000000004 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
@@ -232,7 +239,7 @@
 
 /* Begin PBXResourcesBuildPhase section */
 		010008000000000000000001 /* Resources */ = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (01000100000000000000001B,); runOnlyForDeploymentPostprocessing = 0; };
-		010008000000000000000002 /* Resources */ = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+		010008000000000000000002 /* Resources */ = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (010001000000000000000042,); runOnlyForDeploymentPostprocessing = 0; };
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
@@ -245,7 +252,7 @@
 		010007000000000000000002 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
-			files = (01000100000000000000000D,01000100000000000000003A,01000100000000000000003F,01000100000000000000003B,01000100000000000000003C,01000100000000000000001D,);
+			files = (01000100000000000000000D,01000100000000000000003A,01000100000000000000003F,01000100000000000000003B,01000100000000000000003C,01000100000000000000001D,010001000000000000000041,);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
@@ -278,6 +285,11 @@
 				minimumVersion = 0.2.0;
 			};
 		};
+		01000C000000000000000002 /* XCRemoteSwiftPackageReference "libwebp-Xcode" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/SDWebImage/libwebp-Xcode.git";
+			requirement = {kind = upToNextMajorVersion; minimumVersion = 1.6.0;};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -290,6 +302,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 01000C000000000000000001 /* XCRemoteSwiftPackageReference "ICNativeClient" */;
 			productName = ICNativeClient;
+		};
+		01000D000000000000000003 /* libwebp */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 01000C000000000000000002 /* XCRemoteSwiftPackageReference "libwebp-Xcode" */;
+			productName = libwebp;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

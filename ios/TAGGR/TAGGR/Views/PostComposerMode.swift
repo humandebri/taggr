@@ -74,6 +74,17 @@ enum PostComposerMode {
         return post
     }
 
+    var allowsRealmSelection: Bool {
+        switch self {
+        case .newPost:
+            return true
+        case .edit(let post, _):
+            return post.parent == nil
+        case .reply:
+            return false
+        }
+    }
+
     var draftContext: PostDraftContext {
         switch self {
         case .newPost:

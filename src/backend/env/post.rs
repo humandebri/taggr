@@ -426,13 +426,16 @@ impl Post {
                 }
             }
             let user_id = user.id;
+            let body_changed = post.body != body;
             let tags = tags(CONFIG.max_tag_length, &body).collect();
             if post.parent.is_none() {
                 state.register_post_tags(post.id, &tags);
             }
             post.tags = tags;
             post.body = body;
-            post.patches.push((post.timestamp, patch));
+            if body_changed {
+                post.patches.push((post.timestamp, patch));
+            }
             post.timestamp = timestamp;
             post.valid(&refs)?;
             if !refs.is_empty() {
@@ -454,7 +457,7 @@ impl Post {
             state.charge_in_realm(
                 user_id,
                 costs,
-                post.realm.as_ref(),
+                picked_realm.as_ref(),
                 format!("editing of post [{0}](#/post/{0})", id),
             )?;
 
@@ -1043,6 +1046,69 @@ mod tests {
             let post = Post::get(state, &id).unwrap();
             assert_eq!(post.body, "Hello world!");
             assert!(!state.principal_to_user_mut(p).unwrap().deactivated);
+        });
+    }
+
+    #[test]
+    fn test_content_creation_reorders_realms_by_recent_use() {
+        mutate(|state| {
+            let principal = pr(0);
+            let older_realm = "ORDER_OLDER".to_string();
+            let newer_realm = "ORDER_NEWER".to_string();
+            create_user(state, principal);
+            state.realms.insert(older_realm.clone(), Realm::default());
+            state.realms.insert(newer_realm.clone(), Realm::default());
+            let user = state.principal_to_user_mut(principal).unwrap();
+            user.realms = vec![older_realm.clone(), newer_realm.clone()];
+            user.change_credits(10_000, CreditsDelta::Plus, "").unwrap();
+
+            let newer_realm_post = Post::create(
+                state,
+                "Newer realm post".into(),
+                &[],
+                principal,
+                1,
+                None,
+                Some(newer_realm.clone()),
+                None,
+            )
+            .unwrap();
+            assert_eq!(
+                state.principal_to_user(principal).unwrap().realms,
+                vec![older_realm.clone(), newer_realm.clone()]
+            );
+
+            Post::create(
+                state,
+                "Older realm post".into(),
+                &[],
+                principal,
+                2,
+                None,
+                Some(older_realm.clone()),
+                None,
+            )
+            .unwrap();
+            assert_eq!(
+                state.principal_to_user(principal).unwrap().realms,
+                vec![newer_realm.clone(), older_realm.clone()]
+            );
+
+            Post::create(
+                state,
+                "Comment in newer realm".into(),
+                &[],
+                principal,
+                3,
+                Some(newer_realm_post),
+                None,
+                None,
+            )
+            .unwrap();
+            assert_eq!(
+                state.principal_to_user(principal).unwrap().realms,
+                vec![older_realm, newer_realm]
+            );
         });
     }
 

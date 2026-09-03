@@ -32,16 +32,12 @@ extension TaggrTests {
             preferences.validDestinations(scope: aliceMainnet, availableRealms: ["DEV", "OTHER"]),
             ["", "DEV"]
         )
-        XCTAssertEqual(
-            preferences.orderedRealms(scope: aliceMainnet, availableRealms: ["OTHER", "DEV"]),
-            ["DEV", "OTHER"]
-        )
         XCTAssertTrue(preferences.recentDestinations(scope: aliceStaging).isEmpty)
         XCTAssertTrue(preferences.recentDestinations(scope: bobMainnet).isEmpty)
     }
 
     @MainActor
-    func testPostingRealmSelectionUsesContextThenRecentDestination() throws {
+    func testPostingRealmSelectionUsesContextAndBackendRecency() throws {
         let suiteName = "PostingRealmSelectionTests.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
         defer { defaults.removePersistentDomain(forName: suiteName) }
@@ -59,12 +55,14 @@ extension TaggrTests {
             mode: nil
         )
         let scope = try XCTUnwrap(state.realmPostingScope)
-        preferences.record(destination: "DEV", scope: scope)
+        preferences.record(destination: "OTHER", scope: scope)
 
         XCTAssertEqual(state.initialPostingRealm(for: .hot), "DEV")
         XCTAssertEqual(state.initialPostingRealm(for: .realm("ART")), "ART")
-        XCTAssertEqual(state.orderedPostingRealms(targetRealm: nil), ["DEV", "OTHER"])
-        XCTAssertEqual(state.orderedPostingRealms(targetRealm: "ART"), ["ART", "DEV", "OTHER"])
+        XCTAssertEqual(state.recentlyUsedJoinedRealms, ["DEV", "OTHER"])
+        XCTAssertEqual(state.orderedPostingRealms(selectedRealm: nil), ["DEV", "OTHER"])
+        XCTAssertEqual(state.orderedPostingRealms(selectedRealm: "other"), ["OTHER", "DEV"])
+        XCTAssertEqual(state.orderedPostingRealms(selectedRealm: "ART"), ["ART", "DEV", "OTHER"])
 
         preferences.record(destination: nil, scope: scope)
         XCTAssertEqual(state.initialPostingRealm(for: .latest), "")
@@ -77,7 +75,14 @@ extension TaggrTests {
                 calls.append(call)
             }
             let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
-            return (response, Self.queryReply(Data(##"[{"description":"Builders","label_color":"#123456","num_members":2,"num_posts":3}]"##.utf8)))
+            return (
+                response,
+                Self.queryReply(
+                    Data(
+                        ##"[{"description":"Newest","label_color":"#123456"},{"description":"Older","label_color":"#654321"}]"##.utf8
+                    )
+                )
+            )
         }
         let state = TaggrAppCoordinator(api: api)
         state.currentUser = TaggrUser(
@@ -85,7 +90,7 @@ extension TaggrTests {
             name: "alice",
             about: "",
             principal: nil,
-            realms: ["DEV"],
+            realms: ["OTHER", "DEV"],
             followees: [],
             followers: [],
             blacklist: [],
@@ -96,9 +101,9 @@ extension TaggrTests {
 
         XCTAssertNil(state.errorMessage)
         XCTAssertEqual(calls.map(\.method), ["realms"])
-        XCTAssertEqual(calls.first?.arg, try TaggrCandid.jsonArguments([["DEV"]]))
-        XCTAssertEqual(state.realms.map(\.name), ["DEV"])
-        XCTAssertEqual(state.realms.first?.description, "Builders")
+        XCTAssertEqual(calls.first?.arg, try TaggrCandid.jsonArguments([["DEV", "OTHER"]]))
+        XCTAssertEqual(state.realms.map(\.name), ["DEV", "OTHER"])
+        XCTAssertEqual(state.realms.map(\.description), ["Newest", "Older"])
     }
 
     @MainActor
@@ -581,14 +586,14 @@ extension TaggrTests {
         state.route = .post(42)
         let post = samplePost(id: 42, user: 7, body: "hello", files: [:], realm: "DEV")
 
-        await state.editPost(post: post, text: "updated", reloadMode: .latest)
+        await state.editPost(post: post, text: "updated", realm: "ART", reloadMode: .latest)
 
         let patch = TaggrEditPatch.fullReplacement(from: "updated", to: "hello")
         XCTAssertNil(state.errorMessage)
         XCTAssertEqual(calls.map(\.method), ["edit_post", "user", "thread"])
         XCTAssertEqual(
             calls.first?.arg,
-            TaggrCandid.encodeEditPost(id: 42, text: "updated", refs: [], patch: patch, realm: "DEV")
+            TaggrCandid.encodeEditPost(id: 42, text: "updated", refs: [], patch: patch, realm: "ART")
         )
         XCTAssertEqual(preferences.recentDestinations(scope: postingScope), ["ART"])
     }
@@ -631,7 +636,7 @@ extension TaggrTests {
         let image = TaggrDraftImage(id: "abc12345", data: Data([1, 2, 3]), width: 10, height: 20)
         let body = "updated\n\n\(image.markdown)"
 
-        await state.editPost(post: post, text: body, images: [image], reloadMode: .latest)
+        await state.editPost(post: post, text: body, realm: post.realm, images: [image], reloadMode: .latest)
 
         let patch = TaggrEditPatch.fullReplacement(from: body, to: "hello")
         XCTAssertNil(state.errorMessage)
@@ -798,7 +803,7 @@ extension TaggrTests {
         )
         let post = samplePost(id: 42, user: 7, body: "hello", files: [:], realm: nil)
 
-        await state.editPost(post: post, text: "updated\n\n![10x20, 1kb](/blob/missing)", images: [])
+        await state.editPost(post: post, text: "updated\n\n![10x20, 1kb](/blob/missing)", realm: post.realm, images: [])
 
         XCTAssertEqual(state.errorMessage, "You're referencing pictures that are not attached anymore. Please re-upload.")
         XCTAssertEqual(calls.map(\.method), [])

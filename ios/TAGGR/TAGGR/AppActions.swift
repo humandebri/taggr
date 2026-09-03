@@ -26,7 +26,7 @@ extension TaggrAppCoordinator {
         }
     }
 
-    func postCreditCost(for body: String) async -> Int? {
+    func postCreditCost(for body: String, editing post: TaggrPost? = nil) async -> Int? {
         guard let config = cache?.config,
               let baseCost = config.postCost else {
             return nil
@@ -60,11 +60,21 @@ extension TaggrAppCoordinator {
                       !isCancellation(error) else {
                     return nil
                 }
+                guard post == nil else { return nil }
                 tagCost = 0
             }
             if requestSequence == tagCostRequestSequence {
                 tagCostTask = nil
             }
+        }
+        if let post {
+            return TaggrPostCreditCost.estimateEdit(
+                body: body,
+                post: post,
+                baseCost: baseCost,
+                tagCost: tagCost,
+                pollCost: config.pollCost
+            )
         }
         return TaggrPostCreditCost.estimate(body: body, baseCost: baseCost, tagCost: tagCost)
     }
@@ -90,12 +100,12 @@ extension TaggrAppCoordinator {
         }
     }
 
-    func editPost(post: TaggrPost, text: String, images: [TaggrDraftImage] = [], reloadMode: TaggrFeedMode? = nil) async {
+    func editPost(post: TaggrPost, text: String, realm: String?, images: [TaggrDraftImage] = [], reloadMode: TaggrFeedMode? = nil) async {
         await runBusy {
             let body = text.trimmingCharacters(in: .whitespacesAndNewlines)
             let refs = try await uploadBlobs(referencedNewBlobs(in: body, draftImages: images, existingBlobIDs: Self.blobIDs(in: post.files)))
             let patch = TaggrEditPatch.fullReplacement(from: body, to: post.body)
-            _ = try await api.editPost(id: post.id, text: body, refs: refs, patch: patch, realm: post.realm, identity: authSession)
+            _ = try await api.editPost(id: post.id, text: body, refs: refs, patch: patch, realm: realm, identity: authSession)
             await updateCurrentUserIfPossible()
             await loadCurrentRoute()
         }

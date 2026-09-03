@@ -79,6 +79,52 @@ struct TaggrPost: Identifiable, Equatable, Sendable {
         }
     }
 
+    func editableImageAttachments(
+        config: TaggrRuntimeConfig = .current,
+        bodyText: String
+    ) -> [TaggrEditablePostImage] {
+        let references = TaggrPostImages.imageReferences(in: bodyText)
+        guard !references.isEmpty else {
+            let originalReferences = TaggrPostImages.imageReferences(in: effBody ?? body)
+            guard originalReferences.isEmpty else { return [] }
+            return imageAttachments(config: config, bodyText: bodyText).map {
+                TaggrEditablePostImage(attachment: $0, markdownReferences: [])
+            }
+        }
+
+        var items: [TaggrEditablePostImage] = []
+        var indexes: [String: Int] = [:]
+        var seen = Set<String>()
+        for reference in references {
+            let attachment: TaggrPostImageAttachment?
+            if let id = reference.blobID {
+                if let index = indexes[id] {
+                    items[index].markdownReferences.append(reference.markdown)
+                    continue
+                }
+                attachment = imageAttachment(forBlobID: id, config: config, seen: &seen)
+            } else if let url = reference.remoteURL {
+                let id = "remote-\(url.absoluteString)"
+                if let index = indexes[id] {
+                    items[index].markdownReferences.append(reference.markdown)
+                    continue
+                }
+                attachment = TaggrPostImageAttachment(id: id, url: url)
+            } else {
+                attachment = nil
+            }
+            guard let attachment else { continue }
+            indexes[attachment.id] = items.count
+            items.append(
+                TaggrEditablePostImage(
+                    attachment: attachment,
+                    markdownReferences: [reference.markdown]
+                )
+            )
+        }
+        return items
+    }
+
     private func imageAttachment(
         forBlobID id: String,
         config: TaggrRuntimeConfig,
@@ -201,6 +247,17 @@ struct TaggrPostImageAttachment: Identifiable, Equatable, Sendable {
     }
 }
 
+struct TaggrEditablePostImage: Identifiable, Equatable, Sendable {
+    let attachment: TaggrPostImageAttachment
+    var markdownReferences: [String]
+
+    var id: String { attachment.id }
+
+    var isRemovable: Bool {
+        !markdownReferences.isEmpty
+    }
+}
+
 enum TaggrPostExtension: Equatable {
     case poll(TaggrPoll)
     case repost(Int)
@@ -305,6 +362,7 @@ struct TaggrPoll: Equatable {
 fileprivate struct TaggrPostImageReference: Equatable {
     let alt: String
     let destination: String
+    let markdown: String
 
     var blobID: String? {
         let prefix = "/blob/"
@@ -514,15 +572,27 @@ enum TaggrPostImages {
     fileprivate static func imageReferences(in text: String) -> [TaggrPostImageReference] {
         matches(in: text).compactMap { match in
             guard match.numberOfRanges >= 3,
+                  let markdownRange = Range(match.range, in: text),
                   let altRange = Range(match.range(at: 1), in: text),
                   let destinationRange = Range(match.range(at: 2), in: text) else {
                 return nil
             }
             return TaggrPostImageReference(
                 alt: String(text[altRange]),
-                destination: String(text[destinationRange])
+                destination: String(text[destinationRange]),
+                markdown: String(text[markdownRange])
             )
         }
+    }
+
+    static func removingImageMarkdown(_ references: [String], from text: String) -> String {
+        references.reduce(text) { result, markdown in
+            result
+                .replacingOccurrences(of: markdown + "\n", with: "")
+                .replacingOccurrences(of: "\n" + markdown, with: "")
+                .replacingOccurrences(of: markdown, with: "")
+        }
+        .trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     static func isValidBlobID(_ id: String) -> Bool {
@@ -992,6 +1062,7 @@ struct TaggrConfig: Codable, Equatable, Sendable {
     let feedPageSize: Int?
     let pollRevoteDeadlineHours: Int?
     let postCost: Int?
+    let pollCost: Int?
     let postDeletionPenaltyFactor: Int?
 
     enum CodingKeys: String, CodingKey {
@@ -1008,6 +1079,7 @@ struct TaggrConfig: Codable, Equatable, Sendable {
         case feedPageSize
         case pollRevoteDeadlineHours
         case postCost
+        case pollCost
         case postDeletionPenaltyFactor
     }
 }

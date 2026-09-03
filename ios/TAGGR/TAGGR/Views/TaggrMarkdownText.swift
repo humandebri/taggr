@@ -41,11 +41,68 @@ struct TaggrMarkdownText: View {
     private static func uncachedAttributedMarkdown(from text: String) -> AttributedString {
         // Foundation's Markdown parser covers inline emphasis, code, links, and
         // block intents without adding a parser dependency to the native app.
-        guard var attributed = try? AttributedString(markdown: text) else {
+        let displayText = preservingUserLineBreaks(in: text)
+        guard var attributed = try? AttributedString(markdown: displayText) else {
             return AttributedString(text)
         }
         sanitizeLinks(in: &attributed)
         return attributed
+    }
+
+    static func preservingUserLineBreaks(in text: String) -> String {
+        let lines = text.split(separator: "\n", omittingEmptySubsequences: false)
+        guard lines.count > 1 else { return text }
+
+        var output = ""
+        var fencedCodeMarker: (character: Character, length: Int)?
+        for index in lines.indices {
+            let line = String(lines[index])
+            output += line
+            guard index < lines.index(before: lines.endIndex) else { continue }
+
+            if let openingMarker = fencedCodeMarker {
+                if isClosingFence(line, for: openingMarker) {
+                    fencedCodeMarker = nil
+                }
+            } else if let marker = openingFenceMarker(in: line) {
+                fencedCodeMarker = marker
+            } else if !isIndentedCode(line),
+                      !line.isEmpty,
+                      !line.hasSuffix("  "),
+                      !line.hasSuffix("\\") {
+                output += "  "
+            }
+            output += "\n"
+        }
+        return output
+    }
+
+    private static func openingFenceMarker(in line: String) -> (character: Character, length: Int)? {
+        let indentation = line.prefix(while: { $0 == " " }).count
+        guard indentation <= 3 else { return nil }
+        let trimmed = line.dropFirst(indentation)
+        guard let marker = trimmed.first, marker == "`" || marker == "~" else { return nil }
+        let length = trimmed.prefix(while: { $0 == marker }).count
+        guard length >= 3 else { return nil }
+        let info = trimmed.dropFirst(length)
+        guard marker != "`" || !info.contains("`") else { return nil }
+        return (marker, length)
+    }
+
+    private static func isClosingFence(
+        _ line: String,
+        for opening: (character: Character, length: Int)
+    ) -> Bool {
+        let indentation = line.prefix(while: { $0 == " " }).count
+        guard indentation <= 3 else { return false }
+        let trimmed = line.dropFirst(indentation)
+        let length = trimmed.prefix(while: { $0 == opening.character }).count
+        guard length >= opening.length else { return false }
+        return trimmed.dropFirst(length).allSatisfy(\.isWhitespace)
+    }
+
+    private static func isIndentedCode(_ line: String) -> Bool {
+        line.first == "\t" || line.prefix(while: { $0 == " " }).count >= 4
     }
 
     private static func sanitizeLinks(in attributed: inout AttributedString) {

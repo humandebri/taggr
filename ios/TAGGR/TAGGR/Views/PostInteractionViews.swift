@@ -412,7 +412,9 @@ struct InlineReplyComposer: View {
     let clearRequest: Int
     @Binding var hasDraftChanges: Bool
     @StateObject private var draft: PostDraftSession
+    @StateObject private var imageImport = ImageImportCoordinator()
     @State private var selectedPhotos: [PhotosPickerItem] = []
+    @State private var imageImportWarning: String?
     @State private var isSubmitting = false
     @State private var clearConfirmationPresented = false
     @FocusState private var isFocused: Bool
@@ -467,12 +469,18 @@ struct InlineReplyComposer: View {
                 )
             }
             if let imageWarning {
-                ComposePostImageWarning(text: imageWarning, showCreateStorage: missingStorageForImages) {
-                    Task {
-                        await draft.flush()
-                        state.route = .settings
-                    }
-                }
+                ComposePostImageWarning(
+                    text: imageWarning,
+                    showCreateStorage: missingStorageForImages,
+                    createStorage: openStorageSettings
+                )
+            }
+            if let imageImportWarning {
+                ComposePostImageWarning(
+                    text: imageImportWarning,
+                    showCreateStorage: false,
+                    createStorage: {}
+                )
             }
             if !draft.images.isEmpty {
                 ComposePostDraftImageList(images: draft.images, removeImage: removeImage)
@@ -482,7 +490,8 @@ struct InlineReplyComposer: View {
                 ComposePostAttachmentBar(
                     text: $draft.text,
                     selectedPhotos: $selectedPhotos,
-                    isSubmitting: isSubmitting || state.isBusy,
+                    isSubmitting: isSubmitting || state.isBusy || imageImport.isImporting,
+                    isImagePickerDisabled: isSubmitting || state.isBusy || imageImport.isImporting || !draft.isLoaded,
                     horizontalPadding: 0,
                     verticalPadding: 0,
                     itemSpacing: 6,
@@ -502,7 +511,7 @@ struct InlineReplyComposer: View {
             }
         }
         .onChange(of: selectedPhotos) { _, items in
-            Task { await loadPhotos(items) }
+            loadPhotos(items)
         }
         .onChange(of: draft.text) { _, _ in
             draft.scheduleSave()
@@ -521,6 +530,7 @@ struct InlineReplyComposer: View {
             Task { await draft.flush() }
         }
         .onDisappear {
+            cancelImageImport()
             Task { await draft.flush() }
         }
         .task(id: draftNamespaceID) {
@@ -533,6 +543,7 @@ struct InlineReplyComposer: View {
             titleVisibility: .visible
         ) {
             Button("Clear Draft", role: .destructive) {
+                cancelImageImport()
                 Task {
                     await draft.discard()
                     isFocused = false
@@ -547,7 +558,8 @@ struct InlineReplyComposer: View {
     }
 
     var canSubmit: Bool {
-        draft.isLoaded && state.currentUser != nil && !composedBody.isEmpty && imageWarning == nil && !isSubmitting && !state.isBusy
+        draft.isLoaded && state.currentUser != nil && !composedBody.isEmpty && imageWarning == nil
+            && !imageImport.isImporting && !isSubmitting && !state.isBusy
     }
 
     var imageWarning: String? {
@@ -571,24 +583,40 @@ struct InlineReplyComposer: View {
         !TaggrAppCoordinator.blobIDs(inMarkdown: composedBody).isEmpty && (state.currentUser?.bucket?.isEmpty ?? true)
     }
 
-    @MainActor
-    func loadPhotos(_ items: [PhotosPickerItem]) async {
-        guard !items.isEmpty else { return }
-        var sourceData: [Data] = []
+    func openStorageSettings() {
+        cancelImageImport()
+        Task {
+            await draft.flush()
+            state.route = .settings
+        }
+    }
+
+    func loadPhotos(_ items: [PhotosPickerItem]) {
+        guard !items.isEmpty, !imageImport.isImporting else { return }
+        imageImportWarning = nil
         let maxBytes = state.cache?.config?.maxBlobSizeBytes ?? ImageDrafts.maxImageBytes
-        for item in items {
-            if let data = try? await item.loadTransferable(type: Data.self) {
-                sourceData.append(data)
+        imageImport.start(
+            operation: {
+                await ImageDrafts.importPhotos(items, maxBytes: maxBytes)
+            },
+            completion: { result in
+                selectedPhotos = []
+                imageImportWarning = result.warning
+                let loaded = ImageDrafts.uniquedDraftImages(
+                    result.images,
+                    existingIDs: Set(draft.images.map(\.id))
+                )
+                if !loaded.isEmpty {
+                    await draft.addImages(loaded)
+                }
             }
-        }
-        var loaded = await ImageDrafts.draftImages(from: sourceData, maxBytes: maxBytes)
-        guard !loaded.isEmpty else {
-            selectedPhotos = []
-            return
-        }
-        loaded = ImageDrafts.uniquedDraftImages(loaded, existingIDs: Set(draft.images.map(\.id)))
-        await draft.addImages(loaded)
+        )
+    }
+
+    func cancelImageImport() {
+        imageImport.cancel()
         selectedPhotos = []
+        imageImportWarning = nil
     }
 
     func removeImage(_ image: TaggrDraftImage) {
@@ -604,6 +632,7 @@ struct InlineReplyComposer: View {
             await state.submitPost(text: body, parent: post.id, realm: post.realm, images: images, reloadMode: selectedMode)
             isSubmitting = false
             if state.errorMessage == nil {
+                cancelImageImport()
                 await draft.discard()
                 isFocused = false
             }
