@@ -83,6 +83,10 @@ final class TaggrAppCoordinator {
     var lastHomeFeedMode: TaggrFeedMode {
         navigationStore.lastHomeFeedMode
     }
+    var postReturnRoutesByPostID: [Int: TaggrRoute] {
+        get { navigationStore.postReturnRoutesByPostID }
+        set { navigationStore.postReturnRoutesByPostID = newValue }
+    }
     var profileReturnRoute: TaggrRoute {
         get { navigationStore.profileReturnRoute }
         set { navigationStore.profileReturnRoute = newValue }
@@ -134,6 +138,10 @@ final class TaggrAppCoordinator {
         get { feedStore.canLoadMoreFeed }
         set { feedStore.canLoadMoreFeed = newValue }
     }
+    var isLoadingMoreFeed: Bool {
+        get { feedStore.isLoadingMoreFeed }
+        set { feedStore.isLoadingMoreFeed = newValue }
+    }
     var authorNamesByUserID: [Int: String] {
         get { feedStore.authorNamesByUserID }
         set { feedStore.authorNamesByUserID = newValue }
@@ -157,6 +165,10 @@ final class TaggrAppCoordinator {
     var canLoadMoreRealms: Bool {
         get { contentStore.canLoadMoreRealms }
         set { contentStore.canLoadMoreRealms = newValue }
+    }
+    var isLoadingMoreRealms: Bool {
+        get { contentStore.isLoadingMoreRealms }
+        set { contentStore.isLoadingMoreRealms = newValue }
     }
     var icpInvoice: TaggrICPInvoice? {
         get { walletStorageStore.icpInvoice }
@@ -282,8 +294,16 @@ final class TaggrAppCoordinator {
     }
 
     func open(_ url: URL) {
-        route = TaggrNavigation.route(from: url) ?? .feed(.hot)
+        navigate(to: TaggrNavigation.route(from: url) ?? .feed(.hot))
         routeLoadRevision += 1
+    }
+
+    func navigate(to destination: TaggrRoute) {
+        if case .post(let id) = destination {
+            navigateToPost(id)
+        } else {
+            route = destination
+        }
     }
 
     func loadCurrentRoute() async {
@@ -397,7 +417,9 @@ final class TaggrAppCoordinator {
     }
 
     func loadMoreFeed(mode: TaggrFeedMode) async {
-        guard canLoadMoreFeed else { return }
+        guard canLoadMoreFeed, !isLoadingMoreFeed else { return }
+        isLoadingMoreFeed = true
+        defer { isLoadingMoreFeed = false }
         await loadFeed(mode: mode, reset: false)
     }
 
@@ -405,7 +427,65 @@ final class TaggrAppCoordinator {
         if let mode {
             returnFeedMode = mode
         }
+        let returnRoute: TaggrRoute
+        if case .post(let currentPostID) = route {
+            returnRoute = postReturnRoute(for: currentPostID)
+            postReturnRoutesByPostID.removeValue(forKey: currentPostID)
+        } else {
+            returnRoute = route
+        }
+        postReturnRoutesByPostID[id] = returnRoute
         route = .post(id)
+    }
+
+    func postReturnRoute(for postID: Int) -> TaggrRoute {
+        postReturnRoutesByPostID[postID] ?? .feed(lastHomeFeedMode)
+    }
+
+    var currentPostReturnRoute: TaggrRoute {
+        guard case .post(let postID) = route else {
+            return .feed(lastHomeFeedMode)
+        }
+        return postReturnRoute(for: postID)
+    }
+
+    var postReturnTitle: String {
+        switch currentPostReturnRoute {
+        case .feed:
+            return "Timeline"
+        case .profile:
+            return "Profile"
+        case .userPhotos:
+            return "Photos"
+        case .realm:
+            return "Realm"
+        case .inbox:
+            return "Inbox"
+        case .settings:
+            return "Account"
+        case .post:
+            return "Timeline"
+        }
+    }
+
+    func navigateBackFromPost() {
+        guard case .post(let postID) = route else {
+            navigateToHomeFeed()
+            return
+        }
+        let destination = postReturnRoute(for: postID)
+        postReturnRoutesByPostID.removeValue(forKey: postID)
+        switch destination {
+        case .feed(let mode):
+            navigateToFeed(mode)
+        case .realm(let name):
+            navigateToRealm(name)
+        case .post:
+            navigateToHomeFeed()
+        default:
+            focusedPost = nil
+            route = destination
+        }
     }
 
     func navigateToFeed(_ mode: TaggrFeedMode) {
@@ -479,7 +559,7 @@ final class TaggrAppCoordinator {
             await self.runBusy(validWhile: { self.isCurrentRequest(request) }) {
                 let thread = try await self.loadPostEnvelopes("thread", args: [id], identity: nil, api: activeAPI)
                 guard self.isCurrentRequest(request) else { return }
-                self.focusedPost = thread.first
+                self.focusedPost = thread.last
                 self.feed = thread
             }
         }
@@ -607,7 +687,15 @@ final class TaggrAppCoordinator {
     }
 
     func loadAllRealmsList(reset: Bool = true) async {
-        guard reset || canLoadMoreRealms else { return }
+        guard reset || (canLoadMoreRealms && !isLoadingMoreRealms) else { return }
+        if !reset {
+            isLoadingMoreRealms = true
+        }
+        defer {
+            if !reset {
+                isLoadingMoreRealms = false
+            }
+        }
         let request = beginRequest(.realm)
         let activeAPI = api
         let page = reset ? 0 : nextAllRealmsPage

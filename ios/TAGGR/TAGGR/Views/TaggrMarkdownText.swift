@@ -41,7 +41,7 @@ struct TaggrMarkdownText: View {
     private static func uncachedAttributedMarkdown(from text: String) -> AttributedString {
         // Foundation's Markdown parser covers inline emphasis, code, links, and
         // block intents without adding a parser dependency to the native app.
-        let displayText = preservingUserLineBreaks(in: text)
+        let displayText = preservingUserLineBreaks(in: autolinkBareURLs(in: text))
         guard var attributed = try? AttributedString(markdown: displayText) else {
             return AttributedString(text)
         }
@@ -137,12 +137,19 @@ struct TaggrMarkdownText: View {
         presentation(for: text).hasInteractiveLink
     }
 
+    static func markdownProtectedRanges(in text: String) -> [Range<String.Index>] {
+        let nsRange = NSRange(text.startIndex..<text.endIndex, in: text)
+        return markdownProtectedExpression
+            .matches(in: text, range: nsRange)
+            .compactMap { Range($0.range, in: text) }
+    }
+
     private static func presentation(for text: String) -> PresentationBox {
         let key = text as NSString
         if let cached = presentationCache.object(forKey: key) {
             return cached
         }
-        let linkedText = linkTagsAndUsers(text)
+        let linkedText = autolinkBareURLs(in: linkTagsAndUsers(text))
         let hasMarkdownLink = markdownProtectedRanges(in: text).contains(where: { range in
             let protected = String(text[range])
             return protected.hasPrefix("[") || protected.hasPrefix("![")
@@ -153,13 +160,6 @@ struct TaggrMarkdownText: View {
         )
         presentationCache.setObject(presentation, forKey: key)
         return presentation
-    }
-
-    private static func markdownProtectedRanges(in text: String) -> [Range<String.Index>] {
-        let nsRange = NSRange(text.startIndex..<text.endIndex, in: text)
-        return markdownProtectedExpression
-            .matches(in: text, range: nsRange)
-            .compactMap { Range($0.range, in: text) }
     }
 
     private static func linkTokens(in text: String) -> String {
@@ -194,6 +194,52 @@ struct TaggrMarkdownText: View {
         default:
             return token
         }
+    }
+
+    private static func autolinkBareURLs(in text: String) -> String {
+        let expression = try! NSRegularExpression(
+            pattern: #"(?i)(?:https?://|www\.)[^\s<>\[\]]+"#
+        )
+        let protectedRanges = markdownProtectedRanges(in: text)
+        let matches = expression.matches(
+            in: text,
+            range: NSRange(text.startIndex..<text.endIndex, in: text)
+        )
+
+        var output = ""
+        var cursor = text.startIndex
+        for match in matches {
+            guard let range = Range(match.range, in: text),
+                  !protectedRanges.contains(where: { $0.overlaps(range) }),
+                  let token = autolinkToken(in: range, text: text) else {
+                continue
+            }
+            let hasWWWPrefix = token.value.lowercased().hasPrefix("www.")
+            let destination = hasWWWPrefix ? "https://\(token.value)" : token.value
+            guard let url = URL(string: destination) else { continue }
+            output += String(text[cursor..<range.lowerBound])
+            output += "[\(url.host?.uppercased() ?? token.value)](\(destination))"
+            cursor = token.end
+        }
+        output += String(text[cursor...])
+        return output
+    }
+
+    private static func autolinkToken(
+        in range: Range<String.Index>,
+        text: String
+    ) -> (value: String, end: String.Index)? {
+        var end = range.upperBound
+        while end > range.lowerBound {
+            let character = text[text.index(before: end)]
+            if ".,;:!?)]}'\"".contains(character) {
+                end = text.index(before: end)
+            } else {
+                break
+            }
+        }
+        guard end > range.lowerBound else { return nil }
+        return (String(text[range.lowerBound..<end]), end)
     }
 
     private static func isTokenStart(_ character: Character) -> Bool {

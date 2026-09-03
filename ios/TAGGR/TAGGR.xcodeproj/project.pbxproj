@@ -14,6 +14,7 @@
 		010001000000000000000034 /* PostDraftStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 010000000000000000000034 /* PostDraftStore.swift */; };
 		01000100000000000000001A /* TaggrRuntimeConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01000000000000000000001A /* TaggrRuntimeConfig.swift */; };
 		010001000000000000000003 /* TaggrModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 010000000000000000000003 /* TaggrModels.swift */; };
+		010001000000000000000043 /* TaggrPostContentRestriction.swift in Sources */ = {isa = PBXBuildFile; fileRef = 010000000000000000000043 /* TaggrPostContentRestriction.swift */; };
 		01000100000000000000003E /* TaggrRealm.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01000000000000000000003E /* TaggrRealm.swift */; };
 		010001000000000000000027 /* TaggrAccountImage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 010000000000000000000027 /* TaggrAccountImage.swift */; };
 		010001000000000000000037 /* TaggrRelativeTime.swift in Sources */ = {isa = PBXBuildFile; fileRef = 010000000000000000000037 /* TaggrRelativeTime.swift */; };
@@ -53,6 +54,9 @@
 		010001000000000000000031 /* ICNativeClient in Frameworks */ = {isa = PBXBuildFile; productRef = 01000D000000000000000001 /* ICNativeClient */; };
 		010001000000000000000032 /* ICNativeClient in Frameworks */ = {isa = PBXBuildFile; productRef = 01000D000000000000000002 /* ICNativeClient */; };
 		010001000000000000000041 /* ImageDraftsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 010000000000000000000041 /* ImageDraftsTests.swift */; };
+		010001000000000000000044 /* TaggrPostPresentationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 010000000000000000000044 /* TaggrPostPresentationTests.swift */; };
+		010001000000000000000045 /* TaggrPostBodyView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 010000000000000000000045 /* TaggrPostBodyView.swift */; };
+		010001000000000000000046 /* YouTubeEmbedView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 010000000000000000000046 /* YouTubeEmbedView.swift */; };
 		010001000000000000000042 /* Fixtures in Resources */ = {isa = PBXBuildFile; fileRef = 010000000000000000000042 /* Fixtures */; };
 		010001000000000000000040 /* libwebp in Frameworks */ = {isa = PBXBuildFile; productRef = 01000D000000000000000003 /* libwebp */; };
 /* End PBXBuildFile section */
@@ -75,6 +79,7 @@
 		010000000000000000000034 /* PostDraftStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PostDraftStore.swift; sourceTree = "<group>"; };
 		01000000000000000000001A /* TaggrRuntimeConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaggrRuntimeConfig.swift; sourceTree = "<group>"; };
 		010000000000000000000003 /* TaggrModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaggrModels.swift; sourceTree = "<group>"; };
+		010000000000000000000043 /* TaggrPostContentRestriction.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaggrPostContentRestriction.swift; sourceTree = "<group>"; };
 		01000000000000000000003E /* TaggrRealm.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaggrRealm.swift; sourceTree = "<group>"; };
 		010000000000000000000027 /* TaggrAccountImage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaggrAccountImage.swift; sourceTree = "<group>"; };
 		010000000000000000000037 /* TaggrRelativeTime.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaggrRelativeTime.swift; sourceTree = "<group>"; };
@@ -111,6 +116,9 @@
 		01000000000000000000003C /* TaggrActionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaggrActionTests.swift; sourceTree = "<group>"; };
 		01000000000000000000001D /* TaggrIdentityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaggrIdentityTests.swift; sourceTree = "<group>"; };
 		010000000000000000000041 /* ImageDraftsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageDraftsTests.swift; sourceTree = "<group>"; };
+		010000000000000000000044 /* TaggrPostPresentationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaggrPostPresentationTests.swift; sourceTree = "<group>"; };
+		010000000000000000000045 /* TaggrPostBodyView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaggrPostBodyView.swift; sourceTree = "<group>"; };
+		010000000000000000000046 /* YouTubeEmbedView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YouTubeEmbedView.swift; sourceTree = "<group>"; };
 		010000000000000000000042 /* Fixtures */ = {isa = PBXFileReference; lastKnownFileType = folder; path = Fixtures; sourceTree = "<group>"; };
 		01000000000000000000000E /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		01000000000000000000000F /* TAGGR.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = TAGGR.entitlements; sourceTree = "<group>"; };
@@ -164,6 +172,7 @@
 				01000000000000000000003C /* TaggrActionTests.swift */,
 				01000000000000000000001D /* TaggrIdentityTests.swift */,
 				010000000000000000000041 /* ImageDraftsTests.swift */,
+				010000000000000000000044 /* TaggrPostPresentationTests.swift */,
 				010000000000000000000042 /* Fixtures */,
 			);
 			path = TAGGRTests;
@@ -178,10 +187,10 @@
 			name = Products;
 			sourceTree = "<group>";
 		};
-		010006000000000000000005 /* TaggrModels */ = {isa = PBXGroup; children = (010000000000000000000003 /* TaggrModels.swift */,01000000000000000000003E /* TaggrRealm.swift */,010000000000000000000027 /* TaggrAccountImage.swift */,010000000000000000000037 /* TaggrRelativeTime.swift */,01000000000000000000002C /* TaggrEditPatch.swift */,); path = TaggrModels; sourceTree = "<group>"; };
+		010006000000000000000005 /* TaggrModels */ = {isa = PBXGroup; children = (010000000000000000000003 /* TaggrModels.swift */,010000000000000000000043 /* TaggrPostContentRestriction.swift */,01000000000000000000003E /* TaggrRealm.swift */,010000000000000000000027 /* TaggrAccountImage.swift */,010000000000000000000037 /* TaggrRelativeTime.swift */,01000000000000000000002C /* TaggrEditPatch.swift */,); path = TaggrModels; sourceTree = "<group>"; };
 		010006000000000000000006 /* TaggrAPI */ = {isa = PBXGroup; children = (010000000000000000000004 /* TaggrAPI.swift */,010000000000000000000005 /* CandidEncoder.swift */,); path = TaggrAPI; sourceTree = "<group>"; };
 		010006000000000000000008 /* TaggrNavigation */ = {isa = PBXGroup; children = (010000000000000000000009 /* TaggrNavigation.swift */,); path = TaggrNavigation; sourceTree = "<group>"; };
-		010006000000000000000009 /* Views */ = {isa = PBXGroup; children = (01000000000000000000000A /* RootView.swift */,010000000000000000000030 /* TaggrTheme.swift */,01000000000000000000000B /* FeedViews.swift */,010000000000000000000038 /* PostInteractionViews.swift */,01000000000000000000003D /* PostReactionDetailsView.swift */,010000000000000000000039 /* RealmListViews.swift */,010000000000000000000029 /* ComposePostView.swift */,01000000000000000000002A /* PostComposerMode.swift */,01000000000000000000002B /* ImageDrafts.swift */,010000000000000000000024 /* PostImageViews.swift */,01000000000000000000002F /* PostImageLoaderView.swift */,010000000000000000000033 /* TaggrImagePagerView.swift */,010000000000000000000028 /* TaggrMarkdownText.swift */,010000000000000000000025 /* UserImageLibraryView.swift */,010000000000000000000026 /* AccountImagePagerView.swift */,010000000000000000000020 /* PostDetailViews.swift */,010000000000000000000022 /* RealmViews.swift */,010000000000000000000023 /* SharedViews.swift */,01000000000000000000002E /* TaggrRefreshable.swift */,01000000000000000000001C /* ProfileViews.swift */,01000000000000000000001E /* InboxView.swift */,01000000000000000000000C /* AuthSettingsViews.swift */,); path = Views; sourceTree = "<group>"; };
+		010006000000000000000009 /* Views */ = {isa = PBXGroup; children = (01000000000000000000000A /* RootView.swift */,010000000000000000000030 /* TaggrTheme.swift */,01000000000000000000000B /* FeedViews.swift */,010000000000000000000038 /* PostInteractionViews.swift */,01000000000000000000003D /* PostReactionDetailsView.swift */,010000000000000000000039 /* RealmListViews.swift */,010000000000000000000029 /* ComposePostView.swift */,01000000000000000000002A /* PostComposerMode.swift */,01000000000000000000002B /* ImageDrafts.swift */,010000000000000000000024 /* PostImageViews.swift */,01000000000000000000002F /* PostImageLoaderView.swift */,010000000000000000000033 /* TaggrImagePagerView.swift */,010000000000000000000028 /* TaggrMarkdownText.swift */,010000000000000000000045 /* TaggrPostBodyView.swift */,010000000000000000000046 /* YouTubeEmbedView.swift */,010000000000000000000025 /* UserImageLibraryView.swift */,010000000000000000000026 /* AccountImagePagerView.swift */,010000000000000000000020 /* PostDetailViews.swift */,010000000000000000000022 /* RealmViews.swift */,010000000000000000000023 /* SharedViews.swift */,01000000000000000000002E /* TaggrRefreshable.swift */,01000000000000000000001C /* ProfileViews.swift */,01000000000000000000001E /* InboxView.swift */,01000000000000000000000C /* AuthSettingsViews.swift */,); path = Views; sourceTree = "<group>"; };
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -246,13 +255,13 @@
 		010007000000000000000001 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
-			files = (010001000000000000000001,010001000000000000000002,010001000000000000000035,010001000000000000000036,010001000000000000000034,01000100000000000000001A,010001000000000000000003,01000100000000000000003E,010001000000000000000027,010001000000000000000037,01000100000000000000002C,010001000000000000000004,010001000000000000000005,010001000000000000000009,01000100000000000000000A,010001000000000000000030,01000100000000000000000B,010001000000000000000038,01000100000000000000003D,010001000000000000000039,010001000000000000000029,01000100000000000000002A,01000100000000000000002B,010001000000000000000024,01000100000000000000002F,010001000000000000000033,010001000000000000000028,010001000000000000000025,010001000000000000000026,010001000000000000000020,010001000000000000000022,010001000000000000000023,01000100000000000000002E,01000100000000000000001C,01000100000000000000001E,01000100000000000000000C,);
+			files = (010001000000000000000001,010001000000000000000002,010001000000000000000035,010001000000000000000036,010001000000000000000034,01000100000000000000001A,010001000000000000000003,010001000000000000000043,01000100000000000000003E,010001000000000000000027,010001000000000000000037,01000100000000000000002C,010001000000000000000004,010001000000000000000005,010001000000000000000009,01000100000000000000000A,010001000000000000000030,01000100000000000000000B,010001000000000000000038,01000100000000000000003D,010001000000000000000039,010001000000000000000029,01000100000000000000002A,01000100000000000000002B,010001000000000000000024,01000100000000000000002F,010001000000000000000033,010001000000000000000028,010001000000000000000045,010001000000000000000046,010001000000000000000025,010001000000000000000026,010001000000000000000020,010001000000000000000022,010001000000000000000023,01000100000000000000002E,01000100000000000000001C,01000100000000000000001E,01000100000000000000000C,);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		010007000000000000000002 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
-			files = (01000100000000000000000D,01000100000000000000003A,01000100000000000000003F,01000100000000000000003B,01000100000000000000003C,01000100000000000000001D,010001000000000000000041,);
+			files = (01000100000000000000000D,01000100000000000000003A,01000100000000000000003F,01000100000000000000003B,01000100000000000000003C,01000100000000000000001D,010001000000000000000041,010001000000000000000044,);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */

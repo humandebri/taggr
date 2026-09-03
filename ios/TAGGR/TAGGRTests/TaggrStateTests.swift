@@ -926,6 +926,27 @@ extension TaggrTests {
     }
 
     @MainActor
+    func testLoadPostFocusesRequestedReplyAtEndOfThread() async {
+        let rootEnvelope = try! JSONSerialization.jsonObject(with: postEnvelopeFixture(id: 100)) as! [Any]
+        let replyEnvelope = try! JSONSerialization.jsonObject(
+            with: postEnvelopeFixture(id: 101, parent: 100)
+        ) as! [Any]
+        let threadBody = try! JSONSerialization.data(withJSONObject: [rootEnvelope, replyEnvelope])
+        let api = makeStubbedAPI { request in
+            let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
+            return (response, Self.queryReply(threadBody))
+        }
+        let state = TaggrAppCoordinator(api: api)
+        state.navigateToPost(101)
+
+        await state.loadPost(101)
+
+        XCTAssertEqual(state.feed.map(\.id), [100, 101])
+        XCTAssertEqual(state.focusedPost?.id, 101)
+        XCTAssertEqual(state.focusedPost?.parent, 100)
+    }
+
+    @MainActor
     func testLoadMoreFeedUsesNextPageAndStableOffset() async throws {
         var calls: [(method: String, arg: Data)] = []
         let api = makeStubbedAPI { request in
@@ -955,6 +976,91 @@ extension TaggrTests {
         ])
         XCTAssertEqual(state.feed.map(\.id), [101])
         XCTAssertFalse(state.canLoadMoreFeed)
+    }
+
+    @MainActor
+    func testLoadMoreFeedUsesScopedStateAndIgnoresDuplicateRequest() async {
+        let requestStarted = expectation(description: "feed load more started")
+        let releaseRequest = DispatchSemaphore(value: 0)
+        let lock = NSLock()
+        var requestCount = 0
+        let api = makeStubbedAPI { request in
+            lock.lock()
+            requestCount += 1
+            lock.unlock()
+            requestStarted.fulfill()
+            _ = releaseRequest.wait(timeout: .now() + 5)
+            let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
+            return (response, Self.queryReply(Data("[]".utf8)))
+        }
+        let state = TaggrAppCoordinator(api: api)
+        state.canLoadMoreFeed = true
+
+        let firstRequest = Task { await state.loadMoreFeed(mode: .hot) }
+        await fulfillment(of: [requestStarted], timeout: 1)
+
+        XCTAssertTrue(state.isLoadingMoreFeed)
+        XCTAssertTrue(state.isBusy)
+
+        await state.loadMoreFeed(mode: .hot)
+        let countWhileLoading = lock.withLock { requestCount }
+        XCTAssertEqual(countWhileLoading, 1)
+
+        releaseRequest.signal()
+        await firstRequest.value
+        XCTAssertFalse(state.isLoadingMoreFeed)
+    }
+
+    @MainActor
+    func testLoadMoreRealmsUsesScopedStateAndIgnoresDuplicateRequest() async {
+        let requestStarted = expectation(description: "realm load more started")
+        let releaseRequest = DispatchSemaphore(value: 0)
+        let lock = NSLock()
+        var requestCount = 0
+        let api = makeStubbedAPI { request in
+            lock.lock()
+            requestCount += 1
+            lock.unlock()
+            requestStarted.fulfill()
+            _ = releaseRequest.wait(timeout: .now() + 5)
+            let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
+            return (response, Self.queryReply(Data("[]".utf8)))
+        }
+        let state = TaggrAppCoordinator(api: api)
+        state.canLoadMoreRealms = true
+
+        let firstRequest = Task { await state.loadAllRealmsList(reset: false) }
+        await fulfillment(of: [requestStarted], timeout: 1)
+
+        XCTAssertTrue(state.isLoadingMoreRealms)
+        XCTAssertTrue(state.isBusy)
+
+        await state.loadAllRealmsList(reset: false)
+        let countWhileLoading = lock.withLock { requestCount }
+        XCTAssertEqual(countWhileLoading, 1)
+
+        releaseRequest.signal()
+        await firstRequest.value
+        XCTAssertFalse(state.isLoadingMoreRealms)
+    }
+
+    @MainActor
+    func testLoadMoreScopedStatesResetAfterFailureAndCancellation() async {
+        let failureAPI = makeStubbedAPI { _ in
+            throw URLError(.cannotConnectToHost)
+        }
+        let failedFeedState = TaggrAppCoordinator(api: failureAPI)
+        failedFeedState.canLoadMoreFeed = true
+        await failedFeedState.loadMoreFeed(mode: .hot)
+        XCTAssertFalse(failedFeedState.isLoadingMoreFeed)
+
+        let cancelledAPI = makeStubbedAPI { _ in
+            throw URLError(.cancelled)
+        }
+        let cancelledRealmState = TaggrAppCoordinator(api: cancelledAPI)
+        cancelledRealmState.canLoadMoreRealms = true
+        await cancelledRealmState.loadAllRealmsList(reset: false)
+        XCTAssertFalse(cancelledRealmState.isLoadingMoreRealms)
     }
 
     @MainActor

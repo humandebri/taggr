@@ -466,6 +466,43 @@ extension TaggrTests {
         XCTAssertFalse(TaggrMarkdownText.containsInteractiveLink(in: "plain post text"))
     }
 
+    func testPostBodyParserSeparatesParagraphsAndYouTubeEmbeds() {
+        let body = """
+        部屋の掃除をめっちゃ頑張ってたくさんゴミを捨てました
+
+        音源のほうは清志郎がプロデュース&演奏で参加してる https://nico.ms/sm7037560?ref=other_cap_off
+
+        **GOMI _ 加奈崎芳太郎**
+        https://youtu.be/zG9K9Za56jI?si=vvHxqwh5SE3Msr3r
+        """
+
+        let blocks = TaggrPostBodyParser.blocks(in: body)
+        XCTAssertEqual(blocks.count, 4)
+        guard case .markdown(let first) = blocks[0],
+              case .markdown(let second) = blocks[1],
+              case .markdown(let third) = blocks[2],
+              case .youtube(let preview) = blocks[3] else {
+            return XCTFail("Unexpected post body blocks")
+        }
+        XCTAssertEqual(first, "部屋の掃除をめっちゃ頑張ってたくさんゴミを捨てました")
+        XCTAssertTrue(second.contains("https://nico.ms/sm7037560"))
+        XCTAssertEqual(third, "**GOMI _ 加奈崎芳太郎**")
+        XCTAssertEqual(preview.id, "zG9K9Za56jI")
+        XCTAssertTrue(TaggrPostBodyView.containsInteractiveLink(in: body))
+    }
+
+    func testMarkdownTextAutolinksBareURLsWithoutTouchingCode() {
+        let attributed = TaggrMarkdownText.attributedMarkdown(
+            from: "https://nico.ms/sm7037560 www.example.com WWW.example.org `https://example.com`"
+        )
+
+        XCTAssertEqual(String(attributed.characters), "NICO.MS WWW.EXAMPLE.COM WWW.EXAMPLE.ORG https://example.com")
+        XCTAssertTrue(attributed.runs.contains { $0.link?.host == "nico.ms" })
+        XCTAssertTrue(attributed.runs.contains { $0.link?.absoluteString == "https://www.example.com" })
+        XCTAssertTrue(attributed.runs.contains { $0.link?.absoluteString == "https://WWW.example.org" })
+        XCTAssertFalse(attributed.runs.contains { $0.link?.host == "example.com" })
+    }
+
     func testPostImageURLUsesRuntimeConfig() {
         let mainnet = TaggrRuntimeConfig.from(info: [:])
         XCTAssertEqual(
@@ -611,26 +648,6 @@ extension TaggrTests {
         XCTAssertEqual(urls.count, 7)
         XCTAssertEqual(urls.first?.absoluteString, "https://aaaaa-aa.raw.icp0.io/image?offset=2&len=20")
         XCTAssertEqual(urls.last?.absoluteString, "https://aaaaa-aa.raw.icp0.io/image?offset=8&len=20")
-    }
-
-    func testFeedImagePrefetchSkipsSensitivePosts() {
-        let visible = samplePost(
-            id: 1,
-            body: "visible\n\n![x](/blob/visible)",
-            files: ["visible@aaaaa-aa": [LosslessInt(1), LosslessInt(20)]]
-        )
-        let sensitive = samplePost(
-            id: 2,
-            body: "sensitive\n\n![x](/blob/sensitive)",
-            files: ["sensitive@aaaaa-aa": [LosslessInt(2), LosslessInt(20)]],
-            meta: TaggrPostMeta(authorName: "alice", realmColor: nil, nsfw: true, viewerBlocked: false)
-        )
-
-        let urls = FeedImagePrefetchPolicy
-            .attachments(in: [visible, sensitive], around: visible, currentUserId: nil)
-            .map(\.url)
-
-        XCTAssertEqual(urls.map(\.absoluteString), ["https://aaaaa-aa.raw.icp0.io/image?offset=1&len=20"])
     }
 
     func testFeedImagePrefetchOnlyUsesVisibleTimelineBody() {

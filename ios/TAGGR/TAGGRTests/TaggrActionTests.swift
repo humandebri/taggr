@@ -620,6 +620,7 @@ extension TaggrTests {
         user: Int = 1,
         parent: Int? = nil,
         body: String,
+        effBody: String? = nil,
         reactions: [String: [Int]] = [:],
         children: [Int] = [],
         files: [String: [LosslessInt]],
@@ -628,6 +629,9 @@ extension TaggrTests {
         realm: String? = nil,
         extensionValue: JSONValue? = nil,
         patches: [[JSONValue]] = [],
+        hashes: [String] = [],
+        encrypted: Bool = false,
+        hiddenFor: [Int] = [],
         meta: TaggrPostMeta = TaggrPostMeta(authorName: "alice", realmColor: nil, nsfw: false, viewerBlocked: false)
     ) -> TaggrPost {
         TaggrPost(
@@ -635,7 +639,7 @@ extension TaggrTests {
             parent: parent,
             user: user,
             body: body,
-            effBody: nil,
+            effBody: effBody,
             realm: realm,
             timestamp: timestamp,
             reactions: reactions,
@@ -646,12 +650,12 @@ extension TaggrTests {
             files: files,
             patches: patches,
             tips: [],
-            hashes: [],
+            hashes: hashes,
             extensionValue: extensionValue,
             treeSize: treeSize,
             treeUpdate: nil,
-            encrypted: false,
-            hiddenFor: []
+            encrypted: encrypted,
+            hiddenFor: hiddenFor
         )
     }
 
@@ -721,13 +725,14 @@ extension TaggrTests {
         return data
     }
 
-    nonisolated func postEnvelopeFixture(id: Int = 42, extensionJSON: String = "null") -> Data {
-        Data(
+    nonisolated func postEnvelopeFixture(id: Int = 42, parent: Int? = nil, extensionJSON: String = "null") -> Data {
+        let parentJSON = parent.map(String.init) ?? "null"
+        return Data(
             """
             [
               {
                 "id": \(id),
-                "parent": null,
+                "parent": \(parentJSON),
                 "user": 7,
                 "body": "hello",
                 "timestamp": "123",

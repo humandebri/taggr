@@ -49,6 +49,7 @@ final class NavigationStore {
     var route: TaggrRoute = .feed(.hot)
     var returnFeedMode: TaggrFeedMode = .hot
     var lastHomeFeedMode: TaggrFeedMode = .hot
+    var postReturnRoutesByPostID: [Int: TaggrRoute] = [:]
     var profileReturnRoute: TaggrRoute = .feed(.hot)
     var routeLoadRevision = 0
 
@@ -97,6 +98,7 @@ final class FeedStore {
     var repliesByPostID: [Int: [TaggrPost]] = [:]
     var loadingReplyPostIDs: Set<Int> = []
     var canLoadMoreFeed = false
+    var isLoadingMoreFeed = false
     var authorNamesByUserID: [Int: String] = [:]
 }
 
@@ -108,6 +110,7 @@ final class ContentStore {
     var realms: [TaggrRealm] = []
     var nextAllRealmsPage = 0
     var canLoadMoreRealms = false
+    var isLoadingMoreRealms = false
 }
 
 @MainActor

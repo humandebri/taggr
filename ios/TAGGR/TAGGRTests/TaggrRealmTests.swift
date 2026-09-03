@@ -44,6 +44,95 @@ extension TaggrTests {
         XCTAssertEqual(RootView.feedRoute(lastHomeFeedMode: state.lastHomeFeedMode), .feed(.latest))
     }
 
+    @MainActor
+    func testPostNavigationReturnsToOriginalRoute() {
+        let state = TaggrAppCoordinator()
+        let origins: [(route: TaggrRoute, title: String)] = [
+            (.feed(.latest), "Timeline"),
+            (.realm("DEV"), "Realm"),
+            (.profile("alice"), "Profile"),
+            (.userPhotos("alice"), "Photos"),
+            (.inbox, "Inbox"),
+            (.settings, "Account"),
+        ]
+
+        for origin in origins {
+            state.route = origin.route
+            state.navigateToPost(42)
+
+            XCTAssertEqual(state.postReturnRoute(for: 42), origin.route)
+            XCTAssertEqual(state.postReturnTitle, origin.title)
+
+            state.navigateBackFromPost()
+            XCTAssertEqual(state.route, origin.route)
+            XCTAssertNil(state.postReturnRoutesByPostID[42])
+        }
+    }
+
+    @MainActor
+    func testPostNavigationKeepsOriginalListWhileTraversingPosts() {
+        let state = TaggrAppCoordinator()
+        state.route = .inbox
+
+        state.navigateToPost(42)
+        state.navigateToPost(43)
+
+        XCTAssertNil(state.postReturnRoutesByPostID[42])
+        XCTAssertEqual(state.postReturnRoute(for: 43), .inbox)
+
+        state.navigateBackFromPost()
+
+        XCTAssertEqual(state.route, .inbox)
+    }
+
+    @MainActor
+    func testPostNavigationKeepsParentReturnRouteAcrossProfile() {
+        let state = TaggrAppCoordinator()
+        state.route = .inbox
+
+        state.navigateToPost(42)
+        state.navigateToProfile("alice")
+        state.navigateToPost(43)
+
+        XCTAssertEqual(state.postReturnRoute(for: 42), .inbox)
+        XCTAssertEqual(state.postReturnRoute(for: 43), .profile("alice"))
+
+        state.navigateBackFromPost()
+        XCTAssertEqual(state.route, .profile("alice"))
+
+        state.navigateBackFromProfile()
+        XCTAssertEqual(state.route, .post(42))
+        XCTAssertEqual(state.postReturnTitle, "Inbox")
+
+        state.navigateBackFromPost()
+        XCTAssertEqual(state.route, .inbox)
+    }
+
+    @MainActor
+    func testPostNavigationWithoutRecordedReturnUsesCurrentHomeFeed() {
+        let state = TaggrAppCoordinator()
+        state.navigateToFeed(.personal)
+        state.route = .post(42)
+
+        state.navigateBackFromPost()
+
+        XCTAssertEqual(state.route, .feed(.personal))
+    }
+
+    @MainActor
+    func testPostURLUsesCurrentRouteAsReturnDestination() {
+        let state = TaggrAppCoordinator()
+        state.navigateToFeed(.personal)
+
+        state.open(URL(string: "https://6qfxa-ryaaa-aaaai-qbhsq-cai.icp0.io/post/42")!)
+
+        XCTAssertEqual(state.route, .post(42))
+        XCTAssertEqual(state.postReturnRoute(for: 42), .feed(.personal))
+        XCTAssertEqual(state.postReturnTitle, "Timeline")
+        state.navigateBackFromPost()
+        XCTAssertEqual(state.route, .feed(.personal))
+    }
+
     func testFeedTabReselectionActions() {
         XCTAssertEqual(RootView.feedTabReselectionAction(for: .feed(.hot)), .scrollToTop)
         XCTAssertEqual(RootView.feedTabReselectionAction(for: .feed(.latest)), .scrollToTop)

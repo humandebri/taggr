@@ -14,8 +14,14 @@ struct PostDetailView: View {
                     if let focusedPost = state.focusedPost {
                         let posts = state.feed.isEmpty ? [focusedPost] : state.feed
                         ForEach(posts) { post in
-                            PostRow(post: post) {
-                                state.navigateToPost(post.id)
+                            if post.parent == nil {
+                                PostRow(post: post) {
+                                    state.navigateToPost(post.id)
+                                }
+                            } else {
+                                ReplyPostRow(post: post) {
+                                    state.navigateToPost(post.id)
+                                }
                             }
                         }
                     } else {
@@ -36,18 +42,15 @@ struct PostDetailView: View {
         .taggrBusyOverlay(state.isBusy)
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
-                TaggrBackToolbarButton(title: "Timeline", action: returnToTimeline)
+                TaggrBackToolbarButton(title: state.postReturnTitle) {
+                    state.navigateBackFromPost()
+                }
             }
         }
     }
 
     private func changeMode(_ mode: TaggrFeedMode) {
         selectedMode = mode
-        state.navigateToFeed(mode)
-    }
-
-    private func returnToTimeline() {
-        let mode = selectedMode
         state.navigateToFeed(mode)
     }
 }

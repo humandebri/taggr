@@ -64,16 +64,9 @@ struct RealmsView: View {
                             .frame(maxWidth: .infinity)
                     }
                     if showingAllRealms, state.canLoadMoreRealms {
-                        Button {
+                        TaggrLoadMoreView(loading: state.isLoadingMoreRealms) {
                             Task { await state.loadAllRealmsList(reset: false) }
-                        } label: {
-                            Text("More")
-                                .font(.subheadline.weight(.bold))
-                                .frame(maxWidth: .infinity)
                         }
-                        .buttonStyle(.bordered)
-                        .tint(TaggrTheme.clickable)
-                        .disabled(state.isBusy)
                     }
                     Button {
                         showingAllRealms.toggle()

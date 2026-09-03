@@ -7,10 +7,6 @@ enum TimelineLayout {
     static let rowVerticalPadding: CGFloat = 14
 }
 
-enum TimelinePostContent {
-    static let cutMarker = "\n\n\n\n"
-}
-
 struct FeedView: View {
     @Environment(TaggrAppCoordinator.self) private var state
     @StateObject private var imagePrefetcher = PostImagePrefetcher()
@@ -45,19 +41,9 @@ struct FeedView: View {
                                 }
                             }
                             if state.canLoadMoreFeed {
-                                Button {
+                                TaggrLoadMoreView(loading: state.isLoadingMoreFeed) {
                                     Task { await state.loadMoreFeed(mode: selectedMode) }
-                                } label: {
-                                    Text("More")
-                                        .font(.subheadline.weight(.bold))
-                                        .foregroundStyle(TaggrTheme.text)
-                                        .frame(maxWidth: .infinity)
-                                        .frame(height: 44)
-                                        .background(TaggrTheme.panelRaised)
-                                        .clipShape(RoundedRectangle(cornerRadius: 8))
                                 }
-                                .buttonStyle(.plain)
-                                .padding(16)
                             }
                         }
                     }
@@ -101,7 +87,7 @@ struct FeedView: View {
             syncSelectedModeWithRoute()
         }
         .taggrRefreshable()
-        .taggrBusyOverlay(state.isBusy)
+        .taggrBusyOverlay(Self.showsBusyOverlay(isBusy: state.isBusy, isLoadingMore: state.isLoadingMoreFeed))
         .fullScreenCover(isPresented: $showingComposer) {
             ComposePostView(
                 mode: .newPost(selectedMode: selectedMode),
@@ -135,6 +121,10 @@ struct FeedView: View {
         } else {
             showingComposer = true
         }
+    }
+
+    static func showsBusyOverlay(isBusy: Bool, isLoadingMore: Bool) -> Bool {
+        isBusy && !isLoadingMore
     }
 
     static func feedMode(from route: TaggrRoute) -> TaggrFeedMode? {
@@ -177,34 +167,17 @@ enum FeedImagePrefetchPolicy {
         guard let index = posts.firstIndex(where: { $0.id == post.id }) else { return [] }
         let end = min(posts.count, index + lookAheadPostCount + 1)
         return posts[index..<end].flatMap { candidate -> [TaggrPostImageAttachment] in
-            guard shouldPrefetchImages(for: candidate, currentUserId: currentUserId) else { return [] }
+            guard candidate.contentRestriction(viewerID: currentUserId) == nil else { return [] }
             let attachments = TaggrPostPresentationCache.attachments(
                 for: candidate,
                 config: config,
-                bodyText: visibleTimelineBody(candidate)
+                bodyText: candidate.timelineBody
             )
             let visibleCount = PostImageGrid.visibleCount(for: attachments.count)
             return Array(attachments.prefix(visibleCount))
         }
     }
 
-    static func visibleTimelineBody(_ post: TaggrPost) -> String {
-        let rawBody = post.effBody ?? post.body
-        guard let range = rawBody.range(of: TimelinePostContent.cutMarker) else {
-            return rawBody
-        }
-        return String(rawBody[..<range.lowerBound])
-    }
-
-    static func shouldPrefetchImages(for post: TaggrPost, currentUserId: Int?) -> Bool {
-        if post.encrypted || !post.hashes.isEmpty || post.meta.maxDownvotesReached == true || post.meta.nsfw == true {
-            return false
-        }
-        if let currentUserId, post.hiddenFor.contains(currentUserId) {
-            return false
-        }
-        return true
-    }
 }
 
 @MainActor
@@ -358,14 +331,16 @@ struct PostRow: View {
 
     @ViewBuilder
     var postBodyText: some View {
-        let text = TaggrMarkdownText(text: visibleDisplayBody)
+        let text = TaggrPostBodyView(
+            text: visibleDisplayBody,
+            maximumLines: isDetail ? nil : 10
+        )
             .font(.body)
             .foregroundStyle(TaggrTheme.text)
             .lineSpacing(3)
-            .lineLimit(isDetail ? nil : 10)
             .textSelection(.enabled)
             .frame(maxWidth: .infinity, alignment: .leading)
-        if TaggrMarkdownText.containsInteractiveLink(in: visibleDisplayBody) {
+        if TaggrPostBodyView.containsInteractiveLink(in: visibleDisplayBody) {
             text
         } else {
             text
@@ -468,9 +443,6 @@ struct PostRow: View {
                             previewImage = attachment
                         }
                     }
-                    ForEach(TaggrYouTubePreview.previews(in: visibleRawBody)) { preview in
-                        YouTubePreviewView(preview: preview)
-                    }
                     PostExtensionView(post: post)
                 }
             }
@@ -509,14 +481,11 @@ struct PostRow: View {
     }
 
     var rawBody: String {
-        post.effBody ?? post.body
+        post.effectiveBody
     }
 
     var visibleRawBody: String {
-        guard !isDetail, !showFullBody, let range = rawBody.range(of: TimelinePostContent.cutMarker) else {
-            return rawBody
-        }
-        return String(rawBody[..<range.lowerBound])
+        isDetail || showFullBody ? rawBody : post.timelineBody
     }
 
     var visibleDisplayBody: String {
@@ -536,7 +505,7 @@ struct PostRow: View {
     }
 
     var isShortened: Bool {
-        !isDetail && !showFullBody && rawBody.contains(TimelinePostContent.cutMarker)
+        !isDetail && !showFullBody && rawBody.contains(TaggrPost.timelineCutMarker)
     }
 
     var isDetail: Bool {
@@ -547,35 +516,28 @@ struct PostRow: View {
     }
 
     var safetyNotice: PostSafetyNoticeModel? {
-        if post.encrypted {
+        guard let restriction = post.contentRestriction(viewerID: state.currentUser?.id) else {
+            return nil
+        }
+        if restriction.isRevealable && revealSensitive {
+            return nil
+        }
+        switch restriction {
+        case .encrypted:
             return PostSafetyNoticeModel(title: "Encrypted", detail: "This post is encrypted and cannot be rendered in this build.", actionTitle: nil)
-        }
-        if post.meta.maxDownvotesReached == true {
+        case .moderated:
             return PostSafetyNoticeModel(title: "Hidden by moderation", detail: "This post reached the downvote threshold.", actionTitle: nil)
-        }
-        if !post.hashes.isEmpty {
-            return PostSafetyNoticeModel(title: "Post deleted", detail: post.hashes.map { String($0.prefix(16)) }.joined(separator: "\n"), actionTitle: nil)
-        }
-        if isHiddenByViewer && !revealSensitive {
+        case .deleted(let hashes):
+            return PostSafetyNoticeModel(title: "Post deleted", detail: hashes.map { String($0.prefix(16)) }.joined(separator: "\n"), actionTitle: nil)
+        case .hidden:
             return PostSafetyNoticeModel(title: "Hidden", detail: "You hid this post.", actionTitle: "Show")
-        }
-        if isNSFW && !revealSensitive {
+        case .nsfw:
             return PostSafetyNoticeModel(title: "NSFW", detail: "This post is marked as sensitive.", actionTitle: "Show")
         }
-        return nil
-    }
-
-    var isHiddenByViewer: Bool {
-        guard let userId = state.currentUser?.id else { return false }
-        return post.hiddenFor.contains(userId)
-    }
-
-    var isNSFW: Bool {
-        rawBody.localizedCaseInsensitiveContains("#nsfw") || post.meta.nsfw == true
     }
 
     var replyCount: Int {
-        post.children.isEmpty ? 0 : (post.treeSize ?? post.children.count)
+        post.replyCount
     }
 
     var authorLabel: String {
@@ -621,6 +583,16 @@ struct PostRow: View {
 
     func openRealm(_ realm: String) {
         state.navigateToRealm(realm)
+    }
+}
+
+struct ReplyPostRow: View {
+    let post: TaggrPost
+    let open: () -> Void
+
+    var body: some View {
+        PostRow(post: post, open: open)
+            .padding(.leading, 24)
     }
 }
 
@@ -914,10 +886,9 @@ struct RepostExtensionView: View {
                         Text(embeddedPost.meta.authorName ?? "@\(embeddedPost.user)")
                             .font(.caption.weight(.bold))
                             .foregroundStyle(TaggrTheme.clickable)
-                        TaggrMarkdownText(text: embeddedPost.displayBody)
+                        TaggrPostBodyView(text: embeddedPost.displayBody, maximumLines: 4)
                             .font(.subheadline)
                             .foregroundStyle(TaggrTheme.secondaryText)
-                            .lineLimit(4)
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
                     .padding(12)
@@ -971,37 +942,7 @@ struct YouTubePreviewView: View {
     let preview: TaggrYouTubePreview
 
     var body: some View {
-        Link(destination: preview.url) {
-            HStack(spacing: 10) {
-                AsyncImage(url: preview.thumbnailURL) { phase in
-                    switch phase {
-                    case .success(let image):
-                        image
-                            .resizable()
-                            .scaledToFill()
-                    default:
-                        TaggrTheme.panelRaised
-                            .overlay(Image(systemName: "play.rectangle.fill").foregroundStyle(TaggrTheme.clickable))
-                    }
-                }
-                .frame(width: 108, height: 61)
-                .clipped()
-                .clipShape(RoundedRectangle(cornerRadius: 6))
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("YouTube")
-                        .font(.caption.weight(.bold))
-                        .foregroundStyle(TaggrTheme.text)
-                    Text(preview.url.absoluteString)
-                        .font(.caption)
-                        .foregroundStyle(TaggrTheme.secondaryText)
-                        .lineLimit(2)
-                }
-                Spacer(minLength: 0)
-            }
-            .padding(10)
-            .background(TaggrTheme.panel)
-            .clipShape(RoundedRectangle(cornerRadius: 8))
-        }
+        YouTubeEmbedView(preview: preview)
     }
 }
 
@@ -1093,10 +1034,9 @@ struct PostRepliesAccordion: View {
                 .padding(.leading, 46)
             } else if let replies = state.repliesByPostID[parent.id] {
                 ForEach(replies) { reply in
-                    PostRow(post: reply) {
+                    ReplyPostRow(post: reply) {
                         state.navigateToPost(reply.id)
                     }
-                    .padding(.leading, 24)
                 }
             }
         }

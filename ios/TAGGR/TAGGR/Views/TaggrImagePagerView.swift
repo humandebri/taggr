@@ -89,11 +89,17 @@ private struct TaggrImagePagerPage: View {
 }
 
 private struct TaggrImagePagerPhoto: View {
+    private static let maximumZoomScale: CGFloat = 4
+
     let attachment: TaggrPostImageAttachment
     let accessibilityLabel: String
     let availableSize: CGSize
     let close: () -> Void
     @State private var imageSize: CGSize?
+    @State private var zoomScale: CGFloat = 1
+    @State private var panOffset: CGSize = .zero
+    @GestureState private var pinchScale: CGFloat = 1
+    @GestureState private var dragTranslation: CGSize = .zero
 
     var body: some View {
         ZStack {
@@ -101,28 +107,100 @@ private struct TaggrImagePagerPhoto: View {
                 .contentShape(Rectangle())
                 .onTapGesture(perform: close)
 
-            if let imageSize {
-                TaggrPostImageLoaderView(
-                    attachment: attachment,
-                    contentMode: .fit,
-                    onImageLoaded: updateImageSize
-                )
-                .frame(width: fittedSize(for: imageSize).width, height: fittedSize(for: imageSize).height)
-                .contentShape(Rectangle())
-                // The displayed image consumes taps; black space around its fitted bounds closes the pager.
-                .onTapGesture {}
-                .accessibilityLabel(accessibilityLabel)
-            } else {
-                TaggrPostImageLoaderView(
-                    attachment: attachment,
-                    contentMode: .fit,
-                    onImageLoaded: updateImageSize
-                )
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .allowsHitTesting(false)
-                .accessibilityLabel(accessibilityLabel)
-            }
+            let displayedSize = imageSize.map(fittedSize(for:)) ?? availableSize
+            TaggrPostImageLoaderView(
+                attachment: attachment,
+                contentMode: .fit,
+                onImageLoaded: updateImageSize
+            )
+            .frame(width: displayedSize.width, height: displayedSize.height)
+            .scaleEffect(effectiveZoomScale)
+            .offset(effectivePanOffset)
+            .contentShape(Rectangle())
+            // The displayed image consumes taps; black space around its fitted bounds closes the pager.
+            .onTapGesture {}
+            .onTapGesture(count: 2, perform: toggleZoom)
+            .simultaneousGesture(magnificationGesture)
+            .highPriorityGesture(panGesture)
+            .allowsHitTesting(imageSize != nil)
+            .accessibilityLabel(accessibilityLabel)
+            .accessibilityHint("Pinch to zoom. Drag to pan when enlarged.")
         }
+        .onChange(of: attachment.id) { _, _ in resetZoom() }
+    }
+
+    private var effectiveZoomScale: CGFloat {
+        clampedZoomScale(zoomScale * pinchScale)
+    }
+
+    private var effectivePanOffset: CGSize {
+        clampedPanOffset(
+            CGSize(
+                width: panOffset.width + dragTranslation.width,
+                height: panOffset.height + dragTranslation.height
+            ),
+            scale: effectiveZoomScale
+        )
+    }
+
+    private var magnificationGesture: some Gesture {
+        MagnificationGesture()
+            .updating($pinchScale) { value, state, _ in
+                state = value
+            }
+            .onEnded { value in
+                setZoomScale(zoomScale * value)
+            }
+    }
+
+    private var panGesture: some Gesture {
+        DragGesture(minimumDistance: zoomScale > 1 ? 0 : .infinity)
+            .updating($dragTranslation) { value, state, _ in
+                state = value.translation
+            }
+            .onEnded { value in
+                guard zoomScale > 1 else { return }
+                panOffset = clampedPanOffset(
+                    CGSize(
+                        width: panOffset.width + value.translation.width,
+                        height: panOffset.height + value.translation.height
+                    ),
+                    scale: zoomScale
+                )
+            }
+    }
+
+    private func toggleZoom() {
+        setZoomScale(zoomScale > 1 ? 1 : 2.5)
+    }
+
+    private func setZoomScale(_ scale: CGFloat) {
+        zoomScale = clampedZoomScale(scale)
+        if zoomScale == 1 {
+            panOffset = .zero
+        } else {
+            panOffset = clampedPanOffset(panOffset, scale: zoomScale)
+        }
+    }
+
+    private func resetZoom() {
+        zoomScale = 1
+        panOffset = .zero
+    }
+
+    private func clampedZoomScale(_ scale: CGFloat) -> CGFloat {
+        min(max(scale, 1), Self.maximumZoomScale)
+    }
+
+    private func clampedPanOffset(_ offset: CGSize, scale: CGFloat) -> CGSize {
+        guard let imageSize else { return .zero }
+        let fittedImageSize = fittedSize(for: imageSize)
+        let maximumX = max((fittedImageSize.width * scale - availableSize.width) / 2, 0)
+        let maximumY = max((fittedImageSize.height * scale - availableSize.height) / 2, 0)
+        return CGSize(
+            width: min(max(offset.width, -maximumX), maximumX),
+            height: min(max(offset.height, -maximumY), maximumY)
+        )
     }
 
     private func updateImageSize(_ size: CGSize) {

@@ -14,6 +14,8 @@ enum TaggrFeedMode: Hashable, Sendable {
 }
 
 struct TaggrPost: Identifiable, Equatable, Sendable {
+    static let timelineCutMarker = "\n\n\n\n"
+
     let id: Int
     let parent: Int?
     let user: Int
@@ -40,8 +42,42 @@ struct TaggrPost: Identifiable, Equatable, Sendable {
         TaggrPostExtension(value: extensionValue)
     }
 
+    var effectiveBody: String {
+        effBody ?? body
+    }
+
+    var timelineBody: String {
+        guard let range = effectiveBody.range(of: Self.timelineCutMarker) else {
+            return effectiveBody
+        }
+        return String(effectiveBody[..<range.lowerBound])
+    }
+
+    var replyCount: Int {
+        children.isEmpty ? 0 : (treeSize ?? children.count)
+    }
+
     var displayBody: String {
-        TaggrPostImages.textWithoutImageMarkdown(effBody ?? body)
+        TaggrPostImages.textWithoutImageMarkdown(effectiveBody)
+    }
+
+    func contentRestriction(viewerID: Int?) -> TaggrPostContentRestriction? {
+        if encrypted {
+            return .encrypted
+        }
+        if meta.maxDownvotesReached == true {
+            return .moderated
+        }
+        if !hashes.isEmpty {
+            return .deleted(hashes)
+        }
+        if let viewerID, hiddenFor.contains(viewerID) {
+            return .hidden
+        }
+        if meta.nsfw == true || effectiveBody.localizedCaseInsensitiveContains("#nsfw") {
+            return .nsfw
+        }
+        return nil
     }
 
     func deletionVersions() throws -> [String] {
@@ -58,7 +94,7 @@ struct TaggrPost: Identifiable, Equatable, Sendable {
     }
 
     func imageAttachments(config: TaggrRuntimeConfig = .current, bodyText: String? = nil) -> [TaggrPostImageAttachment] {
-        let references = TaggrPostImages.imageReferences(in: bodyText ?? effBody ?? body)
+        let references = TaggrPostImages.imageReferences(in: bodyText ?? effectiveBody)
         var seen = Set<String>()
 
         if references.isEmpty {

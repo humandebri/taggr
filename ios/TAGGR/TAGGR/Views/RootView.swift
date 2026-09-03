@@ -45,7 +45,7 @@ struct RootView: View {
             guard let route = TaggrNavigation.route(from: url) else {
                 return .systemAction
             }
-            state.route = route
+            state.navigate(to: route)
             return .handled
         })
         .task(id: RouteLoadKey(route: state.route, revision: state.routeLoadRevision)) {

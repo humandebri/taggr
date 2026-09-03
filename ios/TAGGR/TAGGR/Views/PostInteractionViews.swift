@@ -152,7 +152,7 @@ struct PostEngagementBar: View {
     }
 
     var replyCount: Int {
-        post.children.isEmpty ? 0 : (post.treeSize ?? post.children.count)
+        post.replyCount
     }
 
     var bookmarked: Bool {
@@ -1021,10 +1021,9 @@ struct RepostSheet: View {
                 .padding(8)
                 .background(TaggrTheme.panelRaised)
                 .clipShape(RoundedRectangle(cornerRadius: 8))
-            TaggrMarkdownText(text: post.displayBody)
+            TaggrPostBodyView(text: post.displayBody, maximumLines: 4)
                 .font(.subheadline)
                 .foregroundStyle(TaggrTheme.secondaryText)
-                .lineLimit(4)
                 .frame(maxWidth: .infinity, alignment: .leading)
             Spacer()
         }

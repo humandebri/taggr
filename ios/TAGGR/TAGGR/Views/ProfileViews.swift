@@ -221,7 +221,7 @@ struct ProfileView: View {
                     .font(.headline.weight(.black))
                     .foregroundStyle(TaggrTheme.text)
                 Spacer()
-                if journalIsLoading {
+                if Self.showsJournalHeaderSpinner(isLoading: journalIsLoading, hasPosts: !journalPosts.isEmpty) {
                     ProgressView()
                         .tint(.white)
                 }
@@ -244,15 +244,7 @@ struct ProfileView: View {
                     }
                 }
                 if journalCanLoadMore {
-                    Button("More", action: loadMoreJournalPosts)
-                        .font(.subheadline.weight(.bold))
-                        .foregroundStyle(TaggrTheme.text)
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 44)
-                        .background(TaggrTheme.panelRaised)
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
-                        .padding(16)
-                        .disabled(journalIsLoading)
+                    TaggrLoadMoreView(loading: journalIsLoading, height: 44, load: loadMoreJournalPosts)
                 }
             }
         }
@@ -324,6 +316,10 @@ struct ProfileView: View {
     private func loadMoreJournalPosts() {
         guard let handle = profileHandle else { return }
         Task { await loadJournalPosts(handle: handle, reset: false) }
+    }
+
+    static func showsJournalHeaderSpinner(isLoading: Bool, hasPosts: Bool) -> Bool {
+        isLoading && !hasPosts
     }
 
     private func loadJournalPosts(handle: String, reset: Bool) async {
