@@ -79,9 +79,9 @@ private struct TaggrUpdateResult<T: Decodable>: Decodable {
 actor TaggrAPI {
     static var canisterId: String { TaggrRuntimeConfig.current.canisterId }
     static var domain: String { TaggrRuntimeConfig.current.domain }
-    static let icpLedgerCanisterId = "ryjl3-tyaaa-aaaaa-aaaba-cai"
-    static let cmcCanisterId = "rkp4c-7iaaa-aaaaa-aaaca-cai"
-    static let managementCanisterId = "aaaaa-aa"
+    static let icpLedgerCanisterId = TaggrCanisterAdapters.Ledger.canisterId
+    static let cmcCanisterId = TaggrCanisterAdapters.CMC.canisterId
+    static let managementCanisterId = TaggrCanisterAdapters.Management.canisterId
     static let blackholeCanisterId = "e3mmv-5qaaa-aaaah-aadma-cai"
     static let memoCreateCanister: UInt64 = 0x41455243
     static let memoTopUpCanister: UInt64 = 0x50555054
@@ -90,17 +90,29 @@ actor TaggrAPI {
 
     nonisolated var domain: String { config.domain }
 
-    init(session: URLSession = .shared, config: TaggrRuntimeConfig = .current) {
+    init(
+        session: URLSession = .shared,
+        config: TaggrRuntimeConfig = .current,
+        trustRoot: ICTrustRoot = .mainnet
+    ) {
         self.config = config
-        self.icClient = ICClient(configuration: config.icClientConfiguration, session: session)
+        self.icClient = ICClient(configuration: config.icClientConfiguration(trustRoot: trustRoot), session: session)
     }
 
     nonisolated func apiURL(for requestType: String) -> URL {
-        config.icClientConfiguration.apiURL(for: requestType)
+        do {
+            return try config.icClientConfiguration.apiURL(for: requestType)
+        } catch {
+            preconditionFailure("Invalid IC API request path: \(error)")
+        }
     }
 
     nonisolated func apiURL(for requestType: String, canisterId: String) -> URL {
-        config.icClientConfiguration.apiURL(for: requestType, canisterId: canisterId)
+        do {
+            return try config.icClientConfiguration.apiURL(for: requestType, canisterId: canisterId)
+        } catch {
+            preconditionFailure("Invalid IC API request path: \(error)")
+        }
     }
 
     func query<T: Decodable & Sendable>(_ method: String, as type: T.Type) async throws -> T? {
@@ -169,9 +181,9 @@ actor TaggrAPI {
 
     func icpAccountBalance(ownerPrincipal: String) async throws -> UInt64 {
         let account = try ICPAccountIdentifier.defaultAccount(for: ownerPrincipal)
-        let arg = TaggrCandid.encodeICPAccountBalance(account: account)
-        let response = try await queryRaw("account_balance", arg: arg, canisterId: Self.icpLedgerCanisterId, identity: nil)
-        return try TaggrCandid.decodeICPTokens(response)
+        return try await mapICClientErrors {
+            try await TaggrCanisterAdapters.Ledger(client: icClient).accountBalance(account: account)
+        }
     }
 
     func tagsCost(_ tags: [String]) async throws -> Int {
@@ -186,19 +198,17 @@ actor TaggrAPI {
 
     func transferICP(toAccount account: Data, e8s: UInt64, memo: UInt64 = 0, identity: ICAuthSession?) async throws -> UInt64 {
         let identity = try Self.requireIdentity(identity)
-        let arg = TaggrCandid.encodeICPTransfer(
-            to: account,
-            amountE8s: e8s,
-            feeE8s: ICPAmount.feeE8s,
-            memo: memo
-        )
-        let response = try await updateRaw("transfer", arg: arg, canisterId: Self.icpLedgerCanisterId, identity: identity)
-        return try TaggrCandid.decodeICPTransferResult(response)
+        return try await mapICClientErrors {
+            try await TaggrCanisterAdapters.Ledger(client: icClient).transfer(
+                to: account, amountE8s: e8s, feeE8s: ICPAmount.feeE8s, memo: memo, identity: identity
+            )
+        }
     }
 
     func bucketWasm() async throws -> Data {
-        let response = try await queryRaw("bucket_wasm", arg: TaggrCandid.encodeBucketWasm(), identity: nil)
-        return try TaggrCandid.decodeBlob(response, label: "bucket_wasm")
+        try await mapICClientErrors {
+            try await TaggrCanisterAdapters.Taggr(client: icClient).bucketWasm()
+        }
     }
 
     func bucketWasmHash() async throws -> String {
@@ -210,19 +220,19 @@ actor TaggrAPI {
     }
 
     func notifyCreateCanister(blockIndex: UInt64, controller: String, identity: ICAuthSession) async throws -> String {
-        let arg = try TaggrCandid.encodeNotifyCreateCanister(
-            blockIndex: blockIndex,
-            controller: controller,
-            blackhole: Self.blackholeCanisterId
-        )
-        let response = try await updateRaw("notify_create_canister", arg: arg, canisterId: Self.cmcCanisterId, identity: identity)
-        return try TaggrCandid.decodeNotifyCreateCanister(response)
+        try await mapICClientErrors {
+            try await TaggrCanisterAdapters.CMC(client: icClient).notifyCreateCanister(
+                blockIndex: blockIndex, controller: controller, blackhole: Self.blackholeCanisterId, identity: identity
+            )
+        }
     }
 
     func notifyTopUp(blockIndex: UInt64, canisterId: String, identity: ICAuthSession) async throws -> UInt64 {
-        let arg = try TaggrCandid.encodeNotifyTopUp(blockIndex: blockIndex, canisterId: canisterId)
-        let response = try await updateRaw("notify_top_up", arg: arg, canisterId: Self.cmcCanisterId, identity: identity)
-        return try TaggrCandid.decodeNotifyTopUp(response)
+        try await mapICClientErrors {
+            try await TaggrCanisterAdapters.CMC(client: icClient).notifyTopUp(
+                blockIndex: blockIndex, canisterId: canisterId, identity: identity
+            )
+        }
     }
 
     func installBucketCode(
@@ -232,31 +242,19 @@ actor TaggrAPI {
         mode: String,
         identity: ICAuthSession
     ) async throws {
-        let arg = try TaggrCandid.encodeInstallBucketCode(
-            canisterId: canisterId,
-            wasm: wasm,
-            userPrincipal: userPrincipal,
-            mode: mode
-        )
-        _ = try await updateRaw(
-            "install_code",
-            arg: arg,
-            canisterId: Self.managementCanisterId,
-            effectiveCanisterId: canisterId,
-            identity: identity
-        )
+        try await mapICClientErrors {
+            try await TaggrCanisterAdapters.Management(client: icClient).installCode(
+                canisterId: canisterId, wasm: wasm, userPrincipal: userPrincipal, mode: mode, identity: identity
+            )
+        }
     }
 
     func storageCanisterStatus(_ canisterId: String, identity: ICAuthSession) async throws -> TaggrStorageCanisterStatus {
-        let arg = try TaggrCandid.encodeCanisterStatus(canisterId: canisterId)
-        let response = try await updateRaw(
-            "canister_status",
-            arg: arg,
-            canisterId: Self.managementCanisterId,
-            effectiveCanisterId: canisterId,
-            identity: identity
-        )
-        let decoded = try TaggrCandid.decodeCanisterStatus(response)
+        let decoded = try await mapICClientErrors {
+            try await TaggrCanisterAdapters.Management(client: icClient).canisterStatus(
+                canisterId: canisterId, identity: identity
+            )
+        }
         return TaggrStorageCanisterStatus(
             status: decoded.status,
             controllers: decoded.controllers,
@@ -268,16 +266,15 @@ actor TaggrAPI {
     }
 
     func updateStorageControllers(canisterId: String, controllers: [String], identity: ICAuthSession) async throws {
-        let settingsArg = try TaggrCandid.encodeUpdateSettings(canisterId: canisterId, controllers: controllers)
-        _ = try await updateRaw(
-            "update_settings",
-            arg: settingsArg,
-            canisterId: Self.managementCanisterId,
-            effectiveCanisterId: canisterId,
-            identity: identity
-        )
-        let bucketArg = try TaggrCandid.encodeUpdateInternalControllers(controllers)
-        _ = try await updateRaw("update_internal_controllers", arg: bucketArg, canisterId: canisterId, identity: identity)
+        try await mapICClientErrors {
+            try await TaggrCanisterAdapters.Management(client: icClient).updateSettings(
+                canisterId: canisterId, controllers: controllers, identity: identity
+            )
+        }
+        try await mapICClientErrors {
+            try await TaggrCanisterAdapters.Bucket(client: icClient, canisterId: canisterId)
+                .updateInternalControllers(controllers, identity: identity)
+        }
     }
 
     func addPost(
@@ -289,23 +286,20 @@ actor TaggrAPI {
         identity: ICAuthSession?
     ) async throws -> UInt64 {
         let identity = try Self.requireIdentity(identity)
-        let arg = TaggrCandid.encodeAddPost(
-            text: text,
-            refs: refs,
-            parent: parent,
-            realm: realm,
-            extensionBlob: extensionBlob
-        )
-        let response = try await updateRaw("add_post", arg: arg, identity: identity)
-        return try TaggrCandid.decodeResultNat64(response)
+        return try await mapICClientErrors {
+            try await TaggrCanisterAdapters.Taggr(client: icClient).addPost(
+                text: text, refs: refs, parent: parent, realm: realm, extensionBlob: extensionBlob, identity: identity
+            )
+        }
     }
 
     func editPost(id: Int, text: String, refs: [TaggrCandid.FileRef] = [], patch: String, realm: String?, identity: ICAuthSession?) async throws -> Data {
         let identity = try Self.requireIdentity(identity)
-        let arg = TaggrCandid.encodeEditPost(id: id, text: text, refs: refs, patch: patch, realm: realm)
-        let response = try await updateRaw("edit_post", arg: arg, identity: identity)
-        try TaggrCandid.throwIfRejectedResult(response)
-        return response
+        return try await mapICClientErrors {
+            try await TaggrCanisterAdapters.Taggr(client: icClient).editPost(
+                id: id, text: text, refs: refs, patch: patch, realm: realm, identity: identity
+            )
+        }
     }
 
     func toggleBookmark(postId: Int, identity: ICAuthSession?) async throws -> Data {
@@ -328,9 +322,10 @@ actor TaggrAPI {
     }
 
     func bucketImage(bucketId: String, offset: UInt64, length: Int) async throws -> Data {
-        let arg = TaggrCandid.encodeBucketHTTPRequest(offset: offset, length: length)
-        let response = try await queryRaw("http_request", arg: arg, canisterId: bucketId, identity: nil)
-        return try TaggrCandid.decodeBucketHTTPResponseBody(response)
+        try await mapICClientErrors {
+            try await TaggrCanisterAdapters.Bucket(client: icClient, canisterId: bucketId)
+                .image(offset: offset, length: length)
+        }
     }
 
     func repost(postId: Int, text: String, realm: String?, identity: ICAuthSession?) async throws -> UInt64 {
@@ -339,7 +334,7 @@ actor TaggrAPI {
             refs: [],
             parent: nil,
             realm: realm,
-            extensionBlob: TaggrCandid.encodeRepostExtension(postId: postId),
+            extensionBlob: Data(#"{"Repost":\#(postId)}"#.utf8),
             identity: identity
         )
     }
@@ -411,8 +406,8 @@ actor TaggrAPI {
             return TaggrAPIError.invalidResponse(context)
         case .backendUnavailable(let context):
             return TaggrAPIError.backendUnavailable(context)
-        case .rejected(let message):
-            return TaggrAPIError.rejected(message)
+        case .rejected(let reject):
+            return TaggrAPIError.rejected(reject.message)
         case .pollTimeout:
             return TaggrAPIError.pollTimeout
         case .invalidPayload:

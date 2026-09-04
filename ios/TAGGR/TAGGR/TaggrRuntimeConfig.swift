@@ -37,16 +37,29 @@ struct TaggrRuntimeConfig: Equatable, Sendable {
     }
 
     func apiURL(for requestType: String) -> URL {
-        icClientConfiguration.apiURL(for: requestType)
+        do {
+            return try icClientConfiguration.apiURL(for: requestType)
+        } catch {
+            preconditionFailure("Invalid IC API request path: \(error)")
+        }
     }
 
     var icClientConfiguration: ICClientConfiguration {
-        ICClientConfiguration(
-            canisterId: canisterId,
-            apiBaseURL: apiBaseURL,
-            identityProvider: identityURL,
-            derivationOrigin: derivationOrigin
-        )
+        icClientConfiguration(trustRoot: .mainnet)
+    }
+
+    func icClientConfiguration(trustRoot: ICTrustRoot) -> ICClientConfiguration {
+        do {
+            return try ICClientConfiguration(
+                canisterId: canisterId,
+                apiBaseURL: apiBaseURL,
+                internetIdentityURL: identityURL,
+                derivationOrigin: derivationOrigin,
+                trustRoot: trustRoot
+            )
+        } catch {
+            preconditionFailure("Invalid TAGGR runtime configuration: \(error)")
+        }
     }
 
     var shouldLoadBucketImagesThroughAPI: Bool {

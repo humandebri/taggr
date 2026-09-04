@@ -349,6 +349,25 @@ fn read_blob(offset: u64, len: u64) -> Result<Vec<u8>, &'static str> {
 mod tests {
     use super::*;
 
+    candid::export_service!();
+
+    #[test]
+    fn checked_in_candid_matches_exported_service() {
+        use candid_parser::utils::{service_equal, CandidSource};
+
+        let path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../../ios/TAGGR/Candid/production/bucket.did");
+        let exported = __export_service();
+        service_equal(CandidSource::Text(&exported), CandidSource::File(&path)).unwrap_or_else(
+            |error| {
+                panic!(
+                    "exported bucket Candid does not match {}: {error}\n{exported}",
+                    path.display()
+                )
+            },
+        );
+    }
+
     #[test]
     fn stable_pages_to_grow_reserves_only_required_pages() {
         assert_eq!(stable_pages_to_grow(0, 0, CONTROLLERS_REGION_END), 1);

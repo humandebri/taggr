@@ -3,13 +3,34 @@ import Foundation
 import ICNativeClient
 import SwiftUI
 
+enum TaggrPostSubmissionOutcome: Equatable {
+    case submitted
+    case retryableFailure
+    case uncertain
+}
+
 extension TaggrAppCoordinator {
-    func submitPost(text: String, parent: Int? = nil, realm: String? = nil, images: [TaggrDraftImage] = [], reloadMode: TaggrFeedMode? = nil) async {
-        await runBusy {
+    func submitPost(text: String, parent: Int? = nil, realm: String? = nil, images: [TaggrDraftImage] = [], reloadMode: TaggrFeedMode? = nil) async -> TaggrPostSubmissionOutcome {
+        let operationID = UUID()
+        activeOperationIDs.insert(operationID)
+        latestOperationID = operationID
+        isBusy = !activeOperationIDs.isEmpty
+        errorMessage = nil
+        defer {
+            activeOperationIDs.remove(operationID)
+            isBusy = !activeOperationIDs.isEmpty
+        }
+        do {
             let body = text.trimmingCharacters(in: .whitespacesAndNewlines)
             let refs = try await uploadBlobs(referencedNewBlobs(in: body, draftImages: images, existingBlobIDs: []))
             let postingScope = realmPostingScope
-            _ = try await api.addPost(text: body, refs: refs, parent: parent, realm: realm, identity: authSession)
+            do {
+                _ = try await api.addPost(text: body, refs: refs, parent: parent, realm: realm, identity: authSession)
+            } catch {
+                guard !isCancellation(error) else { return .retryableFailure }
+                errorMessage = error.localizedDescription
+                return isUncertainPostSubmissionError(error) ? .uncertain : .retryableFailure
+            }
             if parent == nil, let postingScope {
                 realmPostingPreferences.record(destination: realm, scope: postingScope)
             }
@@ -23,6 +44,12 @@ extension TaggrAppCoordinator {
                 await reloadAfterRootPost(mode: reloadMode)
                 refreshLoadedProfileAfterOwnPost()
             }
+            errorMessage = nil
+            return .submitted
+        } catch {
+            guard !isCancellation(error) else { return .retryableFailure }
+            errorMessage = error.localizedDescription
+            return .retryableFailure
         }
     }
 
@@ -77,6 +104,16 @@ extension TaggrAppCoordinator {
             )
         }
         return TaggrPostCreditCost.estimate(body: body, baseCost: baseCost, tagCost: tagCost)
+    }
+
+    private func isUncertainPostSubmissionError(_ error: Error) -> Bool {
+        guard let error = error as? TaggrAPIError else { return true }
+        switch error {
+        case .pollTimeout, .backendUnavailable, .emptyResponse, .invalidResponse:
+            return true
+        case .invalidCanisterId, .invalidIdentity, .missingIdentity, .rejected:
+            return false
+        }
     }
 
     func postingRealmColors(_ names: [String]) async -> [String: String] {
@@ -573,7 +610,11 @@ extension TaggrAppCoordinator {
     }
 
     func signOut() {
-        identityStore.clear()
+        do {
+            try identityStore.clear()
+        } catch {
+            NSLog("TAGGR identity session could not be cleared: %@", error.localizedDescription)
+        }
         authSession = nil
         currentUser = nil
         icpBalanceE8s = nil
@@ -633,13 +674,53 @@ extension TaggrAppCoordinator {
         guard let bucket = currentUser?.bucket, !bucket.isEmpty else {
             throw TaggrAPIError.rejected("No personal media bucket configured. Set one up under Settings > Storage.")
         }
-        var refs: [TaggrCandid.FileRef] = []
-        refs.reserveCapacity(blobs.count)
-        for blob in blobs {
-            let offset = try await api.bucketWrite(bucketId: bucket, blob: blob.data, identity: authSession)
-            refs.append((id: blob.id, offset: offset, length: UInt64(blob.data.count)))
+        // Bucket updates are serialized by the canister, but several requests can be
+        // in flight while the client waits for their certificates. Keep the window
+        // bounded so a large photo selection does not monopolize the connection.
+        let maxConcurrentUploads = 4
+        let activeAPI = api
+        let activeSession = authSession
+        let indexedRefs = try await withThrowingTaskGroup(
+            of: (Int, TaggrCandid.FileRef).self,
+            returning: [(Int, TaggrCandid.FileRef)].self
+        ) { group in
+            var nextIndex = 0
+
+            func submit(_ index: Int) {
+                let blob = blobs[index]
+                group.addTask {
+                    let offset = try await activeAPI.bucketWrite(
+                        bucketId: bucket,
+                        blob: blob.data,
+                        identity: activeSession
+                    )
+                    return (
+                        index,
+                        (id: blob.id, offset: offset, length: UInt64(blob.data.count))
+                    )
+                }
+            }
+
+            for _ in 0..<min(maxConcurrentUploads, blobs.count) {
+                submit(nextIndex)
+                nextIndex += 1
+            }
+
+            var results: [(Int, TaggrCandid.FileRef)] = []
+            results.reserveCapacity(blobs.count)
+            while let result = try await group.next() {
+                results.append(result)
+                if nextIndex < blobs.count {
+                    submit(nextIndex)
+                    nextIndex += 1
+                }
+            }
+            return results
         }
-        return refs
+
+        return indexedRefs
+            .sorted { $0.0 < $1.0 }
+            .map(\.1)
     }
 
     func referencedNewBlobs(

@@ -1,0 +1,38 @@
+name: iOS Candid
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+
+jobs:
+  verify:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pinned Rust toolchain
+        run: rustup toolchain install 1.90.0 --profile minimal --component rustfmt,clippy
+
+      - name: Install pinned didc
+        run: |
+          curl --proto '=https' --tlsv1.2 -LsSf \
+            https://github.com/dfinity/candid/releases/download/didc-v0.5.4/didc-installer.sh \
+            -o /tmp/didc-installer.sh
+          sh /tmp/didc-installer.sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Check generated Candid bindings
+        run: bash scripts/check_candid_bindings.sh
+
+      - name: Check Rust formatting and types
+        run: |
+          cargo fmt --all -- --check
+          cargo check --workspace
+
+      - name: Test bucket interface export
+        run: cargo test --package bucket
+
+      - name: Build and test iOS Candid bindings
+        run: bash scripts/test_ios_candid.sh

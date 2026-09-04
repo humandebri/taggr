@@ -516,17 +516,17 @@ extension TaggrTests {
         )
     }
 
-    func testBucketHTTPRequestCandidMatchesWebIDL() {
+    func testBucketHTTPRequestCandidMatchesWebIDL() throws {
         XCTAssertEqual(
-            TaggrCandid.encodeBucketHTTPRequest(offset: 268, length: 211736).icHexString,
-            "4449444c036c02007101716d006c02efd6e40271c6a4a198060101021c2f696d6167653f6f66667365743d323638266c656e3d32313137333600"
+            try TaggrCandidAdapter.bucketHTTPRequestArguments(offset: 268, length: 211736).encode().icHexString,
+            "4449444c036c02efd6e40271c6a4a19806016d026c020071017101001c2f696d6167653f6f66667365743d323638266c656e3d32313137333600"
         )
     }
 
     func testBucketHTTPResponseDecodesImageBody() throws {
         let response = Data(icHex: "4449444c056d7b6c02007101716d016e7e6c04a2f5ed880400c6a4a19806029ce9c69906039aa1b2f90c7a010403010203010c636f6e74656e742d747970650a696d6167652f6a70656700c800")!
 
-        XCTAssertEqual(try TaggrCandid.decodeBucketHTTPResponseBody(response), Data([1, 2, 3]))
+        XCTAssertEqual(try TaggrCandidAdapter.httpResponseBody(CandidDecoder().decode(response)), Data([1, 2, 3]))
     }
 
     func testPostImageAttachmentsSkipMalformedFilesMetadata() {
@@ -630,6 +630,19 @@ extension TaggrTests {
         XCTAssertEqual(PostImageGrid.timelineAspectRatio(for: 4), 1.0, accuracy: 0.001)
         XCTAssertEqual(PostImageGrid.timelineAspectRatio(for: 5), 1.0, accuracy: 0.001)
         XCTAssertEqual(PostImageGrid.timelineAspectRatio(for: 6), 1.0, accuracy: 0.001)
+    }
+
+    func testImagePreviewPrefetchIncludesEveryUniqueAttachment() {
+        let attachments = (1...6).map { index in
+            TaggrPostImageAttachment(
+                id: "image\(index)",
+                url: URL(string: "https://bucket.raw.icp0.io/image?offset=\(index)&len=20")!
+            )
+        }
+
+        let prefetched = PostImagePreviewPrefetchPolicy.attachments(attachments + [attachments[2]])
+
+        XCTAssertEqual(prefetched.map(\.id), attachments.map(\.id))
     }
 
     func testFeedImagePrefetchIncludesCurrentAndLookAheadVisibleImages() {
@@ -744,6 +757,110 @@ extension TaggrTests {
             "![10x20, 1kb](/blob/abc12345)",
             "![10x20, 1kb](/blob/abc12301)",
         ])
+    }
+
+    func testPostDraftDocumentKeepsImageMarkersOutOfTextSegments() {
+        let first = "![10x20, 1kb](/blob/first001)"
+        let second = "![10x20, 1kb](/blob/second01)"
+        let document = "before\n\n\(first)\n\nafter\n\n\(second)"
+
+        XCTAssertEqual(
+            PostDraftDocument.segments(in: document).compactMap { segment -> String? in
+                guard case .image(_, _, _, let id) = segment else { return nil }
+                return id
+            },
+            ["first001", "second01"]
+        )
+        XCTAssertEqual(
+            PostDraftDocument.replacingText(in: document, segmentID: 0, with: "start"),
+            "start\(first)\n\nafter\n\n\(second)"
+        )
+    }
+
+    func testPostDraftDocumentInsertsAndMovesImageMarkers() {
+        let first = "![10x20, 1kb](/blob/first001)"
+        let second = "![10x20, 1kb](/blob/second01)"
+
+        let inserted = PostDraftDocument.inserting(
+            markdowns: [first],
+            in: "before\n\nafter",
+            afterTextSegmentID: 0
+        )
+        XCTAssertTrue(inserted.contains(first))
+
+        let moved = PostDraftDocument.moving(
+            imageOccurrence: 1,
+            before: 0,
+            in: "before\n\n\(first)\n\n\(second)\n\nafter"
+        )
+        XCTAssertEqual(
+            moved,
+            "before\n\n\(second)\n\n\(first)\n\nafter"
+        )
+
+        XCTAssertEqual(
+            PostDraftDocument.moving(
+                imageOccurrence: 0,
+                afterTextSegmentID: 2,
+                in: "before\n\n\(first)\n\nafter\n\n\(second)"
+            ),
+            "before\n\nafter\n\n\(first)\n\n\(second)"
+        )
+
+        XCTAssertEqual(
+            PostDraftDocument.moving(
+                imageOccurrence: 0,
+                before: nil,
+                in: "before\n\n\(first)\n\nafter"
+            ),
+            "before\n\nafter\n\n\(first)"
+        )
+    }
+
+    func testPostDraftDocumentChangesOnlyTheSelectedRepeatedMarker() {
+        let marker = "![10x20, 1kb](/blob/repeated)"
+        let document = "before\n\n\(marker)\n\nmid\n\n\(marker)\n\nafter"
+
+        let removed = PostDraftDocument.removing(imageOccurrence: 0, from: document)
+        XCTAssertEqual(PostDraftDocument.segments(in: removed).compactMap { segment -> String? in
+            guard case .image(_, _, let markdown, _) = segment else { return nil }
+            return markdown
+        }, [marker])
+
+        let moved = PostDraftDocument.moving(imageOccurrence: 1, before: 0, in: document)
+        XCTAssertEqual(PostDraftDocument.segments(in: moved).compactMap { segment -> Int? in
+            guard case .image(_, let occurrence, _, _) = segment else { return nil }
+            return occurrence
+        }.count, 2)
+    }
+
+    @MainActor
+    func testPostDraftSessionKeepsImageDataWhileTheSameBlobMarkerRemains() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appending(path: "PostDraftRepeatedBlobTests-\(UUID().uuidString)", directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let store = PostDraftStore(rootURL: root)
+        let namespace = PostDraftNamespace(canisterID: "mainnet-canister", userID: 7)
+        let image = TaggrDraftImage(id: "repeated", data: Data([1, 2, 3]), width: 10, height: 20)
+        try await store.save(
+            namespace: namespace,
+            context: .newPost,
+            text: "\(image.markdown)\n\n\(image.markdown)",
+            realm: "",
+            images: [image]
+        )
+        let session = PostDraftSession(
+            context: .newPost,
+            initialText: "",
+            initialRealm: ""
+        )
+
+        await session.load(store: store, namespace: namespace)
+        await session.removeImage(image, occurrence: 0)
+
+        XCTAssertEqual(session.text, "\n\n\(image.markdown)")
+        XCTAssertEqual(session.images, [image])
+        XCTAssertTrue(PostDraftDocument.containsImageMarker(blobID: image.id, in: session.text))
     }
 
     func testPostDraftStoreRoundTripsImagesAndSeparatesContextsAndNamespaces() async throws {
@@ -890,6 +1007,15 @@ extension TaggrTests {
         XCTAssertEqual(restoredSession.text, "saved text")
         XCTAssertEqual(restoredSession.realm, "DEV")
 
+        await restoredSession.markSubmissionNeedsVerification()
+        let verificationSession = PostDraftSession(
+            context: .newPost,
+            initialText: "",
+            initialRealm: ""
+        )
+        await verificationSession.load(store: store, namespace: namespace)
+        XCTAssertTrue(verificationSession.submissionNeedsVerification)
+
         restoredSession.text = ""
         await restoredSession.flush()
         let emptied = await store.load(namespace: namespace, context: .newPost)
@@ -950,7 +1076,7 @@ extension TaggrTests {
         await state.loadFeed(mode: .personal, reset: true)
 
         guard let capturedBody,
-              case .map(let envelope)? = ICCBOR.decode(capturedBody) else {
+              let envelope = cborMap(from: capturedBody) else {
             return XCTFail("Signed personal feed query was not sent.")
         }
         XCTAssertNotNil(value(named: "sender_sig", in: envelope))

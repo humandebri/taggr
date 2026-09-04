@@ -2,7 +2,7 @@ import XCTest
 import AuthenticationServices
 import CryptoKit
 import UIKit
-import ICNativeClient
+@testable import ICNativeClient
 @testable import TAGGR
 
 @MainActor
@@ -78,9 +78,10 @@ final class TaggrTests: XCTestCase {
             },
             identityAuthenticatorFactory: { config in
                 authenticatorConfig = config
-                return ICInternetIdentityAuthenticator(
+                return try! ICInternetIdentityAuthenticator(
                     configuration: config.icClientConfiguration,
-                    callbackDomain: config.callbackDomain
+                    callbackDomain: config.callbackDomain,
+                    callbackPath: ICInternetIdentityAuthenticator.callbackPath
                 )
             }
         )
@@ -144,13 +145,15 @@ final class TaggrTests: XCTestCase {
             "TAGGR_CALLBACK_DOMAIN": "6qfxa-ryaaa-aaaai-qbhsq-cai.icp0.io",
             "TAGGR_DOMAIN": "taggr.trycloudflare.com",
         ])
-        let privateKey = Curve25519.Signing.PrivateKey()
-        let url = try ICInternetIdentityAuthenticator.authorizationURL(
+        let callbackURL = try ICInternetIdentityAuthenticator.callbackURL(
             callbackDomain: config.callbackDomain,
+            callbackPath: ICInternetIdentityAuthenticator.callbackPath
+        )
+        let pending = try ICRC167Codec.makePendingRequest()
+        let url = try ICRC167Codec.authorizationURL(
             configuration: config.icClientConfiguration,
-            state: "state-1",
-            requestID: "request-1",
-            privateKey: privateKey
+            callbackURL: callbackURL,
+            pendingRequest: pending
         )
         var fragment = URLComponents()
         fragment.percentEncodedQuery = try XCTUnwrap(url.fragment)
@@ -165,63 +168,71 @@ final class TaggrTests: XCTestCase {
         XCTAssertEqual(url.host, "taggr-identity.trycloudflare.com")
         XCTAssertEqual(url.path, "/authorize")
         XCTAssertNil(url.port)
-        XCTAssertEqual(query["state"], "state-1")
+        XCTAssertEqual(query["state"], pending.state)
         XCTAssertEqual(query["callback"], "https://6qfxa-ryaaa-aaaai-qbhsq-cai.icp0.io/ios-auth-callback")
         XCTAssertEqual(object["method"] as? String, "icrc34_delegation")
-        XCTAssertEqual(object["id"] as? String, "request-1")
-        XCTAssertEqual(params["maxTimeToLive"] as? String, ICIdentitySession.maxTimeToLiveNanos)
+        XCTAssertEqual(object["id"] as? String, pending.requestID)
+        XCTAssertEqual(params["maxTimeToLive"] as? String, String(pending.maxTimeToLiveNanoseconds))
         XCTAssertEqual(params["icrc95DerivationOrigin"] as? String, config.derivationOrigin)
     }
 
-    func testProductionCallbackUsesHTTPSMatcher() {
+    func testProductionCallbackUsesExplicitHTTPSPath() throws {
         let config = TaggrRuntimeConfig.from(info: [:])
-        let callbackURL = ICInternetIdentityAuthenticator.callbackURL(callbackDomain: config.callbackDomain)
-        let matcher = ICInternetIdentityAuthenticator.callbackMatcher(callbackDomain: config.callbackDomain)
+        let callbackURL = try ICInternetIdentityAuthenticator.callbackURL(
+            callbackDomain: config.callbackDomain,
+            callbackPath: ICInternetIdentityAuthenticator.callbackPath
+        )
 
         XCTAssertEqual(callbackURL.absoluteString, "https://6qfxa-ryaaa-aaaai-qbhsq-cai.icp0.io/ios-auth-callback")
-        XCTAssertTrue(matcher.matchesURL(callbackURL))
-        XCTAssertFalse(matcher.matchesURL(URL(string: "https://example.com/ios-auth-callback")!))
-        XCTAssertFalse(matcher.matchesURL(URL(string: "https://6qfxa-ryaaa-aaaai-qbhsq-cai.icp0.io/post/1")!))
     }
 
-    func testCustomDomainCallbackUsesHTTPSMatcher() {
+    func testCustomDomainCallbackUsesExplicitHTTPSPath() throws {
         let config = TaggrRuntimeConfig.from(info: [
             "TAGGR_DOMAIN": "example.ngrok-free.app",
         ])
-        let callbackURL = ICInternetIdentityAuthenticator.callbackURL(callbackDomain: config.callbackDomain)
-        let matcher = ICInternetIdentityAuthenticator.callbackMatcher(callbackDomain: config.callbackDomain)
+        let callbackURL = try ICInternetIdentityAuthenticator.callbackURL(
+            callbackDomain: config.callbackDomain,
+            callbackPath: ICInternetIdentityAuthenticator.callbackPath
+        )
 
         XCTAssertEqual(callbackURL.absoluteString, "https://example.ngrok-free.app/ios-auth-callback")
-        XCTAssertTrue(matcher.matchesURL(callbackURL))
-        XCTAssertFalse(matcher.matchesURL(URL(string: "taggr://identity-callback")!))
     }
 
     func testIdentityStorePersistsOnlyMatchingRuntimeConfig() throws {
         let config = customRuntimeConfig()
         let service = "network.taggr.ios.identity.tests.\(UUID().uuidString)"
         let account = "session"
-        let store = ICIdentityStore(configuration: config.icClientConfiguration, service: service, account: account)
+        let keychain = TaggrTestKeychain()
+        let store = ICIdentityStore(
+            configuration: config.icClientConfiguration,
+            service: service,
+            account: account,
+            keychain: keychain
+        )
         let otherStore = ICIdentityStore(
             configuration: TaggrRuntimeConfig.from(info: [:]).icClientConfiguration,
             service: service,
-            account: account
+            account: account,
+            keychain: keychain
         )
         defer {
-            store.clear()
-            otherStore.clear()
+            try? store.clear()
+            try? otherStore.clear()
         }
         let session = makeAuthSession(privateKey: Curve25519.Signing.PrivateKey(), config: config)
 
         try store.save(session)
         let loaded = try XCTUnwrap(store.load())
         XCTAssertEqual(loaded.canisterId, config.canisterId)
-        XCTAssertEqual(loaded.identityProvider, config.identityURL.absoluteString)
+        XCTAssertEqual(loaded.internetIdentityURL, config.identityURL.absoluteString)
         XCTAssertEqual(loaded.derivationOrigin, config.derivationOrigin)
 
-        XCTAssertNil(otherStore.load())
+        XCTAssertThrowsError(try otherStore.load()) { error in
+            XCTAssertEqual(error as? ICClientError, .invalidPayload)
+        }
 
-        store.clear()
-        XCTAssertNil(store.load())
+        try store.clear()
+        XCTAssertNil(try store.load())
     }
 
     func testIdentityStoreUsesWhenUnlockedKeychainProtection() {
@@ -247,25 +258,94 @@ final class TaggrTests: XCTestCase {
         XCTAssertEqual(String(data: nullPreserved, encoding: .utf8), "[\"domain\",null,1]")
     }
 
-    func testCandidGoldenFixtures() {
-        XCTAssertEqual(TaggrCandid.encodeEmpty().icHexString, "4449444c0000")
+    func testCandidGoldenFixtures() throws {
+        XCTAssertEqual(try TaggrCandidAdapter.emptyArguments().encode().icHexString, "4449444c0000")
         XCTAssertEqual(
-            TaggrCandid.encodeAddPost(text: "hello", parent: 1, realm: "DEV").icHexString,
-            "4449444c066c030071017802786d006e786e716d7b6e040571010203050568656c6c6f00010100000000000000010344455600"
+            try TaggrCandidAdapter.addPostArguments(text: "hello", refs: [], parent: 1, realm: "DEV", extensionBlob: nil).encode().icHexString,
+            "4449444c066d016c030071017802786e786e716e056d7b0571000203040568656c6c6f00010100000000000000010344455600"
         )
         XCTAssertEqual(
-            TaggrCandid.encodeAddPost(
+            try TaggrCandidAdapter.addPostArguments(
                 text: "hello",
                 refs: [(id: "blob-id", offset: 0, length: 3)],
                 parent: 1,
-                realm: "DEV"
-            ).icHexString,
-            "4449444c066c030071017802786d006e786e716d7b6e040571010203050568656c6c6f0107626c6f622d696400000000000000000300000000000000010100000000000000010344455600"
+                realm: "DEV",
+                extensionBlob: nil
+            ).encode().icHexString,
+            "4449444c066d016c030071017802786e786e716e056d7b0571000203040568656c6c6f0107626c6f622d696400000000000000000300000000000000010100000000000000010344455600"
         )
         XCTAssertEqual(
-            TaggrCandid.encodeEditPost(id: 7, text: "hello", patch: "patch", realm: "DEV").icHexString,
-            "4449444c036c030071017802786d006e7105787101710207000000000000000568656c6c6f000570617463680103444556"
+            try TaggrCandidAdapter.editPostArguments(id: 7, text: "hello", refs: [], patch: "patch", realm: "DEV").encode().icHexString,
+            "4449444c036d016c030071017802786e7105787100710207000000000000000568656c6c6f000570617463680103444556"
         )
+    }
+
+    func testGeneratedLedgerBindingsProduceCandidMessages() throws {
+        let account = try ICPAccountIdentifier.defaultAccount(for: "2vxsx-fae")
+        XCTAssertEqual(try TaggrCandidAdapter.accountBalanceArguments(account: account).encode().prefix(4).icHexString, "4449444c")
+        XCTAssertEqual(try TaggrCandidAdapter.transferArguments(
+            to: account, amountE8s: 123_000_000, feeE8s: ICPAmount.feeE8s, memo: 0
+        ).encode().prefix(4).icHexString, "4449444c")
+    }
+
+    func testGeneratedCMCNotifyErrorCoversEveryProductionVariant() throws {
+        let errors: [CMCNotifyError] = [
+            .refunded(value: CMCNotifyErrorRefunded(blockIndex: 9, reason: "refunded")),
+            .invalidTransaction(value: "invalid"),
+            .transactionTooOld(value: 12),
+            .processing,
+            .other(value: CMCNotifyErrorOther(errorMessage: "other", errorCode: 5)),
+        ]
+        for error in errors {
+            let decoded = try CMCNotifyError(candidValue: error.candidValue)
+            XCTAssertFalse(TaggrCandidAdapter.notifyErrorMessage(decoded).isEmpty)
+        }
+    }
+
+    func testLedgerTransferNestedErrorRecordsDecodeWithoutFlattening() throws {
+        let tokenFields = [CandidField("e8s", type: .nat64)]
+        let badFeeFields = [CandidField("expected_fee", type: .record(tokenFields))]
+        let insufficientFields = [CandidField("balance", type: .record(tokenFields))]
+        let errorFields = [
+            CandidField("BadFee", type: .record(badFeeFields)),
+            CandidField("InsufficientFunds", type: .record(insufficientFields)),
+        ]
+        let resultFields = [
+            CandidField("Ok", type: .nat64),
+            CandidField("Err", type: .variant(errorFields)),
+        ]
+
+        func reply(tag: String, payloadFields: [CandidField], payloadName: String, e8s: UInt64) throws -> CandidReply {
+            let tokens = CandidValue.record(tokenFields, [Candid.fieldID("e8s"): .nat64(e8s)])
+            let payload = CandidValue.record(payloadFields, [Candid.fieldID(payloadName): tokens])
+            let error = CandidValue.variant(try CandidVariant(fields: errorFields, tag: tag, value: payload))
+            let result = CandidValue.variant(try CandidVariant(fields: resultFields, tag: "Err", value: error))
+            return CandidReply(values: [try CandidTypedValue(type: .variant(resultFields), value: result)])
+        }
+
+        XCTAssertThrowsError(try TaggrCandidAdapter.transferResult(
+            reply(tag: "BadFee", payloadFields: badFeeFields, payloadName: "expected_fee", e8s: 10_000)
+        )) { XCTAssertTrue($0.localizedDescription.contains("0.0001")) }
+        XCTAssertThrowsError(try TaggrCandidAdapter.transferResult(
+            reply(tag: "InsufficientFunds", payloadFields: insufficientFields, payloadName: "balance", e8s: 25_000)
+        )) { XCTAssertTrue($0.localizedDescription.contains("0.00025")) }
+    }
+
+    func testCanisterStatusRejectsNatOverflow() throws {
+        let tooLarge = try CandidNat("18446744073709551616")
+        let status = try Self.managementCanisterStatus(cycles: tooLarge)
+        XCTAssertThrowsError(try TaggrCandidAdapter.canisterStatus(status))
+    }
+
+    func testBucketHeadersKeepAnonymousFieldIDsZeroAndOne() throws {
+        let encoded = try TaggrCandidAdapter.bucketHTTPRequestArguments(offset: 1, length: 2).encode()
+        let reply = try CandidDecoder().decode(encoded)
+        guard case .record(_, let request) = reply.values[0].value,
+              case .vector(let headerType, _) = request[Candid.fieldID("headers")],
+              case .record(let fields) = headerType else {
+            return XCTFail("bucket headers are not vec record")
+        }
+        XCTAssertEqual(fields.map(\.id), [0, 1])
     }
 
     func testEditPatchBuildsFullReplacementPatches() {
@@ -305,7 +385,7 @@ final class TaggrTests: XCTestCase {
     func testAddPostReturnsCreatedPostId() async throws {
         let api = makeStubbedAPI { request in
             let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
-            return (response, Self.queryReply(Self.candidResultOkNat64(77)))
+            return (response, Self.queryReply(Self.candidAddPostResultOk(77)))
         }
 
         let postId = try await api.addPost(
@@ -499,36 +579,75 @@ final class TaggrTests: XCTestCase {
     }
 
     func testStorageCandidEncodersProduceMessages() throws {
-        XCTAssertEqual(try TaggrCandid.encodeCanisterStatus(canisterId: "bkyz2-fmaaa-aaaaa-qaaaq-cai").prefix(4).icHexString, "4449444c")
-        let createArg = try TaggrCandid.encodeNotifyCreateCanister(
+        XCTAssertEqual(try TaggrCandidAdapter.canisterStatusArguments(canisterId: "bkyz2-fmaaa-aaaaa-qaaaq-cai").encode().prefix(4).icHexString, "4449444c")
+        let createArg = try TaggrCandidAdapter.notifyCreateCanisterArguments(
             blockIndex: 7,
             controller: "swqvp-ecw6b-psba6-673lj-2bnf4-z4n66-6mgzy-sbdaq-ksjck-m5zoz-wae",
             blackhole: TaggrAPI.blackholeCanisterId
-        )
+        ).encode()
         XCTAssertEqual(createArg.prefix(4).icHexString, "4449444c")
-        XCTAssertTrue(createArg.icHexString.contains("010c011d56f05f2083defed69d05a5e678df7bcc3671208c1054922533b9766c02"))
+        let decodedCreate = try CandidDecoder().decode(createArg)
+        let create = try CandidRecord(decodedCreate.values[0].value)
+        guard case .optional(_, let settingsValue)? = create.fields[Candid.fieldID("settings")],
+              let settingsValue,
+              case .record(_, let settings) = settingsValue,
+              case .optional(_, let controllersValue)? = settings[Candid.fieldID("controllers")],
+              let controllersValue,
+              case .vector(_, let controllers) = controllersValue else {
+            return XCTFail("notify_create_canister settings/controllers shape is invalid")
+        }
         XCTAssertEqual(
-            try TaggrCandid.encodeNotifyTopUp(blockIndex: 7, canisterId: "bkyz2-fmaaa-aaaaa-qaaaq-cai").prefix(4).icHexString,
+            try controllers.map { try CandidPrincipal(candidValue: $0).text },
+            [
+                "swqvp-ecw6b-psba6-673lj-2bnf4-z4n66-6mgzy-sbdaq-ksjck-m5zoz-wae",
+                TaggrAPI.blackholeCanisterId,
+            ]
+        )
+        XCTAssertEqual(
+            try TaggrCandidAdapter.notifyTopUpArguments(blockIndex: 7, canisterId: "bkyz2-fmaaa-aaaaa-qaaaq-cai").encode().prefix(4).icHexString,
             "4449444c"
         )
         XCTAssertEqual(
-            try TaggrCandid.encodeUpdateInternalControllers([TaggrAPI.blackholeCanisterId]).prefix(4).icHexString,
+            try TaggrCandidAdapter.updateInternalControllersArguments([TaggrAPI.blackholeCanisterId]).encode().prefix(4).icHexString,
             "4449444c"
         )
     }
 
+    func testCanisterStatusUsesManagementRequestIDAndBucketRoutingID() async throws {
+        let bucketId = "bkyz2-fmaaa-aaaaa-qaaaq-cai"
+        var requestPath: String?
+        var requestCanister: Data?
+        let api = makeStubbedAPI { request in
+            requestPath = request.url?.path
+            if let body = Self.requestBody(from: request),
+               let envelope = self.cborMap(from: body),
+               case .map(let content)? = self.value(named: "content", in: envelope),
+               case .bytes(let canister)? = self.value(named: "canister_id", in: content) {
+                requestCanister = canister
+            }
+            let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
+            return (response, Self.queryReply(try Self.candidCanisterStatus()))
+        }
+
+        let status = try await api.storageCanisterStatus(
+            bucketId,
+            identity: makeAuthSession(privateKey: Curve25519.Signing.PrivateKey())
+        )
+
+        XCTAssertEqual(status.status, "running")
+        XCTAssertTrue(requestPath?.contains("/canister/\(bucketId)/query") == true)
+        XCTAssertEqual(requestCanister, ICPrincipal.parse(TaggrAPI.managementCanisterId))
+    }
+
     func testInstallBucketCodeCandidMatchesWebIDL() throws {
-        let encoded = try TaggrCandid.encodeInstallBucketCode(
+        let encoded = try TaggrCandidAdapter.installCodeArguments(
             canisterId: "a5dhi-k7777-77775-aaabq-cai",
             wasm: Data([0, 1, 2]),
             userPrincipal: "swqvp-ecw6b-psba6-673lj-2bnf4-z4n66-6mgzy-sbdaq-ksjck-m5zoz-wae",
-            mode: "install"
-        )
-
-        XCTAssertEqual(
-            encoded.icHexString,
-            "4449444c096d7b6b0285a19bb8047fb490a1d90a7f6e016e7e6c02dceaaefa0202c0a09bde05036e046b03c8bb8a707f9ce9c69906059baaebec087f6e786c05d6fca70200a79fc97e00e3a683c30406b3c4b1f20468ca9998b40d070108294449444c016d68010001011d56f05f2083defed69d05a5e678df7bcc3671208c1054922533b9766c020300010202010affffffffffa00003010100"
-        )
+            mode: .install
+        ).encode()
+        XCTAssertEqual(encoded.prefix(4).icHexString, "4449444c")
+        XCTAssertThrowsError(try TaggrCandidAdapter.installMode("unknown"))
     }
 
     func testICPAccountBalanceQueriesLedgerCanister() async throws {
@@ -548,7 +667,7 @@ final class TaggrTests: XCTestCase {
         XCTAssertTrue(calls.first?.path.contains(TaggrAPI.icpLedgerCanisterId) == true)
         XCTAssertEqual(
             calls.first?.arg,
-            TaggrCandid.encodeICPAccountBalance(account: try ICPAccountIdentifier.defaultAccount(for: "2vxsx-fae"))
+            try TaggrCandidAdapter.accountBalanceArguments(account: ICPAccountIdentifier.defaultAccount(for: "2vxsx-fae")).encode()
         )
     }
 
@@ -560,7 +679,7 @@ final class TaggrTests: XCTestCase {
                 calls.append((call.method, call.arg, request.url?.path ?? ""))
             }
             let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
-            return (response, Self.queryReply(Self.candidResultOkNat64(77)))
+            return (response, Self.queryReply(Self.candidLedgerTransferResultOk(77)))
         }
 
         let block = try await api.transferICP(
@@ -574,11 +693,12 @@ final class TaggrTests: XCTestCase {
         XCTAssertTrue(calls.first?.path.contains(TaggrAPI.icpLedgerCanisterId) == true)
         XCTAssertEqual(
             calls.first?.arg,
-            TaggrCandid.encodeICPTransfer(
+            try TaggrCandidAdapter.transferArguments(
                 to: try ICPAccountIdentifier.parse(recipient),
                 amountE8s: 123_000_000,
-                feeE8s: ICPAmount.feeE8s
-            )
+                feeE8s: ICPAmount.feeE8s,
+                memo: 0
+            ).encode()
         )
     }
 
@@ -609,7 +729,7 @@ final class TaggrTests: XCTestCase {
             signature: Data([9, 10]),
             delegation: delegation
         )
-        guard case .map(let values)? = ICCBOR.decode(envelope) else {
+        guard let values = cborMap(from: envelope) else {
             return XCTFail("Envelope is not a CBOR map.")
         }
         XCTAssertTrue(values.contains { $0.0 == .text("content") })
@@ -623,7 +743,7 @@ final class TaggrTests: XCTestCase {
         let session = makeAuthSession(privateKey: privateKey)
         let content: ICCBOR.Value = .map([(.text("request_type"), .text("query"))])
         let envelope = try ICClient.signedEnvelope(content: content, identity: session)
-        guard case .map(let values)? = ICCBOR.decode(envelope) else {
+        guard let values = cborMap(from: envelope) else {
             return XCTFail("Envelope is not a CBOR map.")
         }
         XCTAssertEqual(value(named: "sender_pubkey", in: values), .bytes(session.delegation.publicKey))
@@ -635,7 +755,7 @@ final class TaggrTests: XCTestCase {
         let session = makeAuthSession(privateKey: privateKey)
         let content: ICCBOR.Value = .map([(.text("request_type"), .text("query"))])
         let envelope = try ICClient.signedEnvelope(content: content, identity: session)
-        guard case .map(let values)? = ICCBOR.decode(envelope),
+        guard let values = cborMap(from: envelope),
               case .bytes(let signature)? = value(named: "sender_sig", in: values),
               case .bytes(let senderPublicKey)? = value(named: "sender_pubkey", in: values) else {
             return XCTFail("Envelope signature is missing.")
@@ -643,7 +763,7 @@ final class TaggrTests: XCTestCase {
         XCTAssertEqual(senderPublicKey, session.delegation.publicKey)
         let requestId = ICRequestID.hash(of: content)
         let challenge = Data([0x0a]) + Data("ic-request".utf8) + requestId
-        let rawPublicKey = Data(session.sessionPublicKey.dropFirst(ICIdentitySession.ed25519DERPrefix.count))
+        let rawPublicKey = Data(session.sessionPublicKey.dropFirst(ICRC167Codec.ed25519DERPrefix.count))
         let publicKey = try Curve25519.Signing.PublicKey(rawRepresentation: rawPublicKey)
         XCTAssertTrue(publicKey.isValidSignature(signature, for: challenge))
     }
@@ -655,7 +775,7 @@ final class TaggrTests: XCTestCase {
             let response = HTTPURLResponse(url: request.url!, statusCode: 202, httpVersion: nil, headerFields: nil)!
             if request.url?.path.hasSuffix("/call") == true {
                 guard let body = Self.requestBody(from: request),
-                      case .map(let envelope)? = ICCBOR.decode(body),
+                      let envelope = self.cborMap(from: body),
                       let content = self.value(named: "content", in: envelope) else {
                     throw TaggrAPIError.invalidResponse("call envelope")
                 }
@@ -682,7 +802,7 @@ final class TaggrTests: XCTestCase {
         )
 
         guard let readStateBody,
-              case .map(let envelope)? = ICCBOR.decode(readStateBody),
+              let envelope = cborMap(from: readStateBody),
               case .map(let content)? = value(named: "content", in: envelope) else {
             return XCTFail("read_state envelope was not sent.")
         }
@@ -766,11 +886,6 @@ final class TaggrTests: XCTestCase {
         try await api.validateIdentity(identity, requestCanisterId: bucketId)
     }
 
-    func testCBORReplyArgReadsTaggedBoundaryResponse() {
-        let response = Data(icHex: "d9d9f7bf66737461747573677265706c696564657265706c79a16361726743010203ff")!
-        XCTAssertEqual(ICCBOR.decodeReplyArg(response), Data([1, 2, 3]))
-    }
-
     func testPrincipalTextRoundTripAndRejectsBadChecksum() throws {
         let blob = Data([1, 2, 3, 4, 5])
         let text = ICPrincipal.text(from: blob)
@@ -779,15 +894,6 @@ final class TaggrTests: XCTestCase {
         let replacement = text.hasSuffix("a") ? "b" : "a"
         let tampered = String(text.dropLast()) + replacement
         XCTAssertNil(ICPrincipal.parse(tampered))
-    }
-
-    func testCBORRejectedResponseReadsMessage() {
-        let response = ICCBOR.encode(.map([
-            (.text("status"), .text("rejected")),
-            (.text("reject_code"), .unsigned(5)),
-            (.text("reject_message"), .text("denied")),
-        ]))
-        XCTAssertEqual(ICCBOR.decodeRejectMessage(response), "denied")
     }
 
     func testCBORDecodesNestedByteSlice() {

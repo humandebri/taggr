@@ -14,8 +14,9 @@ struct TaggrPostBodyView: View {
     }
 
     var body: some View {
+        let blocks = TaggrPostBodyParser.blocks(in: text)
         VStack(alignment: .leading, spacing: 16) {
-            ForEach(Array(TaggrPostBodyParser.blocks(in: text).enumerated()), id: \.offset) { _, block in
+            ForEach(Array(blocks.enumerated()), id: \.offset) { _, block in
                 switch block {
                 case .markdown(let markdown):
                     TaggrMarkdownText(text: markdown)
@@ -25,11 +26,23 @@ struct TaggrPostBodyView: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .frame(maxHeight: Self.maximumHeight(for: maximumLines), alignment: .top)
+        // Keep embedded players intact; the old feed line cap must not crop a player.
+        .frame(
+            maxHeight: Self.maximumHeight(
+                for: maximumLines,
+                containsYouTube: blocks.contains { if case .youtube = $0 { true } else { false } }
+            ),
+            alignment: .top
+        )
         .clipped()
     }
 
     static func maximumHeight(for lines: Int?) -> CGFloat? {
+        maximumHeight(for: lines, containsYouTube: false)
+    }
+
+    static func maximumHeight(for lines: Int?, containsYouTube: Bool) -> CGFloat? {
+        guard !containsYouTube else { return nil }
         guard let lines, lines > 0 else { return nil }
         let dynamicLineHeight = UIFontMetrics(forTextStyle: .body).scaledValue(for: 22)
         return dynamicLineHeight * CGFloat(lines)

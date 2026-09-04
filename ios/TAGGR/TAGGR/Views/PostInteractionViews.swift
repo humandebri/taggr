@@ -415,9 +415,11 @@ struct InlineReplyComposer: View {
     @StateObject private var imageImport = ImageImportCoordinator()
     @State private var selectedPhotos: [PhotosPickerItem] = []
     @State private var imageImportWarning: String?
+    @State private var imageInsertionSegmentID: Int?
+    @State private var documentID = UUID()
     @State private var isSubmitting = false
     @State private var clearConfirmationPresented = false
-    @FocusState private var isFocused: Bool
+    @FocusState private var focusedTextSegmentID: Int?
 
     init(
         post: TaggrPost,
@@ -440,26 +442,21 @@ struct InlineReplyComposer: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            ZStack(alignment: .topLeading) {
-                TextEditor(text: $draft.text)
-                    .scrollContentBackground(.hidden)
-                    .font(.body)
-                    .foregroundStyle(TaggrTheme.text)
-                    .frame(minHeight: 72)
-                    .padding(8)
-                    .background(TaggrTheme.darkPanel)
-                    .clipShape(RoundedRectangle(cornerRadius: 7))
-                    .tint(TaggrTheme.clickable)
-                    .focused($isFocused)
-                if draft.text.isEmpty {
-                    Text("Reply here...")
-                        .font(.body)
-                        .foregroundStyle(TaggrTheme.secondaryText)
-                        .padding(.top, 16)
-                        .padding(.leading, 13)
-                        .allowsHitTesting(false)
-                }
-            }
+            ComposePostDocumentEditor(
+                text: $draft.text,
+                draftImages: draft.images,
+                existingImages: [:],
+                placeholder: "Reply here...",
+                documentID: documentID,
+                focusedTextSegmentID: $focusedTextSegmentID,
+                imageInsertionSegmentID: $imageInsertionSegmentID,
+                removeImage: removeImageMarker,
+                moveImage: moveImageMarker,
+                moveImageToTextSegment: moveImageMarker
+            )
+            .padding(8)
+            .background(TaggrTheme.darkPanel)
+            .clipShape(RoundedRectangle(cornerRadius: 7))
 
             if let warning = draft.restorationWarning {
                 ComposePostImageWarning(
@@ -467,6 +464,19 @@ struct InlineReplyComposer: View {
                     showCreateStorage: false,
                     createStorage: {}
                 )
+            }
+            if draft.submissionNeedsVerification {
+                ComposePostImageWarning(
+                    text: "The last reply request may have been accepted, but its result was not confirmed. Check the thread before choosing what to do with this draft.",
+                    showCreateStorage: false,
+                    createStorage: {}
+                )
+                Button("I confirmed it was posted", action: discardConfirmedSubmission)
+                    .font(.footnote.weight(.bold))
+                    .foregroundStyle(TaggrTheme.clickable)
+                Button("Edit and retry", action: resumeSubmission)
+                    .font(.footnote.weight(.bold))
+                    .foregroundStyle(TaggrTheme.clickable)
             }
             if let imageWarning {
                 ComposePostImageWarning(
@@ -482,10 +492,6 @@ struct InlineReplyComposer: View {
                     createStorage: {}
                 )
             }
-            if !draft.images.isEmpty {
-                ComposePostDraftImageList(images: draft.images, removeImage: removeImage)
-            }
-
             HStack(alignment: .center, spacing: 8) {
                 ComposePostAttachmentBar(
                     text: $draft.text,
@@ -514,6 +520,7 @@ struct InlineReplyComposer: View {
             loadPhotos(items)
         }
         .onChange(of: draft.text) { _, _ in
+            draft.contentDidChange()
             draft.scheduleSave()
         }
         .onChange(of: draft.hasChanges) { _, hasChanges in
@@ -546,7 +553,7 @@ struct InlineReplyComposer: View {
                 cancelImageImport()
                 Task {
                     await draft.discard()
-                    isFocused = false
+                    focusedTextSegmentID = nil
                 }
             }
             Button("Cancel", role: .cancel) {}
@@ -559,6 +566,7 @@ struct InlineReplyComposer: View {
 
     var canSubmit: Bool {
         draft.isLoaded && state.currentUser != nil && !composedBody.isEmpty && imageWarning == nil
+            && !draft.submissionNeedsVerification
             && !imageImport.isImporting && !isSubmitting && !state.isBusy
     }
 
@@ -594,7 +602,9 @@ struct InlineReplyComposer: View {
     func loadPhotos(_ items: [PhotosPickerItem]) {
         guard !items.isEmpty, !imageImport.isImporting else { return }
         imageImportWarning = nil
-        let maxBytes = state.cache?.config?.maxBlobSizeBytes ?? ImageDrafts.maxImageBytes
+        let maxBytes = ImageDrafts.postImageMaximumBytes(
+            serverLimit: state.cache?.config?.maxBlobSizeBytes
+        )
         imageImport.start(
             operation: {
                 await ImageDrafts.importPhotos(items, maxBytes: maxBytes)
@@ -607,7 +617,7 @@ struct InlineReplyComposer: View {
                     existingIDs: Set(draft.images.map(\.id))
                 )
                 if !loaded.isEmpty {
-                    await draft.addImages(loaded)
+                    await draft.addImages(loaded, afterTextSegmentID: imageInsertionSegmentID)
                 }
             }
         )
@@ -619,8 +629,36 @@ struct InlineReplyComposer: View {
         imageImportWarning = nil
     }
 
-    func removeImage(_ image: TaggrDraftImage) {
-        Task { await draft.removeImage(image) }
+    func removeImage(_ image: TaggrDraftImage, occurrence: Int) {
+        Task { await draft.removeImage(image, occurrence: occurrence) }
+    }
+
+    func removeImageMarker(_ occurrence: Int, blobID: String) {
+        if let image = draft.images.first(where: { $0.id == blobID }) {
+            removeImage(image, occurrence: occurrence)
+        } else {
+            Task { await draft.removeImageMarker(occurrence: occurrence) }
+        }
+    }
+
+    func moveImageMarker(_ occurrence: Int, before target: Int?) {
+        Task { await draft.moveImageMarker(occurrence: occurrence, before: target) }
+    }
+
+    func moveImageMarker(_ occurrence: Int, afterTextSegmentID: Int) {
+        Task { await draft.moveImageMarker(occurrence: occurrence, afterTextSegmentID: afterTextSegmentID) }
+    }
+
+    func discardConfirmedSubmission() {
+        Task {
+            cancelImageImport()
+            await draft.discard()
+            focusedTextSegmentID = nil
+        }
+    }
+
+    func resumeSubmission() {
+        Task { await draft.clearSubmissionVerification() }
     }
 
     func submit() {
@@ -629,12 +667,20 @@ struct InlineReplyComposer: View {
         let images = draft.images
         isSubmitting = true
         Task {
-            await state.submitPost(text: body, parent: post.id, realm: post.realm, images: images, reloadMode: selectedMode)
+            let outcome = await state.submitPost(
+                text: body,
+                parent: post.id,
+                realm: post.realm,
+                images: images,
+                reloadMode: selectedMode
+            )
             isSubmitting = false
-            if state.errorMessage == nil {
+            if outcome == .submitted {
                 cancelImageImport()
                 await draft.discard()
-                isFocused = false
+                focusedTextSegmentID = nil
+            } else if outcome == .uncertain {
+                await draft.markSubmissionNeedsVerification()
             }
         }
     }

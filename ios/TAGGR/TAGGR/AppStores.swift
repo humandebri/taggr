@@ -46,12 +46,25 @@ struct RealmPostingPreferences {
 @MainActor
 @Observable
 final class NavigationStore {
+    private static let homeFeedModeKey = "taggr.home-feed-mode"
+    private let defaults: UserDefaults
+
     var route: TaggrRoute = .feed(.hot)
     var returnFeedMode: TaggrFeedMode = .hot
     var lastHomeFeedMode: TaggrFeedMode = .hot
+    private(set) var hasStoredHomeFeedMode = false
     var postReturnRoutesByPostID: [Int: TaggrRoute] = [:]
     var profileReturnRoute: TaggrRoute = .feed(.hot)
     var routeLoadRevision = 0
+
+    init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
+        if let storedValue = defaults.string(forKey: Self.homeFeedModeKey),
+           let storedMode = Self.feedMode(from: storedValue) {
+            lastHomeFeedMode = storedMode
+            hasStoredHomeFeedMode = true
+        }
+    }
 
     func setReturnFeedMode(_ mode: TaggrFeedMode) {
         returnFeedMode = mode
@@ -61,8 +74,28 @@ final class NavigationStore {
         switch mode {
         case .hot, .latest, .personal:
             lastHomeFeedMode = mode
+            defaults.set(Self.rawValue(for: mode), forKey: Self.homeFeedModeKey)
+            hasStoredHomeFeedMode = true
         case .realm, .tags:
             break
+        }
+    }
+
+    private static func rawValue(for mode: TaggrFeedMode) -> String {
+        switch mode {
+        case .hot: return "hot"
+        case .latest: return "latest"
+        case .personal: return "personal"
+        case .realm, .tags: return "hot"
+        }
+    }
+
+    private static func feedMode(from rawValue: String) -> TaggrFeedMode? {
+        switch rawValue {
+        case "hot": return .hot
+        case "latest": return .latest
+        case "personal": return .personal
+        default: return nil
         }
     }
 

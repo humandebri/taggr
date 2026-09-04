@@ -7,6 +7,7 @@ struct YouTubeEmbedView: View {
 
     var body: some View {
         YouTubeWebView(videoID: preview.id)
+            .frame(maxWidth: .infinity)
             .aspectRatio(16.0 / 9.0, contentMode: .fit)
             .clipShape(RoundedRectangle(cornerRadius: 10))
             .accessibilityElement(children: .ignore)
@@ -43,14 +44,14 @@ private struct YouTubeWebView: UIViewRepresentable {
         func load(videoID: String, in webView: WKWebView) {
             guard loadedVideoID != videoID else { return }
             loadedVideoID = videoID
-            let html = """
-            <!doctype html>
-            <html><head><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
-            <body style="margin:0;background:#000;overflow:hidden">
-            <iframe src="https://www.youtube.com/embed/\(videoID)" style="border:0;width:100vw;height:100vh" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>
-            </body></html>
-            """
-            webView.loadHTMLString(html, baseURL: URL(string: "https://www.youtube.com"))
+            var components = URLComponents(string: "https://www.youtube.com/embed/\(videoID)")
+            components?.queryItems = [
+                URLQueryItem(name: "playsinline", value: "1"),
+                URLQueryItem(name: "rel", value: "0"),
+                URLQueryItem(name: "origin", value: "https://www.youtube.com")
+            ]
+            guard let url = components?.url else { return }
+            webView.load(URLRequest(url: url))
         }
     }
 }

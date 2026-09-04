@@ -1,8 +1,9 @@
 import XCTest
 import AuthenticationServices
+import CBlst
 import CryptoKit
 import UIKit
-import ICNativeClient
+@testable import ICNativeClient
 @testable import TAGGR
 
 extension TaggrTests {
@@ -226,7 +227,7 @@ extension TaggrTests {
                 }
                 return (response, Self.queryReply(Data(#"{"Ok":{"e8s":100000000,"paid_e8s":100000000,"paid":true,"account":\#(Array(account).description)}}"#.utf8)))
             case "transfer":
-                return (response, Self.queryReply(Self.candidResultOkNat64(88)))
+                return (response, Self.queryReply(Self.candidLedgerTransferResultOk(88)))
             case "user":
                 return (response, Self.queryReply(Self.currentUserFixture()))
             case "account_balance":
@@ -270,7 +271,7 @@ extension TaggrTests {
                 }
                 return (response, Self.queryReply(Data("[]".utf8)))
             }
-            return (response, Self.queryReply(Self.candidResultOkNat64(42)))
+            return (response, Self.queryReply(Self.candidAddPostResultOk(42)))
         }
         let state = TaggrAppCoordinator(api: api)
         state.authSession = makeAuthSession(privateKey: Curve25519.Signing.PrivateKey())
@@ -279,14 +280,16 @@ extension TaggrTests {
 
         XCTAssertNil(state.errorMessage)
         XCTAssertEqual(calls.first?.method, "add_post")
+        let extensionBlob = Data(#"{"Repost":42}"#.utf8)
         XCTAssertEqual(
             calls.first?.arg,
-            TaggrCandid.encodeAddPost(
+            try TaggrCandidAdapter.addPostArguments(
                 text: "boost",
+                refs: [],
                 parent: nil,
                 realm: "DEV",
-                extensionBlob: TaggrCandid.encodeRepostExtension(postId: 42)
-            )
+                extensionBlob: extensionBlob
+            ).encode()
         )
     }
 
@@ -332,37 +335,6 @@ extension TaggrTests {
         XCTAssertEqual(state.feed, [post])
     }
 
-    func testReadStateCertificateStatusReadsReply() throws {
-        let requestId = Data(repeating: 7, count: 32)
-        let reply = Data([1, 2, 3])
-        let tree = certificateTree(requestId: requestId, status: "replied", reply: reply)
-        let readState = readStateResponse(tree: tree)
-        let result = try ICCBOR.certificateStatusArg(from: readState, requestId: requestId)
-        XCTAssertEqual(try result?.get(), reply)
-    }
-
-    func testReadStateCertificateStatusMapsRejected() throws {
-        let requestId = Data(repeating: 7, count: 32)
-        let tree = certificateTree(requestId: requestId, status: "rejected", rejectMessage: "denied")
-        let readState = readStateResponse(tree: tree)
-        let result = try ICCBOR.certificateStatusArg(from: readState, requestId: requestId)
-        guard case .failure(let error)? = result,
-              case ICClientError.rejected(let message) = error else {
-            return XCTFail("Expected rejected status.")
-        }
-        XCTAssertEqual(message, "denied")
-    }
-
-    func testReadStateCertificatePendingStatusesReturnNil() throws {
-        let requestId = Data(repeating: 7, count: 32)
-        for status in ["received", "processing", "unknown"] {
-            let tree = certificateTree(requestId: requestId, status: status)
-            let readState = readStateResponse(tree: tree)
-            let result = try ICCBOR.certificateStatusArg(from: readState, requestId: requestId)
-            XCTAssertNil(try result?.get())
-        }
-    }
-
     func customRuntimeConfig() -> TaggrRuntimeConfig {
         TaggrRuntimeConfig.from(info: [
             "TAGGR_CANISTER_ID": "bkyz2-fmaaa-aaaaa-qaaaq-cai",
@@ -392,75 +364,63 @@ extension TaggrTests {
         config: TaggrRuntimeConfig = .from(info: [:]),
         targets: [Data]? = nil
     ) -> ICAuthSession {
-        let sessionPublicKey = ICIdentitySession.derPublicKey(from: privateKey.publicKey.rawRepresentation)
-        let rootPublicKey = ICIdentitySession.derPublicKey(from: Curve25519.Signing.PrivateKey().publicKey.rawRepresentation)
-        let expiration = UInt64.max
+        let rootPrivateKey = Curve25519.Signing.PrivateKey()
+        let sessionPublicKey = ICRC167Codec.derPublicKey(from: privateKey.publicKey.rawRepresentation)
+        let rootPublicKey = ICRC167Codec.derPublicKey(from: rootPrivateKey.publicKey.rawRepresentation)
+        let requestedAt = Date()
+        let ttl = config.icClientConfiguration.delegationTTLNanoseconds
+        let requestedAtNanoseconds = UInt64(requestedAt.timeIntervalSince1970 * 1_000_000_000)
+        let expiration = requestedAtNanoseconds + ttl
         let delegation = ICDelegationChain.SignedDelegation.Delegation(
             publicKey: sessionPublicKey,
             expiration: expiration,
             targets: targets
         )
+        var signableFields: [(ICCBOR.Value, ICCBOR.Value)] = [
+            (.text("pubkey"), .bytes(delegation.publicKey)),
+            (.text("expiration"), .unsigned(delegation.expiration)),
+        ]
+        if let targets {
+            signableFields.append((.text("targets"), .array(targets.map(ICCBOR.Value.bytes))))
+        }
+        let signable = Data([0x1a])
+            + Data("ic-request-auth-delegation".utf8)
+            + ICRequestID.hash(of: .map(signableFields))
         let chain = ICDelegationChain(
             publicKey: rootPublicKey,
             delegations: [
-                .init(delegation: delegation, signature: Data(repeating: 7, count: 64)),
+                .init(delegation: delegation, signature: try! rootPrivateKey.signature(for: signable)),
             ]
         )
-        return ICAuthSession(
-            principal: "2vxsx-fae",
+        let principal = ICPrincipal.text(from: ICPrincipal.selfAuthenticatingPublicKey(rootPublicKey))
+        return ICAuthSession(storage: ICStoredAuthSession(
+            formatVersion: ICAuthSession.currentFormatVersion,
+            principal: principal,
             canisterId: config.canisterId,
-            identityProvider: config.identityURL.absoluteString,
+            internetIdentityURL: config.identityURL.absoluteString,
             derivationOrigin: config.derivationOrigin,
             sessionPublicKey: sessionPublicKey,
             sessionPrivateKey: privateKey.rawRepresentation,
             delegation: chain,
-            createdAt: Date()
-        )
+            requestedAt: requestedAt,
+            maxTimeToLiveNanoseconds: ttl
+        ))
     }
 
     nonisolated static func candidResultErr(_ message: String) -> Data {
-        let errId = candidFieldId("Err")
-        let okId = candidFieldId("Ok")
-        let fields: [(UInt64, Int64)] = errId < okId
-            ? [(errId, Int64(-15)), (okId, Int64(-8))]
-            : [(okId, Int64(-8)), (errId, Int64(-15))]
-        let selected = fields.firstIndex { $0.0 == errId } ?? 0
-        var data = Data("DIDL".utf8)
-        data.append(leb128(1))
-        data.append(sleb128(-21))
-        data.append(leb128(UInt64(fields.count)))
-        for field in fields {
-            data.append(leb128(field.0))
-            data.append(sleb128(field.1))
-        }
-        data.append(leb128(1))
-        data.append(sleb128(0))
-        data.append(leb128(UInt64(selected)))
-        data.append(leb128(UInt64(message.utf8.count)))
-        data.append(Data(message.utf8))
-        return data
+        try! CandidArguments([CandidTypedValue(TaggrResult.err(value: message))]).encode()
     }
 
-    nonisolated static func candidResultOkNat64(_ value: UInt64) -> Data {
-        let errId = candidFieldId("Err")
-        let okId = candidFieldId("Ok")
-        let fields: [(UInt64, Int64)] = errId < okId
-            ? [(errId, Int64(-15)), (okId, Int64(-8))]
-            : [(okId, Int64(-8)), (errId, Int64(-15))]
-        let selected = fields.firstIndex { $0.0 == okId } ?? 0
-        var data = Data("DIDL".utf8)
-        data.append(leb128(1))
-        data.append(sleb128(-21))
-        data.append(leb128(UInt64(fields.count)))
-        for field in fields {
-            data.append(leb128(field.0))
-            data.append(sleb128(field.1))
-        }
-        data.append(leb128(1))
-        data.append(sleb128(0))
-        data.append(leb128(UInt64(selected)))
-        withUnsafeBytes(of: value.littleEndian) { data.append(contentsOf: $0) }
-        return data
+    nonisolated static func candidAddPostResultOk(_ value: UInt64) -> Data {
+        try! CandidArguments([CandidTypedValue(TaggrResult.ok(value: value))]).encode()
+    }
+
+    nonisolated static func candidEditPostResultOk() -> Data {
+        try! CandidArguments([CandidTypedValue(TaggrResult1.ok)]).encode()
+    }
+
+    nonisolated static func candidLedgerTransferResultOk(_ value: UInt64) -> Data {
+        try! CandidArguments([CandidTypedValue(LedgerTransferResult.ok(value: value))]).encode()
     }
 
     nonisolated static func candidTokens(_ e8s: UInt64) -> Data {
@@ -474,6 +434,53 @@ extension TaggrTests {
         data.append(sleb128(0))
         withUnsafeBytes(of: e8s.littleEndian) { data.append(contentsOf: $0) }
         return data
+    }
+
+    nonisolated static func candidCanisterStatus() throws -> Data {
+        let status = try managementCanisterStatus(cycles: CandidNat("2"))
+        return try CandidArguments([CandidTypedValue(status)]).encode()
+    }
+
+    nonisolated static func managementCanisterStatus(cycles: CandidNat) throws -> ManagementCanisterStatus {
+        let zero = try CandidNat("0")
+        return ManagementCanisterStatus(
+            memoryMetrics: ManagementMemoryMetrics(
+                wasmBinarySize: zero,
+                wasmChunkStoreSize: zero,
+                canisterHistorySize: zero,
+                stableMemorySize: zero,
+                snapshotsSize: zero,
+                wasmMemorySize: zero,
+                globalMemorySize: zero,
+                customSectionsSize: zero
+            ),
+            status: .running,
+            memorySize: try CandidNat("1"),
+            readyForMigration: false,
+            version: 0,
+            cycles: cycles,
+            settings: ManagementDefiniteCanisterSettings(
+                freezingThreshold: zero,
+                wasmMemoryThreshold: zero,
+                environmentVariables: [],
+                controllers: [],
+                reservedCyclesLimit: zero,
+                logVisibility: .controllers,
+                snapshotVisibility: .controllers,
+                wasmMemoryLimit: zero,
+                memoryAllocation: zero,
+                computeAllocation: zero
+            ),
+            queryStats: ManagementQueryStats(
+                responsePayloadBytesTotal: zero,
+                numInstructionsTotal: zero,
+                numCallsTotal: zero,
+                requestPayloadBytesTotal: zero
+            ),
+            idleCyclesBurnedPerDay: try CandidNat("3"),
+            moduleHash: nil,
+            reservedCycles: zero
+        )
     }
 
     nonisolated static func candidFieldId(_ label: String) -> UInt64 {
@@ -529,16 +536,148 @@ extension TaggrTests {
         _ handler: @escaping (URLRequest) throws -> (HTTPURLResponse, Data),
         config: TaggrRuntimeConfig
     ) -> TaggrAPI {
-        TaggrURLProtocolStub.requestHandler = handler
+        let root = TaggrTestBLSKey(seed: 1)
+        let node = Curve25519.Signing.PrivateKey()
+        let nodeId = Data([0xaa])
+        let subnetId = Data([0x01, 0x02, 0x03])
+        let subnetCertificate = try! signedSubnetCertificate(
+            root: root,
+            subnetId: subnetId,
+            nodeId: nodeId,
+            node: node
+        )
+        TaggrURLProtocolStub.requestHandler = { request in
+            if request.url?.path.hasSuffix("/read_state") == true,
+               self.readStateRequest(request, containsPathLabel: "subnet") {
+                let response = HTTPURLResponse(
+                    url: request.url!,
+                    statusCode: 200,
+                    httpVersion: nil,
+                    headerFields: nil
+                )!
+                return (
+                    response,
+                    ICCBOR.encode(.map([(.text("certificate"), .bytes(subnetCertificate))]))
+                )
+            }
+            let (response, data) = try handler(request)
+            if request.url?.path.hasSuffix("/read_state") == true {
+                return (response, try self.resignReadStateResponse(data, key: root))
+            }
+            guard let body = Self.requestBody(from: request),
+                  let envelope = self.cborMap(from: body),
+                  case .map(let content)? = self.value(named: "content", in: envelope) else {
+                return (response, data)
+            }
+            if request.url?.path.hasSuffix("/query") == true,
+               let queryResponse = self.cborMap(from: data) {
+                let requestId = ICRequestID.hash(of: .map(content))
+                let timestamp = UInt64(Date().timeIntervalSince1970 * 1_000_000_000)
+                let unsigned: Data
+                let signed: (Data) -> Data
+                if case .map(let reply)? = self.value(named: "reply", in: queryResponse),
+                   case .bytes(let arg)? = self.value(named: "arg", in: reply) {
+                    unsigned = Self.signedQueryReply(arg: arg, signatures: [])
+                    signed = { signature in
+                        Self.signedQueryReply(
+                            arg: arg,
+                            signatures: [(nodeId, signature, timestamp)]
+                        )
+                    }
+                } else if case .text("rejected")? = self.value(named: "status", in: queryResponse),
+                          case .text(let message)? = self.value(named: "reject_message", in: queryResponse) {
+                    let code: UInt64
+                    if case .unsigned(let value)? = self.value(named: "reject_code", in: queryResponse) {
+                        code = value
+                    } else {
+                        code = 5
+                    }
+                    unsigned = Self.signedQueryReject(code: code, message: message, signatures: [])
+                    signed = { signature in
+                        Self.signedQueryReject(
+                            code: code,
+                            message: message,
+                            signatures: [(nodeId, signature, timestamp)]
+                        )
+                    }
+                } else {
+                    return (response, data)
+                }
+                let parsed = try ICQueryResponse(cbor: unsigned)
+                let signature = try node.signature(
+                    for: parsed.signable(requestID: requestId, timestamp: timestamp)
+                )
+                return (response, signed(signature))
+            }
+            guard request.url?.path.hasSuffix("/call") == true,
+                  let queryResponse = self.cborMap(from: data),
+                  case .map(let reply)? = self.value(named: "reply", in: queryResponse),
+                  case .bytes(let arg)? = self.value(named: "arg", in: reply) else {
+                return (response, data)
+            }
+            let requestId = ICRequestID.hash(of: .map(content))
+            let certificate = try self.signedCertificate(
+                requestId: requestId,
+                reply: arg,
+                key: root
+            )
+            return (
+                response,
+                ICCBOR.encode(.map([
+                    (.text("status"), .text("replied")),
+                    (.text("certificate"), .bytes(certificate)),
+                ]))
+            )
+        }
         let configuration = URLSessionConfiguration.ephemeral
         configuration.protocolClasses = [TaggrURLProtocolStub.self]
-        return TaggrAPI(session: URLSession(configuration: configuration), config: config)
+        return TaggrAPI(
+            session: URLSession(configuration: configuration),
+            config: config,
+            trustRoot: .custom(root.derPublicKey)
+        )
     }
 
     nonisolated static func queryReply(_ arg: Data) -> Data {
         ICCBOR.encode(.map([
             (.text("status"), .text("replied")),
             (.text("reply"), .map([(.text("arg"), .bytes(arg))])),
+        ]))
+    }
+
+    nonisolated static func signedQueryReply(
+        arg: Data,
+        signatures: [(Data, Data, UInt64)]
+    ) -> Data {
+        ICCBOR.encode(.map([
+            (.text("status"), .text("replied")),
+            (.text("reply"), .map([(.text("arg"), .bytes(arg))])),
+            (.text("signatures"), .array(signatures.map { identity, signature, timestamp in
+                .map([
+                    (.text("identity"), .bytes(identity)),
+                    (.text("signature"), .bytes(signature)),
+                    (.text("timestamp"), .unsigned(timestamp)),
+                ])
+            })),
+        ]))
+    }
+
+    nonisolated static func signedQueryReject(
+        code: UInt64,
+        message: String,
+        signatures: [(Data, Data, UInt64)]
+    ) -> Data {
+        ICCBOR.encode(.map([
+            (.text("status"), .text("rejected")),
+            (.text("reject_code"), .unsigned(code)),
+            (.text("reject_message"), .text(message)),
+            (.text("signatures"), .array(signatures.map { identity, signature, timestamp in
+                .map([
+                    (.text("identity"), .bytes(identity)),
+                    (.text("signature"), .bytes(signature)),
+                    (.text("timestamp"), .unsigned(timestamp)),
+                ])
+            })),
         ]))
     }
 
@@ -591,13 +730,37 @@ extension TaggrTests {
 
     nonisolated func requestMethodAndArg(from request: URLRequest) -> (method: String, arg: Data)? {
         guard let body = Self.requestBody(from: request),
-              case .map(let envelope)? = ICCBOR.decode(body),
+              let envelope = cborMap(from: body),
               case .map(let content)? = value(named: "content", in: envelope),
               case .text(let method)? = value(named: "method_name", in: content),
               case .bytes(let arg)? = value(named: "arg", in: content) else {
             return nil
         }
         return (method, arg)
+    }
+
+    nonisolated func cborMap(from data: Data) -> [(ICCBOR.Value, ICCBOR.Value)]? {
+        switch ICCBOR.decode(data) {
+        case .map(let fields):
+            return fields
+        case .tagged(ICCBOR.selfDescribeTag, .map(let fields)):
+            return fields
+        default:
+            return nil
+        }
+    }
+
+    nonisolated func readStateRequest(_ request: URLRequest, containsPathLabel label: String) -> Bool {
+        guard let body = Self.requestBody(from: request),
+              let envelope = cborMap(from: body),
+              case .map(let content)? = value(named: "content", in: envelope),
+              case .array(let paths)? = value(named: "paths", in: content) else {
+            return false
+        }
+        return paths.contains { path in
+            guard case .array(let labels) = path else { return false }
+            return labels.contains(.bytes(Data(label.utf8)))
+        }
     }
 
     func notificationUser(_ notifications: [Int: TaggrNotificationEntry]) -> TaggrUser {
@@ -672,6 +835,89 @@ extension TaggrTests {
             (.text("signature"), .bytes(Data([9]))),
         ]))
         return ICCBOR.encode(.map([(.text("certificate"), .bytes(certificate))]))
+    }
+
+    nonisolated fileprivate func signedCertificate(
+        requestId: Data,
+        reply: Data,
+        key: TaggrTestBLSKey
+    ) throws -> Data {
+        let tree = certificateTree(requestId: requestId, status: "replied", reply: reply)
+        let digest = try ICHashTree(value: tree).digest
+        let signature = key.sign(Data([0x0d]) + Data("ic-state-root".utf8) + digest)
+        return ICCBOR.encode(.tagged(ICCBOR.selfDescribeTag, .map([
+            (.text("tree"), tree),
+            (.text("signature"), .bytes(signature)),
+        ])))
+    }
+
+    nonisolated fileprivate func resignReadStateResponse(
+        _ data: Data,
+        key: TaggrTestBLSKey
+    ) throws -> Data {
+        guard let response = cborMap(from: data),
+              case .bytes(let certificateData)? = value(named: "certificate", in: response),
+              let certificate = cborMap(from: certificateData),
+              let tree = value(named: "tree", in: certificate) else {
+            throw TaggrAPIError.invalidResponse("read_state certificate fixture")
+        }
+        let digest = try ICHashTree(value: tree).digest
+        let signature = key.sign(Data([0x0d]) + Data("ic-state-root".utf8) + digest)
+        let signed = ICCBOR.encode(.tagged(ICCBOR.selfDescribeTag, .map([
+            (.text("tree"), tree),
+            (.text("signature"), .bytes(signature)),
+        ])))
+        return ICCBOR.encode(.map([(.text("certificate"), .bytes(signed))]))
+    }
+
+    nonisolated fileprivate func signedSubnetCertificate(
+        root: TaggrTestBLSKey,
+        subnetId: Data,
+        nodeId: Data,
+        node: Curve25519.Signing.PrivateKey
+    ) throws -> Data {
+        let ranges = ICCBOR.encode(.array([
+            .array([.bytes(Data()), .bytes(Data(repeating: 0xff, count: 29))]),
+        ]))
+        let tree = hashTree([
+            ([Data("time".utf8)], leb128(UInt64(Date().timeIntervalSince1970 * 1_000_000_000))),
+            ([Data("subnet".utf8), subnetId, Data("canister_ranges".utf8)], ranges),
+            ([Data("subnet".utf8), subnetId, Data("node".utf8), nodeId, Data("public_key".utf8)],
+             ICRC167Codec.derPublicKey(from: node.publicKey.rawRepresentation)),
+        ])
+        let digest = try ICHashTree(value: tree).digest
+        let signature = root.sign(Data([0x0d]) + Data("ic-state-root".utf8) + digest)
+        return ICCBOR.encode(.tagged(ICCBOR.selfDescribeTag, .map([
+            (.text("tree"), tree),
+            (.text("signature"), .bytes(signature)),
+        ])))
+    }
+
+    nonisolated func hashTree(_ leaves: [([Data], Data)]) -> ICCBOR.Value {
+        precondition(!leaves.isEmpty)
+        let groups = Dictionary(grouping: leaves, by: { $0.0[0] })
+        let nodes = groups.keys.sorted(by: { $0.lexicographicallyPrecedes($1) }).map { label -> ICCBOR.Value in
+            let entries = groups[label]!
+            let child: ICCBOR.Value
+            if entries.allSatisfy({ $0.0.count == 1 }) {
+                precondition(entries.count == 1)
+                child = .array([.unsigned(3), .bytes(entries[0].1)])
+            } else {
+                child = hashTree(entries.map { (Array($0.0.dropFirst()), $0.1) })
+            }
+            return .array([.unsigned(2), .bytes(label), child])
+        }
+        return forkTree(nodes)
+    }
+
+    nonisolated func forkTree(_ nodes: [ICCBOR.Value]) -> ICCBOR.Value {
+        if nodes.count == 1 { return nodes[0] }
+        let midpoint = nodes.count / 2
+        return .array([
+            .unsigned(1),
+            forkTree(Array(nodes[..<midpoint])),
+            forkTree(Array(nodes[midpoint...])),
+        ])
     }
 
     nonisolated func certificateTree(requestId: Data, status: String, reply: Data? = nil, rejectMessage: String? = nil) -> ICCBOR.Value {
@@ -794,6 +1040,90 @@ extension TaggrTests {
             ]
             """#.utf8
         )
+    }
+}
+
+fileprivate struct TaggrTestBLSKey: @unchecked Sendable {
+    private static let dst = Data("BLS_SIG_BLS12381G1_XMD:SHA-256_SSWU_RO_NUL_".utf8)
+    private let secret: blst_scalar
+    private let publicKey: Data
+
+    var derPublicKey: Data {
+        Data([
+            0x30, 0x81, 0x82, 0x30, 0x1d, 0x06, 0x0d, 0x2b, 0x06, 0x01, 0x04, 0x01,
+            0x82, 0xdc, 0x7c, 0x05, 0x03, 0x01, 0x02, 0x01, 0x06, 0x0c, 0x2b, 0x06,
+            0x01, 0x04, 0x01, 0x82, 0xdc, 0x7c, 0x05, 0x03, 0x02, 0x01, 0x03, 0x61, 0x00,
+        ]) + publicKey
+    }
+
+    init(seed: UInt8) {
+        var secret = blst_scalar()
+        let ikm = Data(repeating: seed, count: 32)
+        ikm.withUnsafeBytes { bytes in
+            blst_keygen(&secret, bytes.bindMemory(to: UInt8.self).baseAddress, ikm.count, nil, 0)
+        }
+        var point = blst_p2()
+        blst_sk_to_pk_in_g2(&point, &secret)
+        var compressed = [UInt8](repeating: 0, count: 96)
+        blst_p2_compress(&compressed, &point)
+        self.secret = secret
+        self.publicKey = Data(compressed)
+    }
+
+    func sign(_ message: Data) -> Data {
+        var hash = blst_p1()
+        message.withUnsafeBytes { messageBytes in
+            Self.dst.withUnsafeBytes { dstBytes in
+                blst_hash_to_g1(
+                    &hash,
+                    messageBytes.bindMemory(to: UInt8.self).baseAddress,
+                    message.count,
+                    dstBytes.bindMemory(to: UInt8.self).baseAddress,
+                    Self.dst.count,
+                    nil,
+                    0
+                )
+            }
+        }
+        var signature = blst_p1()
+        var secret = secret
+        blst_sign_pk_in_g2(&signature, &hash, &secret)
+        var compressed = [UInt8](repeating: 0, count: 48)
+        blst_p1_compress(&compressed, &signature)
+        return Data(compressed)
+    }
+}
+
+final class TaggrTestKeychain: ICKeychainAccess, @unchecked Sendable {
+    private var data: Data?
+
+    func copyMatching(
+        _ query: CFDictionary,
+        result: UnsafeMutablePointer<CFTypeRef?>?
+    ) -> OSStatus {
+        result?.pointee = data as CFData?
+        return data == nil ? errSecItemNotFound : errSecSuccess
+    }
+
+    func update(_ query: CFDictionary, attributes: CFDictionary) -> OSStatus {
+        guard data != nil else { return errSecItemNotFound }
+        if let values = attributes as? [String: Any] {
+            data = values[kSecValueData as String] as? Data
+        }
+        return errSecSuccess
+    }
+
+    func add(_ attributes: CFDictionary) -> OSStatus {
+        guard data == nil else { return errSecDuplicateItem }
+        if let values = attributes as? [String: Any] {
+            data = values[kSecValueData as String] as? Data
+        }
+        return errSecSuccess
+    }
+
+    func delete(_ query: CFDictionary) -> OSStatus {
+        data = nil
+        return errSecSuccess
     }
 }
 

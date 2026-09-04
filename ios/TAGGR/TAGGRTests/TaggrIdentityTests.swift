@@ -1,71 +1,41 @@
 import CryptoKit
-import ICNativeClient
+@testable import ICNativeClient
 import XCTest
 @testable import TAGGR
 
-final class TaggrIdentityTests: XCTestCase {
-    func testIdentitySessionUsesRuntimeConfiguration() throws {
-        let privateKey = Curve25519.Signing.PrivateKey()
-        let session = try ICIdentitySession.makeSession(
-            privateKey: privateKey,
-            delegation: delegation(for: privateKey),
-            configuration: defaultConfiguration
-        )
+extension TaggrTests {
+    func testStoredAuthSessionUsesRuntimeConfigurationAndValidSignature() throws {
+        let config = TaggrRuntimeConfig.from(info: [:])
+        let session = makeAuthSession(privateKey: Curve25519.Signing.PrivateKey(), config: config)
 
+        XCTAssertEqual(session.formatVersion, ICAuthSession.currentFormatVersion)
         XCTAssertEqual(session.canisterId, TaggrRuntimeConfig.productionCanisterId)
-        XCTAssertEqual(session.identityProvider, "https://id.ai/authorize")
+        XCTAssertEqual(session.internetIdentityURL, "https://id.ai/authorize")
         XCTAssertEqual(session.derivationOrigin, TaggrRuntimeConfig.productionDerivationOrigin)
-        XCTAssertEqual(
-            session.sessionPublicKey,
-            ICIdentitySession.derPublicKey(from: privateKey.publicKey.rawRepresentation)
+        XCTAssertNoThrow(try ICIdentityValidation.validateSession(session, configuration: config.icClientConfiguration))
+    }
+
+    func testStoredAuthSessionRejectsTamperedDelegationSignature() {
+        let config = TaggrRuntimeConfig.from(info: [:])
+        let valid = makeAuthSession(privateKey: Curve25519.Signing.PrivateKey(), config: config)
+        let signed = valid.delegation.delegations[0]
+        let brokenChain = ICDelegationChain(
+            publicKey: valid.delegation.publicKey,
+            delegations: [.init(delegation: signed.delegation, signature: Data(repeating: 7, count: 64))]
         )
-    }
-
-    func testIdentitySessionRejectsMismatchedLeafKey() {
-        let privateKey = Curve25519.Signing.PrivateKey()
-        let otherKey = Curve25519.Signing.PrivateKey()
-
-        XCTAssertThrowsError(try ICIdentitySession.makeSession(
-            privateKey: privateKey,
-            delegation: delegation(for: otherKey),
-            configuration: defaultConfiguration
+        let broken = ICAuthSession(storage: ICStoredAuthSession(
+            formatVersion: valid.formatVersion,
+            principal: valid.principal,
+            canisterId: valid.canisterId,
+            internetIdentityURL: valid.internetIdentityURL,
+            derivationOrigin: valid.derivationOrigin,
+            sessionPublicKey: valid.sessionPublicKey,
+            sessionPrivateKey: valid.storage.sessionPrivateKey,
+            delegation: brokenChain,
+            requestedAt: valid.requestedAt,
+            maxTimeToLiveNanoseconds: valid.maxTimeToLiveNanoseconds
         ))
-    }
 
-    func testIdentitySessionRejectsExpiredDelegation() {
-        let privateKey = Curve25519.Signing.PrivateKey()
-
-        XCTAssertThrowsError(try ICIdentitySession.makeSession(
-            privateKey: privateKey,
-            delegation: delegation(for: privateKey, expiration: 1),
-            configuration: defaultConfiguration
-        ))
-    }
-
-    private var defaultConfiguration: ICClientConfiguration {
-        TaggrRuntimeConfig.from(info: [:]).icClientConfiguration
-    }
-
-    private func delegation(
-        for privateKey: Curve25519.Signing.PrivateKey,
-        expiration: UInt64 = UInt64((Date().timeIntervalSince1970 + 3600) * 1_000_000_000)
-    ) -> ICDelegationChain {
-        ICDelegationChain(
-            publicKey: ICIdentitySession.derPublicKey(
-                from: Curve25519.Signing.PrivateKey().publicKey.rawRepresentation
-            ),
-            delegations: [
-                .init(
-                    delegation: .init(
-                        publicKey: ICIdentitySession.derPublicKey(
-                            from: privateKey.publicKey.rawRepresentation
-                        ),
-                        expiration: expiration,
-                        targets: nil
-                    ),
-                    signature: Data(repeating: 7, count: 64)
-                ),
-            ]
-        )
+        XCTAssertThrowsError(try ICIdentityValidation.validateSession(broken, configuration: config.icClientConfiguration))
     }
 }

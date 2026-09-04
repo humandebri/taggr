@@ -83,6 +83,12 @@ final class TaggrAppCoordinator {
     var lastHomeFeedMode: TaggrFeedMode {
         navigationStore.lastHomeFeedMode
     }
+    var effectiveHomeFeedMode: TaggrFeedMode {
+        if lastHomeFeedMode == .personal, authSession == nil {
+            return .hot
+        }
+        return lastHomeFeedMode
+    }
     var postReturnRoutesByPostID: [Int: TaggrRoute] {
         get { navigationStore.postReturnRoutesByPostID }
         set { navigationStore.postReturnRoutesByPostID = newValue }
@@ -238,10 +244,15 @@ final class TaggrAppCoordinator {
             )
         },
         identityAuthenticatorFactory: @MainActor (TaggrRuntimeConfig) -> ICInternetIdentityAuthenticator = { runtimeConfig in
-            ICInternetIdentityAuthenticator(
-                configuration: runtimeConfig.icClientConfiguration,
-                callbackDomain: runtimeConfig.callbackDomain
-            )
+            do {
+                return try ICInternetIdentityAuthenticator(
+                    configuration: runtimeConfig.icClientConfiguration,
+                    callbackDomain: runtimeConfig.callbackDomain,
+                    callbackPath: ICInternetIdentityAuthenticator.callbackPath
+                )
+            } catch {
+                preconditionFailure("Invalid Internet Identity configuration: \(error)")
+            }
         }
     ) {
         self.sessionStore = SessionStore(config: buildConfig)
@@ -287,9 +298,20 @@ final class TaggrAppCoordinator {
     }
 
     func bootstrap() async {
-        authSession = identityStore.load()
+        do {
+            authSession = try identityStore.load()
+        } catch {
+            NSLog("TAGGR identity session could not be loaded: %@", error.localizedDescription)
+            authSession = nil
+        }
         await reloadCache()
         await refreshCurrentUser()
+        if navigationStore.lastHomeFeedMode == .personal, authSession == nil {
+            route = .feed(.hot)
+        } else if !navigationStore.hasStoredHomeFeedMode, authSession != nil {
+            route = .feed(.personal)
+            navigationStore.rememberHomeFeedMode(.personal)
+        }
         routeLoadRevision += 1
     }
 
@@ -439,12 +461,12 @@ final class TaggrAppCoordinator {
     }
 
     func postReturnRoute(for postID: Int) -> TaggrRoute {
-        postReturnRoutesByPostID[postID] ?? .feed(lastHomeFeedMode)
+        postReturnRoutesByPostID[postID] ?? .feed(effectiveHomeFeedMode)
     }
 
     var currentPostReturnRoute: TaggrRoute {
         guard case .post(let postID) = route else {
-            return .feed(lastHomeFeedMode)
+            return .feed(effectiveHomeFeedMode)
         }
         return postReturnRoute(for: postID)
     }
@@ -496,7 +518,7 @@ final class TaggrAppCoordinator {
     }
 
     func navigateToHomeFeed() {
-        navigateToFeed(lastHomeFeedMode)
+        navigateToFeed(effectiveHomeFeedMode)
     }
 
     func navigateToRealm(_ name: String) {

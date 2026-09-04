@@ -1,8 +1,10 @@
 // TAGGR/Views: Shared full-screen composer for creating root posts, replies, and editing existing posts.
 
 import PhotosUI
+import CoreTransferable
 import SwiftUI
 import UIKit
+import UniformTypeIdentifiers
 
 struct ComposePostView: View {
     @Environment(TaggrAppCoordinator.self) private var state
@@ -13,12 +15,14 @@ struct ComposePostView: View {
     @StateObject private var imageImport = ImageImportCoordinator()
     @State private var selectedPhotos: [PhotosPickerItem] = []
     @State private var imageImportWarning: String?
+    @State private var imageInsertionSegmentID: Int?
+    @State private var documentID = UUID()
     @State private var creditCost: Int?
     @State private var creditCostUnavailable = false
     @State private var realmColors: [String: String] = [:]
     @State private var isSubmitting = false
     @State private var discardConfirmationPresented = false
-    @FocusState private var isTextEditorFocused: Bool
+    @FocusState private var focusedTextSegmentID: Int?
 
     init(mode: PostComposerMode, initialRealm: String? = nil, dismiss: @escaping () -> Void) {
         self.mode = mode
@@ -58,10 +62,17 @@ struct ComposePostView: View {
 
                 ScrollView {
                     VStack(alignment: .leading, spacing: 16) {
-                        ComposePostTextEditor(
+                        ComposePostDocumentEditor(
                             text: $draft.text,
+                            draftImages: draft.images,
+                            existingImages: existingImagesByID,
                             placeholder: mode.placeholder,
-                            isFocused: $isTextEditorFocused
+                            documentID: documentID,
+                            focusedTextSegmentID: $focusedTextSegmentID,
+                            imageInsertionSegmentID: $imageInsertionSegmentID,
+                            removeImage: removeImageMarker,
+                            moveImage: moveImageMarker,
+                            moveImageToTextSegment: moveImageMarker
                         )
                         if let realmWarning {
                             ComposePostImageWarning(
@@ -77,6 +88,21 @@ struct ComposePostView: View {
                                 createStorage: {}
                             )
                         }
+                        if draft.submissionNeedsVerification {
+                            ComposePostImageWarning(
+                                text: "The last post request may have been accepted, but its result was not confirmed. Check your recent posts before choosing what to do with this draft.",
+                                showCreateStorage: false,
+                                createStorage: {}
+                            )
+                            if mode.editingPost == nil {
+                                Button("I confirmed it was posted", action: discardConfirmedSubmission)
+                                    .font(.footnote.weight(.bold))
+                                    .foregroundStyle(TaggrTheme.clickable)
+                                Button("Edit and retry", action: resumeSubmission)
+                                    .font(.footnote.weight(.bold))
+                                    .foregroundStyle(TaggrTheme.clickable)
+                            }
+                        }
                         if let imageWarning {
                             ComposePostImageWarning(text: imageWarning, showCreateStorage: missingStorageForImages) {
                                 openStorageSettings()
@@ -88,17 +114,6 @@ struct ComposePostView: View {
                                 showCreateStorage: false,
                                 createStorage: {}
                             )
-                        }
-                        if !editableImages.isEmpty {
-                            ComposeExistingPostImageList(images: editableImages) { image in
-                                draft.text = TaggrPostImages.removingImageMarkdown(
-                                    image.markdownReferences,
-                                    from: draft.text
-                                )
-                            }
-                        }
-                        if !draft.images.isEmpty {
-                            ComposePostDraftImageList(images: draft.images, removeImage: removeImage)
                         }
                     }
                     .padding(.horizontal, 18)
@@ -119,9 +134,11 @@ struct ComposePostView: View {
             loadPhotos(items)
         }
         .onChange(of: draft.text) { _, _ in
+            draft.contentDidChange()
             draft.scheduleSave()
         }
         .onChange(of: draft.realm) { _, _ in
+            draft.contentDidChange()
             draft.scheduleSave()
         }
         .onChange(of: scenePhase) { _, phase in
@@ -129,7 +146,7 @@ struct ComposePostView: View {
             Task { await draft.flush() }
         }
         .onAppear {
-            isTextEditorFocused = true
+            focusedTextSegmentID = 0
         }
         .onDisappear {
             cancelImageImport()
@@ -164,7 +181,7 @@ struct ComposePostView: View {
 
     private var canSubmit: Bool {
         guard draft.isLoaded, state.currentUser != nil else { return false }
-        guard !imageImport.isImporting else { return false }
+        guard !imageImport.isImporting, !draft.submissionNeedsVerification else { return false }
         let body = composedBody
         guard !body.isEmpty else { return false }
         guard imageWarning == nil else { return false }
@@ -231,6 +248,12 @@ struct ComposePostView: View {
         )
     }
 
+    private var existingImagesByID: [String: TaggrEditablePostImage] {
+        editableImages.reduce(into: [:]) { images, image in
+            images[image.attachment.id] = image
+        }
+    }
+
     private var selectableRealms: [String] {
         let selectedRealm = draft.realm.isEmpty || !joinedRealm(draft.realm) ? nil : draft.realm
         return state.orderedPostingRealms(selectedRealm: selectedRealm)
@@ -268,6 +291,7 @@ struct ComposePostView: View {
         let images = draft.images
         isSubmitting = true
         Task {
+            let outcome: TaggrPostSubmissionOutcome
             if let editingPost = mode.editingPost {
                 await state.editPost(
                     post: editingPost,
@@ -276,8 +300,9 @@ struct ComposePostView: View {
                     images: images,
                     reloadMode: mode.selectedMode
                 )
+                outcome = state.errorMessage == nil ? .submitted : .retryableFailure
             } else {
-                await state.submitPost(
+                outcome = await state.submitPost(
                     text: body,
                     parent: mode.parentPostID,
                     realm: selectedTargetRealm,
@@ -286,10 +311,12 @@ struct ComposePostView: View {
                 )
             }
             isSubmitting = false
-            if state.errorMessage == nil {
+            if outcome == .submitted {
                 cancelImageImport()
                 await draft.discard()
                 dismiss()
+            } else if outcome == .uncertain {
+                await draft.markSubmissionNeedsVerification()
             }
         }
     }
@@ -297,7 +324,9 @@ struct ComposePostView: View {
     private func loadPhotos(_ items: [PhotosPickerItem]) {
         guard !items.isEmpty, !imageImport.isImporting else { return }
         imageImportWarning = nil
-        let maxBytes = state.cache?.config?.maxBlobSizeBytes ?? ImageDrafts.maxImageBytes
+        let maxBytes = ImageDrafts.postImageMaximumBytes(
+            serverLimit: state.cache?.config?.maxBlobSizeBytes
+        )
         imageImport.start(
             operation: {
                 await ImageDrafts.importPhotos(items, maxBytes: maxBytes)
@@ -310,7 +339,7 @@ struct ComposePostView: View {
                     existingIDs: Set(draft.images.map(\.id))
                 )
                 if !loaded.isEmpty {
-                    await draft.addImages(loaded)
+                    await draft.addImages(loaded, afterTextSegmentID: imageInsertionSegmentID)
                 }
             }
         )
@@ -322,8 +351,36 @@ struct ComposePostView: View {
         imageImportWarning = nil
     }
 
-    private func removeImage(_ image: TaggrDraftImage) {
-        Task { await draft.removeImage(image) }
+    private func removeImage(_ image: TaggrDraftImage, occurrence: Int) {
+        Task { await draft.removeImage(image, occurrence: occurrence) }
+    }
+
+    private func removeImageMarker(_ occurrence: Int, blobID: String) {
+        if let image = draft.images.first(where: { $0.id == blobID }) {
+            removeImage(image, occurrence: occurrence)
+        } else {
+            Task { await draft.removeImageMarker(occurrence: occurrence) }
+        }
+    }
+
+    private func moveImageMarker(_ occurrence: Int, before target: Int?) {
+        Task { await draft.moveImageMarker(occurrence: occurrence, before: target) }
+    }
+
+    private func moveImageMarker(_ occurrence: Int, afterTextSegmentID: Int) {
+        Task { await draft.moveImageMarker(occurrence: occurrence, afterTextSegmentID: afterTextSegmentID) }
+    }
+
+    private func discardConfirmedSubmission() {
+        Task {
+            cancelImageImport()
+            await draft.discard()
+            dismiss()
+        }
+    }
+
+    private func resumeSubmission() {
+        Task { await draft.clearSubmissionVerification() }
     }
 
     @MainActor
@@ -529,21 +586,83 @@ private struct ComposeRealmPicker: View {
     }
 }
 
-private struct ComposePostTextEditor: View {
+/// Keeps generated blob Markdown out of the editable text surface. The post is
+/// still stored as Markdown, so web and older app clients remain compatible.
+struct ComposePostDocumentEditor: View {
     @Binding var text: String
+    let draftImages: [TaggrDraftImage]
+    let existingImages: [String: TaggrEditablePostImage]
     let placeholder: String
-    let isFocused: FocusState<Bool>.Binding
+    let documentID: UUID
+    let focusedTextSegmentID: FocusState<Int?>.Binding
+    @Binding var imageInsertionSegmentID: Int?
+    let removeImage: (Int, String) -> Void
+    let moveImage: (Int, Int?) -> Void
+    let moveImageToTextSegment: (Int, Int) -> Void
+
+    init(
+        text: Binding<String>,
+        draftImages: [TaggrDraftImage],
+        existingImages: [String: TaggrEditablePostImage],
+        placeholder: String,
+        documentID: UUID,
+        focusedTextSegmentID: FocusState<Int?>.Binding,
+        imageInsertionSegmentID: Binding<Int?>,
+        removeImage: @escaping (Int, String) -> Void,
+        moveImage: @escaping (Int, Int?) -> Void,
+        moveImageToTextSegment: @escaping (Int, Int) -> Void = { _, _ in }
+    ) {
+        _text = text
+        self.draftImages = draftImages
+        self.existingImages = existingImages
+        self.placeholder = placeholder
+        self.documentID = documentID
+        self.focusedTextSegmentID = focusedTextSegmentID
+        _imageInsertionSegmentID = imageInsertionSegmentID
+        self.removeImage = removeImage
+        self.moveImage = moveImage
+        self.moveImageToTextSegment = moveImageToTextSegment
+    }
+
+    private var segments: [PostDraftDocument.Segment] {
+        PostDraftDocument.segments(in: text)
+    }
 
     var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            ForEach(segments) { segment in
+                switch segment {
+                case .text(let id, let value):
+                    textBlock(id: id, value: value)
+                case .image(_, let occurrence, let markdown, let blobID):
+                    imageBlock(occurrence: occurrence, markdown: markdown, blobID: blobID)
+                }
+            }
+        }
+    }
+
+    private func textBlock(id: Int, value: String) -> some View {
         ZStack(alignment: .topLeading) {
-            TextEditor(text: $text)
-                .scrollContentBackground(.hidden)
-                .font(.title3)
-                .foregroundStyle(TaggrTheme.text)
-                .frame(minHeight: 170)
-                .tint(TaggrTheme.clickable)
-                .focused(isFocused)
-            if text.isEmpty {
+            TextEditor(text: Binding(
+                get: { value },
+                set: { text = PostDraftDocument.replacingText(in: text, segmentID: id, with: $0) }
+            ))
+            .scrollContentBackground(.hidden)
+            .font(.title3)
+            .foregroundStyle(TaggrTheme.text)
+            .frame(minHeight: value.isEmpty ? 70 : 120)
+            .tint(TaggrTheme.clickable)
+            .focused(focusedTextSegmentID, equals: id)
+            .onTapGesture {
+                imageInsertionSegmentID = id
+            }
+            .dropDestination(for: PostDraftImageDragItem.self) { items, _ in
+                guard let item = items.first, accepts(item) else { return false }
+                moveImageToTextSegment(item.occurrence, id)
+                imageInsertionSegmentID = id
+                return true
+            }
+            if value.isEmpty && segments.count == 1 {
                 Text(placeholder)
                     .font(.title3)
                     .foregroundStyle(TaggrTheme.secondaryText)
@@ -553,6 +672,80 @@ private struct ComposePostTextEditor: View {
             }
         }
     }
+
+    @ViewBuilder
+    private func imageBlock(occurrence: Int, markdown: String, blobID: String) -> some View {
+        let draftImage = draftImages.first { $0.id == blobID }
+        let existingImage = existingImages[blobID]
+        ZStack(alignment: .topTrailing) {
+            if let draftImage, let uiImage = UIImage(data: draftImage.data) {
+                Image(uiImage: uiImage)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(maxWidth: .infinity)
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+            } else if let existingImage {
+                TaggrPostImageLoaderView(attachment: existingImage.attachment, contentMode: .fit)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 240)
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+            } else {
+                Label("Attached image", systemImage: "photo")
+                    .frame(maxWidth: .infinity, minHeight: 120)
+                    .background(TaggrTheme.darkPanel)
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+            }
+            Button("Remove image", systemImage: "xmark") {
+                removeImage(occurrence, blobID)
+            }
+            .labelStyle(.iconOnly)
+            .font(.caption.weight(.bold))
+            .foregroundStyle(.white)
+            .frame(width: 30, height: 30)
+            .background(Color.black.opacity(0.55))
+            .clipShape(Circle())
+            .padding(8)
+        }
+        .draggable(
+            PostDraftImageDragItem(
+                documentID: documentID,
+                documentFingerprint: text.hashValue,
+                occurrence: occurrence
+            )
+        )
+        .dropDestination(for: PostDraftImageDragItem.self) { items, _ in
+            guard let item = items.first, accepts(item), item.occurrence != occurrence else { return false }
+            moveImage(item.occurrence, occurrence)
+            return true
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Attached image. Drag to change its position.")
+    }
+
+    private func accepts(_ item: PostDraftImageDragItem) -> Bool {
+        guard item.documentID == documentID,
+              item.documentFingerprint == text.hashValue else { return false }
+        return segments.contains { segment in
+            if case .image(_, let occurrence, _, _) = segment {
+                return occurrence == item.occurrence
+            }
+            return false
+        }
+    }
+}
+
+struct PostDraftImageDragItem: Codable, Transferable {
+    let documentID: UUID
+    let documentFingerprint: Int
+    let occurrence: Int
+
+    static var transferRepresentation: some TransferRepresentation {
+        CodableRepresentation(contentType: .taggrPostDraftImage)
+    }
+}
+
+private extension UTType {
+    static let taggrPostDraftImage = UTType(exportedAs: "network.taggr.ios.post-draft-image")
 }
 
 private struct ComposePostCreditCostBadge: View {
@@ -624,92 +817,6 @@ struct ComposePostImageWarning: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(TaggrTheme.panel)
         .clipShape(RoundedRectangle(cornerRadius: 8))
-    }
-}
-
-private struct ComposeExistingPostImageList: View {
-    let images: [TaggrEditablePostImage]
-    let removeImage: (TaggrEditablePostImage) -> Void
-
-    var body: some View {
-        LazyVStack(spacing: 12) {
-            ForEach(images) { image in
-                ComposeExistingPostImage(image: image) {
-                    removeImage(image)
-                }
-            }
-        }
-    }
-}
-
-private struct ComposeExistingPostImage: View {
-    let image: TaggrEditablePostImage
-    let remove: () -> Void
-
-    var body: some View {
-        ZStack(alignment: .topTrailing) {
-            TaggrPostImageLoaderView(
-                attachment: image.attachment,
-                contentMode: .fit
-            )
-            .frame(maxWidth: .infinity)
-            .frame(height: 240)
-            .background(TaggrTheme.darkPanel)
-            .clipShape(RoundedRectangle(cornerRadius: 10))
-
-            if image.isRemovable {
-                Button("Remove image", systemImage: "xmark", action: remove)
-                    .labelStyle(.iconOnly)
-                    .font(.caption.weight(.bold))
-                    .foregroundStyle(.white)
-                    .frame(width: 30, height: 30)
-                    .background(Color.black.opacity(0.55))
-                    .clipShape(Circle())
-                    .padding(8)
-            }
-        }
-        .accessibilityElement(children: .contain)
-        .accessibilityLabel(image.isRemovable ? "Existing post image" : "Legacy post image, preview only")
-    }
-}
-
-struct ComposePostDraftImageList: View {
-    let images: [TaggrDraftImage]
-    let removeImage: (TaggrDraftImage) -> Void
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            ForEach(images, id: \.id) { image in
-                ComposePostDraftImage(image: image) {
-                    removeImage(image)
-                }
-            }
-        }
-    }
-}
-
-private struct ComposePostDraftImage: View {
-    let image: TaggrDraftImage
-    let remove: () -> Void
-
-    var body: some View {
-        ZStack(alignment: .topTrailing) {
-            if let uiImage = UIImage(data: image.data) {
-                Image(uiImage: uiImage)
-                    .resizable()
-                    .scaledToFit()
-                    .frame(maxWidth: .infinity)
-                    .clipShape(RoundedRectangle(cornerRadius: 10))
-            }
-            Button("Remove image", systemImage: "xmark", action: remove)
-                .labelStyle(.iconOnly)
-                .font(.caption.weight(.bold))
-                .foregroundStyle(.white)
-                .frame(width: 30, height: 30)
-                .background(Color.black.opacity(0.55))
-                .clipShape(Circle())
-                .padding(8)
-        }
     }
 }
 

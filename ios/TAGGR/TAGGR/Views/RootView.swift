@@ -10,7 +10,7 @@ struct RootView: View {
             get: { tab },
             set: { next in
                 let route = next == .feed
-                    ? Self.feedRoute(lastHomeFeedMode: state.lastHomeFeedMode)
+                    ? Self.feedRoute(lastHomeFeedMode: state.effectiveHomeFeedMode)
                     : next.route
                 state.selectRootRoute(route)
             }

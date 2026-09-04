@@ -110,6 +110,15 @@ private enum IndexedImageImportResult: Sendable {
 enum ImageDrafts {
     static let maxImagePixels = 16_777_216
     static let maxImageBytes = 460_800
+    static let maxPostImagePixels = 3_000_000
+    static let maxPostImageBytes = 200 * 1_024
+
+    static func postImageMaximumBytes(serverLimit: Int?) -> Int {
+        guard let serverLimit, serverLimit > 0 else {
+            return maxPostImageBytes
+        }
+        return min(maxPostImageBytes, serverLimit)
+    }
 
     static func blobId(for data: Data) -> String {
         Data(SHA256.hash(data: data)).prefix(4).icHexString
@@ -124,7 +133,7 @@ enum ImageDrafts {
         }
     }
 
-    static func draftImage(from data: Data, maxBytes: Int = maxImageBytes) -> TaggrDraftImage? {
+    static func draftImage(from data: Data, maxBytes: Int = maxPostImageBytes) -> TaggrDraftImage? {
         guard case .success(let image) = postImageResult(from: data, maxBytes: maxBytes) else {
             return nil
         }
@@ -133,7 +142,7 @@ enum ImageDrafts {
 
     static func importPhotos(
         _ items: [PhotosPickerItem],
-        maxBytes: Int = maxImageBytes,
+        maxBytes: Int = maxPostImageBytes,
         maxConcurrent: Int = 2
     ) async -> ImageImportBatchResult {
         guard !items.isEmpty else {
@@ -201,7 +210,7 @@ enum ImageDrafts {
 
     static func draftImages(
         from sourceData: [Data],
-        maxBytes: Int = maxImageBytes,
+        maxBytes: Int = maxPostImageBytes,
         maxConcurrent: Int = 2
     ) async -> [TaggrDraftImage] {
         guard !sourceData.isEmpty else { return [] }
@@ -245,7 +254,7 @@ enum ImageDrafts {
     static func postImageResult(
         from data: Data,
         maxBytes: Int,
-        maxPixels: Int = maxImagePixels
+        maxPixels: Int = maxPostImagePixels
     ) -> Result<TaggrDraftImage, ImageImportFailureReason> {
         switch normalizedPostImage(from: data, maxBytes: maxBytes, maxPixels: maxPixels) {
         case .success(let normalized):

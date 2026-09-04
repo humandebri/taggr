@@ -45,6 +45,29 @@ extension TaggrTests {
     }
 
     @MainActor
+    func testPersonalHomeModeFallsBackToHotWithoutAuthentication() {
+        let state = TaggrAppCoordinator()
+        state.navigateToFeed(.personal)
+
+        XCTAssertEqual(state.lastHomeFeedMode, .personal)
+        XCTAssertEqual(state.effectiveHomeFeedMode, .hot)
+    }
+
+    @MainActor
+    func testHomeFeedModePersistsAcrossNavigationStoreInstances() {
+        let suiteName = "taggr-feed-mode-test-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        let firstStore = NavigationStore(defaults: defaults)
+
+        XCTAssertFalse(firstStore.hasStoredHomeFeedMode)
+        firstStore.rememberHomeFeedMode(.personal)
+
+        let restoredStore = NavigationStore(defaults: defaults)
+        XCTAssertTrue(restoredStore.hasStoredHomeFeedMode)
+        XCTAssertEqual(restoredStore.lastHomeFeedMode, .personal)
+    }
+
+    @MainActor
     func testPostNavigationReturnsToOriginalRoute() {
         let state = TaggrAppCoordinator()
         let origins: [(route: TaggrRoute, title: String)] = [

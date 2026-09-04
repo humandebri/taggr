@@ -33,11 +33,19 @@ enum PostImageGrid {
     }
 }
 
+enum PostImagePreviewPrefetchPolicy {
+    static func attachments(_ attachments: [TaggrPostImageAttachment]) -> [TaggrPostImageAttachment] {
+        var seenURLs = Set<URL>()
+        return attachments.filter { seenURLs.insert($0.url).inserted }
+    }
+}
+
 @MainActor
 final class PostImagePrefetcher: ObservableObject {
     private var loadedURLs = Set<URL>()
     private var runningURLs = Set<URL>()
     private let maxConcurrentLoads = 6
+    private var allImagesTask: Task<Void, Never>?
 
     func prefetch(
         _ attachments: [TaggrPostImageAttachment],
@@ -49,6 +57,64 @@ final class PostImagePrefetcher: ObservableObject {
         }
         for attachment in candidates.prefix(max(maxConcurrentLoads - runningURLs.count, 0)) {
             start(attachment, api: api, config: config)
+        }
+    }
+
+    func prefetchAll(
+        _ attachments: [TaggrPostImageAttachment],
+        api: TaggrAPI,
+        config: TaggrRuntimeConfig
+    ) {
+        allImagesTask?.cancel()
+        let uniqueAttachments = PostImagePreviewPrefetchPolicy.attachments(attachments)
+        allImagesTask = Task {
+            await Self.loadAll(
+                uniqueAttachments,
+                api: api,
+                config: config,
+                maximumConcurrentLoads: maxConcurrentLoads
+            )
+        }
+    }
+
+    func cancelAll() {
+        allImagesTask?.cancel()
+        allImagesTask = nil
+    }
+
+    nonisolated private static func loadAll(
+        _ attachments: [TaggrPostImageAttachment],
+        api: TaggrAPI,
+        config: TaggrRuntimeConfig,
+        maximumConcurrentLoads: Int
+    ) async {
+        var iterator = attachments.makeIterator()
+        await withTaskGroup(of: Void.self) { group in
+            for _ in 0..<min(maximumConcurrentLoads, attachments.count) {
+                guard let attachment = iterator.next() else { break }
+                group.addTask {
+                    await load(attachment, api: api, config: config)
+                }
+            }
+            while await group.next() != nil {
+                guard !Task.isCancelled, let attachment = iterator.next() else { continue }
+                group.addTask {
+                    await load(attachment, api: api, config: config)
+                }
+            }
+        }
+    }
+
+    nonisolated private static func load(
+        _ attachment: TaggrPostImageAttachment,
+        api: TaggrAPI,
+        config: TaggrRuntimeConfig
+    ) async {
+        guard !Task.isCancelled else { return }
+        do {
+            _ = try await TaggrPostImageDataLoader.data(for: attachment, api: api, config: config)
+        } catch {
+            // Visible image loading owns user-facing failure handling.
         }
     }
 

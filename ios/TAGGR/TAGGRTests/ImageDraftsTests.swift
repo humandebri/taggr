@@ -95,11 +95,26 @@ extension TaggrTests {
             let draft = try XCTUnwrap(ImageDrafts.draftImage(from: input))
 
             XCTAssertTrue(isWebP(draft.data), fixture)
-            XCTAssertLessThanOrEqual(draft.data.count, ImageDrafts.maxImageBytes, fixture)
-            XCTAssertLessThanOrEqual(draft.width * draft.height, ImageDrafts.maxImagePixels, fixture)
+            XCTAssertLessThanOrEqual(draft.data.count, ImageDrafts.maxPostImageBytes, fixture)
+            XCTAssertLessThanOrEqual(draft.width * draft.height, ImageDrafts.maxPostImagePixels, fixture)
             XCTAssertNotNil(UIImage(data: draft.data), fixture)
             XCTAssertEqual(draft.id, ImageDrafts.blobId(for: draft.data), fixture)
         }
+    }
+
+    func testPostImageMaximumBytesUsesTheSmallerOfLocalAndServerLimits() {
+        XCTAssertEqual(
+            ImageDrafts.postImageMaximumBytes(serverLimit: nil),
+            ImageDrafts.maxPostImageBytes
+        )
+        XCTAssertEqual(
+            ImageDrafts.postImageMaximumBytes(serverLimit: 460_800),
+            ImageDrafts.maxPostImageBytes
+        )
+        XCTAssertEqual(
+            ImageDrafts.postImageMaximumBytes(serverLimit: 150 * 1_024),
+            150 * 1_024
+        )
     }
 
     func testSmallJPEGAndPNGAreBothReencodedAsWebP() throws {

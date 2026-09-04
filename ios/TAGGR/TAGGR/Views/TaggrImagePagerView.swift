@@ -10,6 +10,8 @@ struct TaggrImagePagerView<Item: Identifiable, TopTrailingContent: View, BottomC
     let close: () -> Void
     let topTrailingContent: (Item) -> TopTrailingContent
     let bottomContent: (Item) -> BottomContent
+    @Environment(TaggrAppCoordinator.self) private var state
+    @StateObject private var imagePrefetcher = PostImagePrefetcher()
     @State private var selection: String
 
     init(
@@ -59,6 +61,16 @@ struct TaggrImagePagerView<Item: Identifiable, TopTrailingContent: View, BottomC
             }
         }
         .background(Color.black.ignoresSafeArea())
+        .onAppear {
+            imagePrefetcher.prefetchAll(
+                PostImagePreviewPrefetchPolicy.attachments(items.map(imageAttachment)),
+                api: state.api,
+                config: state.runtimeConfig
+            )
+        }
+        .onDisappear {
+            imagePrefetcher.cancelAll()
+        }
     }
 
     private var selectedIndex: Int {

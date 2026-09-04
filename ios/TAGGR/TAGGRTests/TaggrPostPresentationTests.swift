@@ -56,6 +56,7 @@ extension TaggrTests {
         XCTAssertNotNil(compactHeight)
         XCTAssertGreaterThan(feedHeight ?? 0, compactHeight ?? 0)
         XCTAssertNil(TaggrPostBodyView.maximumHeight(for: nil))
+        XCTAssertNil(TaggrPostBodyView.maximumHeight(for: 10, containsYouTube: true))
     }
 
     func testPostPresentationDerivesBodiesAndReplyCount() {

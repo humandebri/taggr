@@ -399,7 +399,7 @@ extension TaggrTests {
                 }
                 return (response, Self.queryReply(Data("[]".utf8)))
             }
-            return (response, Self.queryReply(Self.candidResultOkNat64(42)))
+            return (response, Self.queryReply(Self.candidAddPostResultOk(42)))
         }
         let suiteName = "SubmitPostRealmPreferencesTests.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
@@ -411,11 +411,12 @@ extension TaggrTests {
         let postingScope = try XCTUnwrap(state.realmPostingScope)
         state.route = .feed(.realm("DEV"))
 
-        await state.submitPost(text: "hello", realm: "DEV", reloadMode: .realm("DEV"))
+        let outcome = await state.submitPost(text: "hello", realm: "DEV", reloadMode: .realm("DEV"))
 
+        XCTAssertEqual(outcome, .submitted)
         XCTAssertNil(state.errorMessage)
         XCTAssertEqual(calls.map(\.method), ["add_post", "user", "last_posts"])
-        XCTAssertEqual(calls.first?.arg, TaggrCandid.encodeAddPost(text: "hello", parent: nil, realm: "DEV"))
+        XCTAssertEqual(calls.first?.arg, try TaggrCandidAdapter.addPostArguments(text: "hello", refs: [], parent: nil, realm: "DEV", extensionBlob: nil).encode())
         XCTAssertEqual(calls.last?.arg, try TaggrCandid.jsonArguments([TaggrRuntimeConfig.productionDomain, "DEV", 0, 0, true]))
         XCTAssertEqual(state.route, .feed(.realm("DEV")))
         XCTAssertEqual(state.currentUser?.name, "alice")
@@ -436,7 +437,7 @@ extension TaggrTests {
                 }
                 return (response, Self.queryReply(Data("[]".utf8)))
             }
-            return (response, Self.queryReply(Self.candidResultOkNat64(42)))
+            return (response, Self.queryReply(Self.candidAddPostResultOk(42)))
         }
         let suiteName = "SubmitPostTaggrPreferencesTests.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
@@ -474,7 +475,20 @@ extension TaggrTests {
         failingState.authSession = makeAuthSession(privateKey: Curve25519.Signing.PrivateKey())
         failingState.currentUser = user
 
-        await failingState.submitPost(text: "hello", realm: "DEV")
+        let failedOutcome = await failingState.submitPost(text: "hello", realm: "DEV")
+        XCTAssertEqual(failedOutcome, .retryableFailure)
+        XCTAssertEqual(preferences.recentDestinations(scope: scope), ["ART"])
+
+        let unavailableAPI = makeStubbedAPI { request in
+            let response = HTTPURLResponse(url: request.url!, statusCode: 502, httpVersion: nil, headerFields: nil)!
+            return (response, Data("gateway unavailable".utf8))
+        }
+        let unavailableState = TaggrAppCoordinator(api: unavailableAPI, realmPostingPreferences: preferences)
+        unavailableState.authSession = makeAuthSession(privateKey: Curve25519.Signing.PrivateKey())
+        unavailableState.currentUser = user
+
+        let uncertainOutcome = await unavailableState.submitPost(text: "hello", realm: "DEV")
+        XCTAssertEqual(uncertainOutcome, .uncertain)
         XCTAssertEqual(preferences.recentDestinations(scope: scope), ["ART"])
 
         let replyAPI = makeStubbedAPI { request in
@@ -485,7 +499,7 @@ extension TaggrTests {
                 }
                 return (response, Self.queryReply(Data("[]".utf8)))
             }
-            return (response, Self.queryReply(Self.candidResultOkNat64(42)))
+            return (response, Self.queryReply(Self.candidAddPostResultOk(42)))
         }
         let replyState = TaggrAppCoordinator(api: replyAPI, realmPostingPreferences: preferences)
         replyState.authSession = makeAuthSession(privateKey: Curve25519.Signing.PrivateKey())
@@ -509,7 +523,7 @@ extension TaggrTests {
                 }
                 return (response, Self.queryReply(Data("[]".utf8)))
             }
-            return (response, Self.queryReply(Self.candidResultOkNat64(42)))
+            return (response, Self.queryReply(Self.candidAddPostResultOk(42)))
         }
         let state = TaggrAppCoordinator(api: api)
         state.authSession = makeAuthSession(privateKey: Curve25519.Signing.PrivateKey())
@@ -544,7 +558,7 @@ extension TaggrTests {
                 }
                 return (response, Self.queryReply(Data("[]".utf8)))
             }
-            return (response, Self.queryReply(Self.candidResultOkNat64(43)))
+            return (response, Self.queryReply(Self.candidAddPostResultOk(43)))
         }
         let state = TaggrAppCoordinator(api: api)
         state.authSession = makeAuthSession(privateKey: Curve25519.Signing.PrivateKey())
@@ -554,7 +568,7 @@ extension TaggrTests {
 
         XCTAssertNil(state.errorMessage)
         XCTAssertEqual(calls.map(\.method), ["add_post", "user", "thread", "thread"])
-        XCTAssertEqual(calls.first?.arg, TaggrCandid.encodeAddPost(text: "reply", parent: 42, realm: "DEV"))
+        XCTAssertEqual(calls.first?.arg, try TaggrCandidAdapter.addPostArguments(text: "reply", refs: [], parent: 42, realm: "DEV", extensionBlob: nil).encode())
         XCTAssertEqual(state.repliesByPostID[42], [])
     }
 
@@ -572,7 +586,7 @@ extension TaggrTests {
                 }
                 return (response, Self.queryReply(Data("[]".utf8)))
             }
-            return (response, Self.queryReply(Self.candidResultOkNat64(42)))
+            return (response, Self.queryReply(Self.candidEditPostResultOk()))
         }
         let suiteName = "EditPostRealmPreferencesTests.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
@@ -593,7 +607,7 @@ extension TaggrTests {
         XCTAssertEqual(calls.map(\.method), ["edit_post", "user", "thread"])
         XCTAssertEqual(
             calls.first?.arg,
-            TaggrCandid.encodeEditPost(id: 42, text: "updated", refs: [], patch: patch, realm: "ART")
+            try TaggrCandidAdapter.editPostArguments(id: 42, text: "updated", refs: [], patch: patch, realm: "ART").encode()
         )
         XCTAssertEqual(preferences.recentDestinations(scope: postingScope), ["ART"])
     }
@@ -615,7 +629,7 @@ extension TaggrTests {
                 }
                 return (response, Self.queryReply(Data("[]".utf8)))
             }
-            return (response, Self.queryReply(Self.candidResultOkNat64(42)))
+            return (response, Self.queryReply(Self.candidEditPostResultOk()))
         }
         let state = TaggrAppCoordinator(api: api)
         state.authSession = makeAuthSession(privateKey: Curve25519.Signing.PrivateKey())
@@ -644,13 +658,13 @@ extension TaggrTests {
         XCTAssertEqual(calls.first?.arg, Data([1, 2, 3]))
         XCTAssertEqual(
             calls.dropFirst().first?.arg,
-            TaggrCandid.encodeEditPost(
+            try TaggrCandidAdapter.editPostArguments(
                 id: 42,
                 text: body,
                 refs: [(id: "abc12345", offset: 7, length: 3)],
                 patch: patch,
                 realm: "DEV"
-            )
+            ).encode()
         )
     }
 
@@ -673,7 +687,7 @@ extension TaggrTests {
                 }
                 return (response, Self.queryReply(Data("[]".utf8)))
             }
-            return (response, Self.queryReply(Self.candidResultOkNat64(42)))
+            return (response, Self.queryReply(Self.candidAddPostResultOk(42)))
         }
         let state = TaggrAppCoordinator(api: api)
         state.authSession = makeAuthSession(privateKey: Curve25519.Signing.PrivateKey())
@@ -701,15 +715,16 @@ extension TaggrTests {
         XCTAssertEqual(calls[1].arg, Data([1, 2, 3]))
         XCTAssertEqual(
             calls[2].arg,
-            TaggrCandid.encodeAddPost(
+            try TaggrCandidAdapter.addPostArguments(
                 text: body,
                 refs: [
                     (id: "abc12345", offset: 7, length: 3),
                     (id: "abc12301", offset: 8, length: 3),
                 ],
                 parent: nil,
-                realm: nil
-            )
+                realm: nil,
+                extensionBlob: nil
+            ).encode()
         )
     }
 
@@ -721,7 +736,7 @@ extension TaggrTests {
                 calls.append(call)
             }
             let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
-            return (response, Self.queryReply(Self.candidResultOkNat64(42)))
+            return (response, Self.queryReply(Self.candidAddPostResultOk(42)))
         }
         let state = TaggrAppCoordinator(api: api)
         state.authSession = makeAuthSession(privateKey: Curve25519.Signing.PrivateKey())
@@ -753,7 +768,7 @@ extension TaggrTests {
                 calls.append(call)
             }
             let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
-            return (response, Self.queryReply(Self.candidResultOkNat64(42)))
+            return (response, Self.queryReply(Self.candidAddPostResultOk(42)))
         }
         let state = TaggrAppCoordinator(api: api)
         state.authSession = makeAuthSession(privateKey: Curve25519.Signing.PrivateKey())
@@ -785,7 +800,7 @@ extension TaggrTests {
                 calls.append(call)
             }
             let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
-            return (response, Self.queryReply(Self.candidResultOkNat64(42)))
+            return (response, Self.queryReply(Self.candidAddPostResultOk(42)))
         }
         let state = TaggrAppCoordinator(api: api)
         state.authSession = makeAuthSession(privateKey: Curve25519.Signing.PrivateKey())
