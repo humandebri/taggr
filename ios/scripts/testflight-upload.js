@@ -47,6 +47,7 @@ function readMarketingVersion() {
         scheme,
         "-configuration",
         "Release",
+        "-skipPackagePluginValidation",
         "-showBuildSettings",
     ];
     const result = spawnSync("xcodebuild", args, {
@@ -142,6 +143,7 @@ const archiveArgs = [
     archivePath,
     "-derivedDataPath",
     derivedDataPath,
+    "-skipPackagePluginValidation",
     "-allowProvisioningUpdates",
     "archive",
     `MARKETING_VERSION=${marketingVersion}`,
