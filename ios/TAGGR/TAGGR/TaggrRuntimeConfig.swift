@@ -1,6 +1,20 @@
 import Foundation
 import ICNativeClient
 
+enum TaggrIdentitySignInMethod: CaseIterable, Equatable, Hashable, Sendable {
+    case passkey
+    case apple
+    case google
+
+    var title: String {
+        switch self {
+        case .passkey: "Continue with passkey"
+        case .apple: "Continue with Apple"
+        case .google: "Continue with Google"
+        }
+    }
+}
+
 struct TaggrRuntimeConfig: Equatable, Sendable {
     static let productionCanisterId = "6qfxa-ryaaa-aaaai-qbhsq-cai"
     static let productionAPIBaseURL = URL(string: "https://ic0.app")!
@@ -64,6 +78,41 @@ struct TaggrRuntimeConfig: Equatable, Sendable {
 
     var shouldLoadBucketImagesThroughAPI: Bool {
         apiBaseURL != Self.productionAPIBaseURL
+    }
+
+    var availableIdentitySignInMethods: [TaggrIdentitySignInMethod] {
+        isProductionInternetIdentity ? TaggrIdentitySignInMethod.allCases : [.passkey]
+    }
+
+    func config(for signInMethod: TaggrIdentitySignInMethod) -> TaggrRuntimeConfig {
+        guard isProductionInternetIdentity else { return self }
+        var components = URLComponents(url: identityURL, resolvingAgainstBaseURL: false)!
+        switch signInMethod {
+        case .passkey:
+            components.queryItems = nil
+        case .apple:
+            components.queryItems = [URLQueryItem(name: "openid", value: "https://appleid.apple.com")]
+        case .google:
+            components.queryItems = [URLQueryItem(name: "openid", value: "https://accounts.google.com")]
+        }
+        return TaggrRuntimeConfig(
+            canisterId: canisterId,
+            apiBaseURL: apiBaseURL,
+            domain: domain,
+            callbackDomain: callbackDomain,
+            identityURL: components.url!,
+            derivationOrigin: derivationOrigin
+        )
+    }
+
+    private var isProductionInternetIdentity: Bool {
+        guard let components = URLComponents(url: identityURL, resolvingAgainstBaseURL: false) else {
+            return false
+        }
+        return components.scheme?.lowercased() == "https"
+            && components.host?.lowercased() == "id.ai"
+            && components.port == nil
+            && components.path == "/authorize"
     }
 
     private static func urlValue(_ key: String, in info: [String: Any]) -> URL? {

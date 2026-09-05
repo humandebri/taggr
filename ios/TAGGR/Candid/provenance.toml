@@ -16,8 +16,9 @@ path = "production/ledger.did"
 source_url = "https://github.com/dfinity/ic/blob/b61f969cc56157b113e7fe56e053c39620c5d443/rs/ledger_suite/icp/ledger.did"
 upstream_commit = "b61f969cc56157b113e7fe56e053c39620c5d443"
 canister_id = "ryjl3-tyaaa-aaaaa-aaaba-cai"
-retrieved_at = "2026-09-04"
-sha256 = "a0db3fdb7cd24e4beda0216aa6c48282b904c342b1d72918c0962a873f8b96d2"
+retrieved_at = "2026-09-05"
+verified_against = "icp canister metadata ryjl3-tyaaa-aaaaa-aaaba-cai candid:service --network ic"
+sha256 = "2b4d3fe36fb6549cb2153353c85a0ff9a1567a821ed91565e092a6aa35aa57e6"
 
 [[interface]]
 name = "cmc"

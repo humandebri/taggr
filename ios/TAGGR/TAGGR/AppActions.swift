@@ -575,11 +575,24 @@ extension TaggrAppCoordinator {
     }
 
     func startIdentitySignIn() {
-        startIdentitySignIn(reason: nil)
+        presentIdentitySignInMethodPicker()
     }
 
     func startIdentitySignIn(reason: String?) {
+        presentIdentitySignInMethodPicker(reason: reason)
+    }
+
+    func presentIdentitySignInMethodPicker(reason: String? = nil) {
         guard !isAuthenticatingIdentity else { return }
+        identitySignInReason = reason
+        identitySignInMethodPickerPresented = true
+    }
+
+    func startIdentitySignIn(_ signInMethod: TaggrIdentitySignInMethod, reason: String? = nil) {
+        guard !isAuthenticatingIdentity else { return }
+        identitySignInMethodPickerPresented = false
+        identitySignInReason = nil
+        activateIdentityConfiguration(for: signInMethod)
         isAuthenticatingIdentity = true
         errorMessage = reason
         Task {
@@ -593,6 +606,13 @@ extension TaggrAppCoordinator {
             }
             isAuthenticatingIdentity = false
         }
+    }
+
+    func activateIdentityConfiguration(for signInMethod: TaggrIdentitySignInMethod) {
+        let config = runtimeConfig.config(for: signInMethod)
+        api = injectedAPI ?? apiFactory(config)
+        identityStore = injectedIdentityStore ?? identityStoreFactory(config)
+        identityAuthenticator = injectedIdentityAuthenticator ?? identityAuthenticatorFactory(config)
     }
 
     func completeIdentity(_ session: ICAuthSession) async {

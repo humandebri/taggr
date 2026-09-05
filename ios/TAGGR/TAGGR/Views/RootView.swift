@@ -68,6 +68,26 @@ struct RootView: View {
                     .padding()
             }
         }
+        .confirmationDialog(
+            "Sign in with Internet Identity",
+            isPresented: Binding(
+                get: { state.identitySignInMethodPickerPresented },
+                set: { state.identitySignInMethodPickerPresented = $0 }
+            ),
+            titleVisibility: .visible
+        ) {
+            ForEach(state.runtimeConfig.availableIdentitySignInMethods, id: \.self) { method in
+                Button(method.title) {
+                    state.startIdentitySignIn(method, reason: state.identitySignInReason)
+                }
+            }
+        } message: {
+            if let reason = state.identitySignInReason {
+                Text(reason)
+            } else {
+                Text("Choose a sign-in method.")
+            }
+        }
         .tint(TaggrTheme.clickable)
         .preferredColorScheme(.dark)
     }

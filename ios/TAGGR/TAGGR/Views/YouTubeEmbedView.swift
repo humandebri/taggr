@@ -1,4 +1,5 @@
 // TAGGR/Views: Inline YouTube player matching the PWA's 16:9 embed.
+import Foundation
 import SwiftUI
 import WebKit
 
@@ -12,6 +13,22 @@ struct YouTubeEmbedView: View {
             .clipShape(RoundedRectangle(cornerRadius: 10))
             .accessibilityElement(children: .ignore)
             .accessibilityLabel("YouTube video")
+    }
+}
+
+enum YouTubeEmbedRequest {
+    static func make(videoID: String, bundleIdentifier: String? = Bundle.main.bundleIdentifier) -> URLRequest? {
+        guard let bundleIdentifier, !bundleIdentifier.isEmpty else { return nil }
+        var components = URLComponents(string: "https://www.youtube.com/embed/\(videoID)")
+        components?.queryItems = [
+            URLQueryItem(name: "playsinline", value: "1"),
+            URLQueryItem(name: "rel", value: "0")
+        ]
+        guard let url = components?.url else { return nil }
+
+        var request = URLRequest(url: url)
+        request.setValue("https://\(bundleIdentifier.lowercased())", forHTTPHeaderField: "Referer")
+        return request
     }
 }
 
@@ -44,14 +61,8 @@ private struct YouTubeWebView: UIViewRepresentable {
         func load(videoID: String, in webView: WKWebView) {
             guard loadedVideoID != videoID else { return }
             loadedVideoID = videoID
-            var components = URLComponents(string: "https://www.youtube.com/embed/\(videoID)")
-            components?.queryItems = [
-                URLQueryItem(name: "playsinline", value: "1"),
-                URLQueryItem(name: "rel", value: "0"),
-                URLQueryItem(name: "origin", value: "https://www.youtube.com")
-            ]
-            guard let url = components?.url else { return }
-            webView.load(URLRequest(url: url))
+            guard let request = YouTubeEmbedRequest.make(videoID: videoID) else { return }
+            webView.load(request)
         }
     }
 }

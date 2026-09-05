@@ -6,6 +6,25 @@ import ICNativeClient
 @testable import TAGGR
 
 extension TaggrTests {
+    func testYouTubeEmbedRequestIncludesAppReferer() throws {
+        let request = try XCTUnwrap(
+            YouTubeEmbedRequest.make(videoID: "zG9K9Za56jI", bundleIdentifier: "NETWORK.TAGGR.IOS")
+        )
+        let components = try XCTUnwrap(URLComponents(url: try XCTUnwrap(request.url), resolvingAgainstBaseURL: false))
+
+        XCTAssertEqual(components.scheme, "https")
+        XCTAssertEqual(components.host, "www.youtube.com")
+        XCTAssertEqual(components.path, "/embed/zG9K9Za56jI")
+        XCTAssertEqual(
+            Set(components.queryItems ?? []),
+            Set([
+                URLQueryItem(name: "playsinline", value: "1"),
+                URLQueryItem(name: "rel", value: "0")
+            ])
+        )
+        XCTAssertEqual(request.value(forHTTPHeaderField: "Referer"), "https://network.taggr.ios")
+    }
+
     func testPostCreditCostMatchesBodySizeAndTags() async throws {
         var calls: [(method: String, arg: Data)] = []
         let api = makeStubbedAPI { request in

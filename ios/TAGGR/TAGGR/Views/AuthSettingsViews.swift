@@ -57,7 +57,7 @@ struct SettingsView: View {
                             }
                         } else {
                             Button {
-                                state.startIdentitySignIn()
+                                state.presentIdentitySignInMethodPicker()
                             } label: {
                                 Label(
                                     state.isAuthenticatingIdentity ? "Signing in..." : "Sign in with Internet Identity",

@@ -125,6 +125,14 @@ final class TaggrAppCoordinator {
         get { sessionStore.isAuthenticatingIdentity }
         set { sessionStore.isAuthenticatingIdentity = newValue }
     }
+    var identitySignInMethodPickerPresented: Bool {
+        get { sessionStore.identitySignInMethodPickerPresented }
+        set { sessionStore.identitySignInMethodPickerPresented = newValue }
+    }
+    var identitySignInReason: String? {
+        get { sessionStore.identitySignInReason }
+        set { sessionStore.identitySignInReason = newValue }
+    }
     var runtimeConfig: TaggrRuntimeConfig {
         sessionStore.runtimeConfig
     }
@@ -197,9 +205,15 @@ final class TaggrAppCoordinator {
         set { walletStorageStore.storageCreationState = newValue }
     }
 
-    let api: TaggrAPI
-    let identityStore: ICIdentityStore
-    let identityAuthenticator: ICInternetIdentityAuthenticator
+    var api: TaggrAPI
+    var identityStore: ICIdentityStore
+    var identityAuthenticator: ICInternetIdentityAuthenticator
+    let apiFactory: @MainActor (TaggrRuntimeConfig) -> TaggrAPI
+    let identityStoreFactory: @MainActor (TaggrRuntimeConfig) -> ICIdentityStore
+    let identityAuthenticatorFactory: @MainActor (TaggrRuntimeConfig) -> ICInternetIdentityAuthenticator
+    let injectedAPI: TaggrAPI?
+    let injectedIdentityStore: ICIdentityStore?
+    let injectedIdentityAuthenticator: ICInternetIdentityAuthenticator?
     let postDraftStore: PostDraftStore
     let realmPostingPreferences: RealmPostingPreferences
     static let maxAuthorNameCacheEntries = 500
@@ -236,14 +250,14 @@ final class TaggrAppCoordinator {
         postDraftStore: PostDraftStore = PostDraftStore(),
         realmPostingPreferences: RealmPostingPreferences = RealmPostingPreferences(),
         buildConfig: TaggrRuntimeConfig = .current,
-        apiFactory: @MainActor (TaggrRuntimeConfig) -> TaggrAPI = { TaggrAPI(config: $0) },
-        identityStoreFactory: @MainActor (TaggrRuntimeConfig) -> ICIdentityStore = { runtimeConfig in
+        apiFactory: @escaping @MainActor (TaggrRuntimeConfig) -> TaggrAPI = { TaggrAPI(config: $0) },
+        identityStoreFactory: @escaping @MainActor (TaggrRuntimeConfig) -> ICIdentityStore = { runtimeConfig in
             ICIdentityStore(
                 configuration: runtimeConfig.icClientConfiguration,
                 service: TaggrAppCoordinator.identityStoreService
             )
         },
-        identityAuthenticatorFactory: @MainActor (TaggrRuntimeConfig) -> ICInternetIdentityAuthenticator = { runtimeConfig in
+        identityAuthenticatorFactory: @escaping @MainActor (TaggrRuntimeConfig) -> ICInternetIdentityAuthenticator = { runtimeConfig in
             do {
                 return try ICInternetIdentityAuthenticator(
                     configuration: runtimeConfig.icClientConfiguration,
@@ -256,6 +270,12 @@ final class TaggrAppCoordinator {
         }
     ) {
         self.sessionStore = SessionStore(config: buildConfig)
+        self.apiFactory = apiFactory
+        self.identityStoreFactory = identityStoreFactory
+        self.identityAuthenticatorFactory = identityAuthenticatorFactory
+        self.injectedAPI = api
+        self.injectedIdentityStore = identityStore
+        self.injectedIdentityAuthenticator = identityAuthenticator
         self.api = api ?? apiFactory(buildConfig)
         self.identityStore = identityStore ?? identityStoreFactory(buildConfig)
         self.identityAuthenticator = identityAuthenticator ?? identityAuthenticatorFactory(buildConfig)
@@ -298,11 +318,24 @@ final class TaggrAppCoordinator {
     }
 
     func bootstrap() async {
-        do {
-            authSession = try identityStore.load()
-        } catch {
-            NSLog("TAGGR identity session could not be loaded: %@", error.localizedDescription)
-            authSession = nil
+        var loadError: Error?
+        authSession = nil
+        for signInMethod in runtimeConfig.availableIdentitySignInMethods {
+            activateIdentityConfiguration(for: signInMethod)
+            do {
+                if let session = try identityStore.load() {
+                    authSession = session
+                    break
+                }
+            } catch {
+                loadError = error
+            }
+        }
+        if authSession == nil {
+            activateIdentityConfiguration(for: .passkey)
+            if let loadError {
+                NSLog("TAGGR identity session could not be loaded: %@", loadError.localizedDescription)
+            }
         }
         await reloadCache()
         await refreshCurrentUser()

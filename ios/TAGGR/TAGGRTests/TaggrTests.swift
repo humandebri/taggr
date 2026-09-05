@@ -51,6 +51,70 @@ final class TaggrTests: XCTestCase {
         XCTAssertEqual(config.derivationOrigin, TaggrRuntimeConfig.productionDerivationOrigin)
     }
 
+    func testProductionIdentitySignInMethodsUseFixedTrustedURLs() {
+        let config = TaggrRuntimeConfig.from(info: [:])
+
+        XCTAssertEqual(config.availableIdentitySignInMethods, [.passkey, .apple, .google])
+        XCTAssertEqual(
+            config.config(for: .passkey).identityURL.absoluteString,
+            "https://id.ai/authorize"
+        )
+        XCTAssertEqual(
+            config.config(for: .apple).identityURL.absoluteString,
+            "https://id.ai/authorize?openid=https://appleid.apple.com"
+        )
+        XCTAssertEqual(
+            config.config(for: .google).identityURL.absoluteString,
+            "https://id.ai/authorize?openid=https://accounts.google.com"
+        )
+    }
+
+    func testCustomIdentityURLDoesNotEnableProductionOpenIDProviders() {
+        let config = TaggrRuntimeConfig.from(info: [
+            "TAGGR_II_URL": "https://identity.trycloudflare.com/authorize",
+        ])
+
+        XCTAssertEqual(config.availableIdentitySignInMethods, [.passkey])
+        XCTAssertEqual(
+            config.config(for: .apple).identityURL.absoluteString,
+            "https://identity.trycloudflare.com/authorize"
+        )
+    }
+
+    func testAppleSignInActivatesMatchingIdentityConfigurationEverywhere() {
+        let config = TaggrRuntimeConfig.from(info: [:])
+        let identityService = testIdentityService()
+        var apiConfigurations: [TaggrRuntimeConfig] = []
+        var identityStoreConfigurations: [TaggrRuntimeConfig] = []
+        var authenticatorConfigurations: [TaggrRuntimeConfig] = []
+        let state = TaggrAppCoordinator(
+            buildConfig: config,
+            apiFactory: { selectedConfig in
+                apiConfigurations.append(selectedConfig)
+                return TaggrAPI(config: selectedConfig)
+            },
+            identityStoreFactory: { selectedConfig in
+                identityStoreConfigurations.append(selectedConfig)
+                return self.makeTestIdentityStore(config: selectedConfig, service: identityService)
+            },
+            identityAuthenticatorFactory: { selectedConfig in
+                authenticatorConfigurations.append(selectedConfig)
+                return try! ICInternetIdentityAuthenticator(
+                    configuration: selectedConfig.icClientConfiguration,
+                    callbackDomain: selectedConfig.callbackDomain,
+                    callbackPath: ICInternetIdentityAuthenticator.callbackPath
+                )
+            }
+        )
+
+        state.activateIdentityConfiguration(for: .apple)
+
+        let expectedURL = "https://id.ai/authorize?openid=https://appleid.apple.com"
+        XCTAssertEqual(apiConfigurations.last?.identityURL.absoluteString, expectedURL)
+        XCTAssertEqual(identityStoreConfigurations.last?.identityURL.absoluteString, expectedURL)
+        XCTAssertEqual(authenticatorConfigurations.last?.identityURL.absoluteString, expectedURL)
+    }
+
     @MainActor
     func testCustomBuildConfigIsUsedAtLaunch() {
         let customConfig = TaggrRuntimeConfig.from(info: [
@@ -174,6 +238,24 @@ final class TaggrTests: XCTestCase {
         XCTAssertEqual(object["id"] as? String, pending.requestID)
         XCTAssertEqual(params["maxTimeToLive"] as? String, String(pending.maxTimeToLiveNanoseconds))
         XCTAssertEqual(params["icrc95DerivationOrigin"] as? String, config.derivationOrigin)
+    }
+
+    func testAppleICRC167AuthorizationURLPreservesOpenIDQueryAndUsesFragment() throws {
+        let config = TaggrRuntimeConfig.from(info: [:]).config(for: .apple)
+        let callbackURL = try ICInternetIdentityAuthenticator.callbackURL(
+            callbackDomain: config.callbackDomain,
+            callbackPath: ICInternetIdentityAuthenticator.callbackPath
+        )
+        let pending = try ICRC167Codec.makePendingRequest()
+        let url = try ICRC167Codec.authorizationURL(
+            configuration: config.icClientConfiguration,
+            callbackURL: callbackURL,
+            pendingRequest: pending
+        )
+
+        let components = try XCTUnwrap(URLComponents(url: url, resolvingAgainstBaseURL: false))
+        XCTAssertEqual(components.queryItems, [URLQueryItem(name: "openid", value: "https://appleid.apple.com")])
+        XCTAssertNotNil(components.fragment)
     }
 
     func testProductionCallbackUsesExplicitHTTPSPath() throws {
@@ -335,6 +417,44 @@ final class TaggrTests: XCTestCase {
         let tooLarge = try CandidNat("18446744073709551616")
         let status = try Self.managementCanisterStatus(cycles: tooLarge)
         XCTAssertThrowsError(try TaggrCandidAdapter.canisterStatus(status))
+    }
+
+    func testCanisterStatusAcceptsAdditionalManagementFields() throws {
+        let status = try Self.managementCanisterStatus(cycles: CandidNat("2"))
+        guard case .record(let statusFields, var statusValues) = status.candidValue else {
+            return XCTFail("expected canister_status record")
+        }
+        let settingsID = Candid.fieldID("settings")
+        guard case .record(let settingsFields, var settingsValues) = statusValues[settingsID] else {
+            return XCTFail("expected canister_status settings record")
+        }
+
+        let logMemoryLimit = CandidField("log_memory_limit", type: .nat)
+        let actualSettingsFields = settingsFields + [logMemoryLimit]
+        settingsValues[logMemoryLimit.id] = .nat(try CandidNat("0"))
+        statusValues[settingsID] = .record(actualSettingsFields, settingsValues)
+        let actualStatusFields = statusFields.map { field in
+            field.id == settingsID
+                ? CandidField(id: field.id, type: .record(actualSettingsFields))
+                : field
+        }
+        let actual = try CandidTypedValue(
+            type: .record(actualStatusFields),
+            value: .record(actualStatusFields, statusValues)
+        )
+
+        let decoded = try TaggrCanister._ICBindgenSupport.decode(
+            actual,
+            as: ManagementCanisterStatus.self,
+            context: "canister_status"
+        )
+        XCTAssertEqual(decoded.cycles.decimal, "2")
+    }
+
+    func testLedgerFutureTransferErrorUsesMainnetNullPayload() {
+        XCTAssertThrowsError(try TaggrCandidAdapter.transferResult(.err(.txCreatedInFuture))) { error in
+            XCTAssertEqual(error.localizedDescription, "ICP transfer request was created in the future.")
+        }
     }
 
     func testBucketHeadersKeepAnonymousFieldIDsZeroAndOne() throws {

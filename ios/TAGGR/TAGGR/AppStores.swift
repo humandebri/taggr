@@ -117,6 +117,8 @@ final class SessionStore {
     var isBusy = false
     var errorMessage: String?
     var isAuthenticatingIdentity = false
+    var identitySignInMethodPickerPresented = false
+    var identitySignInReason: String?
     let runtimeConfig: TaggrRuntimeConfig
 
     init(config: TaggrRuntimeConfig) {

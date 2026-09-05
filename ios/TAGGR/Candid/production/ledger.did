@@ -12,7 +12,7 @@ type TransferError = variant {
   BadFee : record { expected_fee : Tokens };
   InsufficientFunds : record { balance : Tokens };
   TxTooOld : record { allowed_window_nanos : nat64 };
-  TxCreatedInFuture : record { ledger_time : nat64 };
+  TxCreatedInFuture;
   TxDuplicate : record { duplicate_of : nat64 };
 };
 type TransferResult = variant { Ok : nat64; Err : TransferError };
