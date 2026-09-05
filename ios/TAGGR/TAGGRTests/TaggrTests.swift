@@ -1032,6 +1032,8 @@ final class TaggrTests: XCTestCase {
         XCTAssertEqual(post.post.children, [])
         XCTAssertEqual(post.post.reactions, [:])
         XCTAssertEqual(post.post.meta.authorName, "alice")
+        XCTAssertEqual(post.post.meta.authorBadges, ["OG", "FUTURE_BADGE"])
+        XCTAssertEqual(TaggrUserBadge.decoded(from: post.post.meta.authorBadges), [.og])
         XCTAssertEqual(post.post.meta.realmColor, "#123456")
         XCTAssertEqual(post.post.meta.viewerBlocked, false)
         XCTAssertEqual(post.post.encrypted, false)
@@ -1042,6 +1044,7 @@ final class TaggrTests: XCTestCase {
     func testPostEnvelopeAllowsMissingAuthorNameFallback() throws {
         let post = try JSONDecoder.taggr.decode(TaggrPostEnvelope.self, from: postEnvelopeWithoutAuthorFixture())
         XCTAssertNil(post.post.meta.authorName)
+        XCTAssertEqual(post.post.meta.authorBadges, [])
         XCTAssertEqual(post.post.user, 7)
     }
 

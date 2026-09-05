@@ -416,6 +416,9 @@ struct PostRow: View {
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
+                UserAttributeBadgesView(
+                    badges: TaggrUserBadge.decoded(from: post.meta.authorBadges)
+                )
                 if let notice = safetyNotice {
                     PostSafetyNotice(notice: notice) {
                         revealSensitive = true
@@ -886,6 +889,9 @@ struct RepostExtensionView: View {
                         Text(embeddedPost.meta.authorName ?? "@\(embeddedPost.user)")
                             .font(.caption.weight(.bold))
                             .foregroundStyle(TaggrTheme.clickable)
+                        UserAttributeBadgesView(
+                            badges: TaggrUserBadge.decoded(from: embeddedPost.meta.authorBadges)
+                        )
                         TaggrPostBodyView(text: embeddedPost.displayBody, maximumLines: 4)
                             .font(.subheadline)
                             .foregroundStyle(TaggrTheme.secondaryText)

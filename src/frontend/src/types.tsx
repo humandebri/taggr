@@ -161,6 +161,7 @@ export type Realm = {
 
 export type Meta = {
     author_name: string;
+    author_badges?: string[];
     author_filters: UserFilter;
     viewer_blocked: boolean;
     realm_color: string;

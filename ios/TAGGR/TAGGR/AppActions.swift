@@ -616,7 +616,7 @@ extension TaggrAppCoordinator {
     }
 
     func completeIdentity(_ session: ICAuthSession) async {
-        await runBusy {
+        let completed = await runBusy {
             // This signed canister query is the practical verifier before the II delegation is saved.
             currentUser = try await api.signedQuery("user", args: [api.domain, []], identity: session, as: Optional<TaggrUser>.self) ?? nil
             if let currentUser {
@@ -626,6 +626,9 @@ extension TaggrAppCoordinator {
             authSession = session
             await reloadCache()
             await loadCurrentRoute()
+        }
+        if completed {
+            await refreshWallet()
         }
     }
 

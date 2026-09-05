@@ -666,6 +666,7 @@ enum TaggrPostImages {
 
 struct TaggrPostMeta: Codable, Equatable, Sendable {
     let authorName: String?
+    let authorBadges: [String]
     let realmColor: String?
     let nsfw: Bool?
     let viewerBlocked: Bool?
@@ -673,6 +674,7 @@ struct TaggrPostMeta: Codable, Equatable, Sendable {
 
     enum CodingKeys: String, CodingKey {
         case authorName
+        case authorBadges
         case realmColor
         case nsfw
         case viewerBlocked
@@ -681,16 +683,28 @@ struct TaggrPostMeta: Codable, Equatable, Sendable {
 
     init(
         authorName: String?,
+        authorBadges: [String] = [],
         realmColor: String?,
         nsfw: Bool?,
         viewerBlocked: Bool?,
         maxDownvotesReached: Bool? = nil
     ) {
         self.authorName = authorName
+        self.authorBadges = authorBadges
         self.realmColor = realmColor
         self.nsfw = nsfw
         self.viewerBlocked = viewerBlocked
         self.maxDownvotesReached = maxDownvotesReached
+    }
+
+    init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        authorName = try values.decodeIfPresent(String.self, forKey: .authorName)
+        authorBadges = try values.decodeIfPresent([String].self, forKey: .authorBadges) ?? []
+        realmColor = try values.decodeIfPresent(String.self, forKey: .realmColor)
+        nsfw = try values.decodeIfPresent(Bool.self, forKey: .nsfw)
+        viewerBlocked = try values.decodeIfPresent(Bool.self, forKey: .viewerBlocked)
+        maxDownvotesReached = try values.decodeIfPresent(Bool.self, forKey: .maxDownvotesReached)
     }
 }
 
@@ -872,6 +886,8 @@ struct TaggrUser: Codable, Identifiable, Equatable, Sendable {
     let pinnedPosts: [Int]
     let settings: [String: String]
     let controlledRealms: [String]
+    let controllers: [String]
+    let stalwart: Bool
     let notifications: [Int: TaggrNotificationEntry]
     let bucket: String?
     let mode: String?
@@ -898,6 +914,8 @@ struct TaggrUser: Codable, Identifiable, Equatable, Sendable {
         case pinnedPosts
         case settings
         case controlledRealms
+        case controllers
+        case stalwart
         case notifications
         case bucket
         case mode
@@ -925,6 +943,8 @@ struct TaggrUser: Codable, Identifiable, Equatable, Sendable {
         pinnedPosts: [Int] = [],
         settings: [String: String] = [:],
         controlledRealms: [String] = [],
+        controllers: [String] = [],
+        stalwart: Bool = false,
         notifications: [Int: TaggrNotificationEntry] = [:],
         bucket: String? = nil,
         mode: String?,
@@ -950,6 +970,8 @@ struct TaggrUser: Codable, Identifiable, Equatable, Sendable {
         self.pinnedPosts = pinnedPosts
         self.settings = settings
         self.controlledRealms = controlledRealms
+        self.controllers = controllers
+        self.stalwart = stalwart
         self.notifications = notifications
         self.bucket = bucket
         self.mode = mode
@@ -978,6 +1000,8 @@ struct TaggrUser: Codable, Identifiable, Equatable, Sendable {
         pinnedPosts = try values.decodeIfPresent([Int].self, forKey: .pinnedPosts) ?? []
         settings = try values.decodeIfPresent([String: String].self, forKey: .settings) ?? [:]
         controlledRealms = try values.decodeIfPresent([String].self, forKey: .controlledRealms) ?? []
+        controllers = try values.decodeIfPresent([String].self, forKey: .controllers) ?? []
+        stalwart = try values.decodeIfPresent(Bool.self, forKey: .stalwart) ?? false
         notifications = try values.decodeIfPresent([Int: TaggrNotificationEntry].self, forKey: .notifications) ?? [:]
         bucket = try values.decodeIfPresent(String.self, forKey: .bucket)
         mode = try values.decodeIfPresent(String.self, forKey: .mode)
@@ -1006,6 +1030,8 @@ struct TaggrUser: Codable, Identifiable, Equatable, Sendable {
             pinnedPosts: pinnedPosts,
             settings: settings,
             controlledRealms: controlledRealms,
+            controllers: controllers,
+            stalwart: stalwart,
             notifications: notifications,
             bucket: bucket,
             mode: mode,
@@ -1035,6 +1061,8 @@ struct TaggrUser: Codable, Identifiable, Equatable, Sendable {
             pinnedPosts: pinnedPosts,
             settings: settings,
             controlledRealms: controlledRealms,
+            controllers: controllers,
+            stalwart: stalwart,
             notifications: notifications,
             bucket: bucket,
             mode: mode,
@@ -1050,6 +1078,56 @@ struct TaggrUser: Codable, Identifiable, Equatable, Sendable {
         )
     }
 
+}
+
+enum TaggrUserBadge: String, CaseIterable, Hashable, Sendable {
+    case bot = "BOT"
+    case og = "OG"
+    case stalwart = "STALWART"
+    case frequenter = "FREQUENTER"
+    case followsYou = "FOLLOWS YOU"
+    case inactive = "INACTIVE"
+
+    static func badges(
+        for user: TaggrUser,
+        viewerID: Int?,
+        votingPowerActivityWeeks: Int?,
+        now: Date = Date()
+    ) -> [TaggrUserBadge] {
+        let endOf2022: Int64 = 1_672_500_000_000_000_000
+        var badges: [TaggrUserBadge] = []
+
+        if user.controllers.contains(where: { $0.count == 27 }) {
+            badges.append(.bot)
+        } else if let timestamp = user.timestamp?.value, timestamp < endOf2022 {
+            badges.append(.og)
+        }
+        if user.stalwart {
+            badges.append(.stalwart)
+        }
+        if (user.activeWeeks ?? 0) > 12 {
+            badges.append(.frequenter)
+        }
+        if let viewerID, viewerID != user.id, user.followees.contains(viewerID) {
+            badges.append(.followsYou)
+        }
+        if let lastActivity = user.lastActivity?.value,
+           let votingPowerActivityWeeks,
+           votingPowerActivityWeeks >= 0 {
+            let lastActivityDate = Date(
+                timeIntervalSince1970: Double(lastActivity) / 1_000_000_000
+            )
+            let inactiveInterval = TimeInterval(votingPowerActivityWeeks) * 7 * 24 * 60 * 60
+            if now.timeIntervalSince(lastActivityDate) > inactiveInterval {
+                badges.append(.inactive)
+            }
+        }
+        return badges
+    }
+
+    static func decoded(from values: [String]) -> [TaggrUserBadge] {
+        values.compactMap(TaggrUserBadge.init(rawValue:))
+    }
 }
 
 struct TaggrStats: Codable, Equatable, Sendable {
@@ -1100,6 +1178,7 @@ struct TaggrConfig: Codable, Equatable, Sendable {
     let postCost: Int?
     let pollCost: Int?
     let postDeletionPenaltyFactor: Int?
+    let votingPowerActivityWeeks: Int?
 
     enum CodingKeys: String, CodingKey {
         case name
@@ -1117,6 +1196,7 @@ struct TaggrConfig: Codable, Equatable, Sendable {
         case postCost
         case pollCost
         case postDeletionPenaltyFactor
+        case votingPowerActivityWeeks
     }
 }
 

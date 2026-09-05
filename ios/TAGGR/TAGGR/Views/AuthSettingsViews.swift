@@ -7,6 +7,8 @@ struct SettingsView: View {
     @State private var accountCreationPresented = false
     @State private var sendICPPresented = false
     @State private var mintConfirmationPresented = false
+    @State private var principalCopied = false
+    @State private var signOutConfirmationPresented = false
 
     var body: some View {
         ZStack {
@@ -21,10 +23,28 @@ struct SettingsView: View {
                                 .textSelection(.enabled)
                         }
                         if let session = state.authSession {
-                            Text(session.principal)
-                                .font(.footnote.monospaced())
-                                .foregroundStyle(TaggrTheme.text)
-                                .textSelection(.enabled)
+                            HStack(alignment: .top, spacing: 8) {
+                                Text(session.principal)
+                                    .font(.footnote.monospaced())
+                                    .foregroundStyle(TaggrTheme.text)
+                                    .textSelection(.enabled)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                Button {
+                                    UIPasteboard.general.string = session.principal
+                                    principalCopied = true
+                                } label: {
+                                    Label(
+                                        principalCopied ? "Principal copied" : "Copy principal",
+                                        systemImage: principalCopied ? "checkmark" : "doc.on.doc"
+                                    )
+                                    .labelStyle(.iconOnly)
+                                    .frame(width: 44, height: 44)
+                                    .background(TaggrTheme.panelRaised)
+                                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                                }
+                                .buttonStyle(.plain)
+                                .foregroundStyle(principalCopied ? TaggrTheme.accent : TaggrTheme.clickable)
+                            }
                             if state.currentUser == nil {
                                 Button {
                                     state.icpInvoice = nil
@@ -37,23 +57,64 @@ struct SettingsView: View {
                                 Label(user.name, systemImage: "checkmark.seal")
                                     .font(.subheadline.weight(.bold))
                                     .foregroundStyle(TaggrTheme.text)
-                                Button {
-                                    state.navigateToProfile(user.name)
-                                } label: {
-                                    Label("Open journal", systemImage: "person.crop.square")
-                                        .font(.subheadline.weight(.bold))
-                                }
-                                Button {
-                                    state.route = .userPhotos(user.name)
-                                } label: {
-                                    Label("Photos", systemImage: "photo.on.rectangle")
-                                        .font(.subheadline.weight(.bold))
+                                UserAttributeBadgesView(
+                                    badges: TaggrUserBadge.badges(
+                                        for: user,
+                                        viewerID: user.id,
+                                        votingPowerActivityWeeks: state.cache?.config?.votingPowerActivityWeeks
+                                    )
+                                )
+                                HStack(spacing: 10) {
+                                    Button {
+                                        state.navigateToProfile(user.name)
+                                    } label: {
+                                        Label("Open journal", systemImage: "person.crop.square")
+                                            .labelStyle(.iconOnly)
+                                            .frame(width: 44, height: 44)
+                                            .background(TaggrTheme.panelRaised)
+                                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                                    }
+                                    .buttonStyle(.plain)
+                                    Button {
+                                        state.route = .userPhotos(user.name)
+                                    } label: {
+                                        Label("Photos", systemImage: "photo.on.rectangle")
+                                            .labelStyle(.iconOnly)
+                                            .frame(width: 44, height: 44)
+                                            .background(TaggrTheme.panelRaised)
+                                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                                    }
+                                    .buttonStyle(.plain)
                                 }
                             }
-                            Button(role: .destructive) {
-                                state.signOut()
+                            Divider()
+                                .overlay(TaggrTheme.panelRaised)
+                            Button {
+                                signOutConfirmationPresented = true
                             } label: {
                                 Label("Sign out", systemImage: "rectangle.portrait.and.arrow.right")
+                                    .font(.subheadline.bold())
+                                    .frame(maxWidth: .infinity)
+                                    .frame(minHeight: 44)
+                                    .background(.red.opacity(0.08))
+                                    .overlay {
+                                        RoundedRectangle(cornerRadius: 8)
+                                            .stroke(.red.opacity(0.85), lineWidth: 1)
+                                    }
+                            }
+                            .buttonStyle(.plain)
+                            .foregroundStyle(.red)
+                            .confirmationDialog(
+                                "Sign out?",
+                                isPresented: $signOutConfirmationPresented,
+                                titleVisibility: .visible
+                            ) {
+                                Button("Sign out", role: .destructive) {
+                                    state.signOut()
+                                }
+                                Button("Cancel", role: .cancel) {}
+                            } message: {
+                                Text("This removes the saved Internet Identity session from this device. Your TAGGR account and posts remain.")
                             }
                         } else {
                             Button {
@@ -77,42 +138,33 @@ struct SettingsView: View {
                             walletPanel(state.currentUser)
                         }
                     }
-                    if state.youtubeUpload.auth.isEnabled {
+                    if state.youtubeUpload.auth.isConnected,
+                       let channel = state.youtubeUpload.auth.channel {
                         SettingsPanel(title: "YouTube") {
-                            if let channel = state.youtubeUpload.auth.channel {
-                                Label(channel.title, systemImage: "play.rectangle.fill")
-                                    .font(.subheadline.weight(.bold))
-                                    .foregroundStyle(TaggrTheme.text)
-                                Text("Videos selected in TAGGR are uploaded directly to this channel.")
-                                    .font(.footnote)
-                                    .foregroundStyle(TaggrTheme.secondaryText)
-                                Button(role: .destructive) {
-                                    state.youtubeUpload.disconnect()
-                                } label: {
-                                    Label("Disconnect YouTube", systemImage: "link.badge.minus")
-                                }
-                                .disabled(state.youtubeUpload.auth.isBusy)
-                            } else {
-                                Button {
-                                    state.youtubeUpload.auth.connect()
-                                } label: {
-                                    Label(
-                                        state.youtubeUpload.auth.isBusy ? "Connecting..." : "Connect YouTube",
-                                        systemImage: "play.rectangle"
-                                    )
-                                }
-                                .disabled(state.youtubeUpload.auth.isBusy)
+                            Label(channel.title, systemImage: "play.rectangle.fill")
+                                .font(.subheadline.weight(.bold))
+                                .foregroundStyle(TaggrTheme.text)
+                            Text("Videos selected in TAGGR are uploaded directly to this channel.")
+                                .font(.footnote)
+                                .foregroundStyle(TaggrTheme.secondaryText)
+                            Button(role: .destructive) {
+                                state.youtubeUpload.disconnect()
+                            } label: {
+                                Label("Disconnect YouTube", systemImage: "link.badge.minus")
                             }
+                            .disabled(state.youtubeUpload.auth.isBusy)
+                            Link(
+                                "Manage Google access",
+                                destination: URL(
+                                    string: "https://security.google.com/settings/security/permissions"
+                                )!
+                            )
+                            .font(.footnote.weight(.semibold))
                             if let error = state.youtubeUpload.auth.errorMessage {
                                 Text(error)
                                     .font(.footnote)
                                     .foregroundStyle(.red)
                             }
-                            Link(
-                                "Manage Google permissions",
-                                destination: URL(string: "https://security.google.com/settings/security/permissions")!
-                            )
-                            .font(.footnote.weight(.semibold))
                         }
                     }
                     SettingsPanel(title: "Support") {
@@ -150,6 +202,12 @@ struct SettingsView: View {
                 await state.refreshWallet()
                 await state.loadStorageStatus()
             }
+        }
+        .task(id: principalCopied) {
+            guard principalCopied else { return }
+            try? await Task.sleep(for: .seconds(1.5))
+            guard !Task.isCancelled else { return }
+            principalCopied = false
         }
     }
 

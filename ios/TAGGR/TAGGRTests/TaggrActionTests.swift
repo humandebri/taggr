@@ -335,6 +335,45 @@ extension TaggrTests {
         XCTAssertEqual(state.feed, [post])
     }
 
+    @MainActor
+    func testCompletingIdentityRefreshesICPBalance() async throws {
+        var calls: [String] = []
+        let api = makeStubbedAPI { request in
+            let method = self.requestMethodAndArg(from: request)?.method ?? ""
+            calls.append(method)
+            let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
+            switch method {
+            case "user":
+                return (response, Self.queryReply(Self.currentUserFixture()))
+            case "stats":
+                return (response, Self.queryReply(Data(#"{"canister_id":"\#(TaggrRuntimeConfig.productionCanisterId)"}"#.utf8)))
+            case "config":
+                return (response, Self.queryReply(Data(#"{"feed_page_size":30}"#.utf8)))
+            case "account_balance":
+                return (response, Self.queryReply(Self.candidTokens(200_000_000)))
+            default:
+                return (response, Self.queryReply(Data("null".utf8)))
+            }
+        }
+        let identityStore = makeTestIdentityStore(
+            config: TaggrRuntimeConfig.current,
+            service: testIdentityService()
+        )
+        defer { try? identityStore.clear() }
+        let state = TaggrAppCoordinator(api: api, identityStore: identityStore)
+        let session = makeAuthSession(privateKey: Curve25519.Signing.PrivateKey())
+        state.route = .settings
+
+        await state.completeIdentity(session)
+
+        XCTAssertNil(state.errorMessage)
+        XCTAssertEqual(state.authSession?.principal, session.principal)
+        XCTAssertEqual(state.icpBalanceE8s, 200_000_000)
+        XCTAssertEqual(calls.first, "user")
+        XCTAssertEqual(Set(calls.dropFirst().prefix(2)), Set(["stats", "config"]))
+        XCTAssertEqual(calls.last, "account_balance")
+    }
+
     func customRuntimeConfig() -> TaggrRuntimeConfig {
         TaggrRuntimeConfig.from(info: [
             "TAGGR_CANISTER_ID": "bkyz2-fmaaa-aaaaa-qaaaq-cai",
@@ -998,6 +1037,7 @@ extension TaggrTests {
               },
               {
                 "author_name": "alice",
+                "author_badges": ["OG", "FUTURE_BADGE"],
                 "author_filters": {"users": [], "tags": [], "realms": []},
                 "realm_color": "#123456",
                 "viewer_blocked": false,

@@ -5,6 +5,20 @@ use serde::{Deserialize, Serialize};
 
 pub type UserId = u64;
 
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub(crate) enum UserAttributeBadge {
+    #[serde(rename = "BOT")]
+    Bot,
+    #[serde(rename = "OG")]
+    Og,
+    #[serde(rename = "STALWART")]
+    Stalwart,
+    #[serde(rename = "FREQUENTER")]
+    Frequenter,
+    #[serde(rename = "INACTIVE")]
+    Inactive,
+}
+
 #[derive(Clone, Default, Serialize, Deserialize)]
 pub struct Filters {
     pub users: BTreeSet<UserId>,
@@ -117,6 +131,34 @@ pub struct User {
 }
 
 impl User {
+    pub(crate) fn attribute_badges(
+        &self,
+        now: u64,
+        voting_power_activity_weeks: u64,
+    ) -> Vec<UserAttributeBadge> {
+        const END_OF_2022: u64 = 1_672_500_000_000_000_000;
+
+        let mut badges = Vec::new();
+        if self.is_bot() {
+            badges.push(UserAttributeBadge::Bot);
+        } else if self.timestamp < END_OF_2022 {
+            badges.push(UserAttributeBadge::Og);
+        }
+        if self.stalwart {
+            badges.push(UserAttributeBadge::Stalwart);
+        }
+        if self.active_weeks > 12 {
+            badges.push(UserAttributeBadge::Frequenter);
+        }
+        let activity_deadline = self
+            .last_activity
+            .saturating_add(voting_power_activity_weeks.saturating_mul(WEEK));
+        if activity_deadline < now {
+            badges.push(UserAttributeBadge::Inactive);
+        }
+        badges
+    }
+
     /// Returns true if the user is organic (not a system account).
     pub fn organic(&self) -> bool {
         self.id < MAX_USER_ID
@@ -861,6 +903,70 @@ mod tests {
         env::{invite::tests::create_invite_with_realm, tests::pr},
         tests::create_user,
     };
+
+    #[test]
+    fn test_attribute_badges_match_web_profile_rules() {
+        const END_OF_2022: u64 = 1_672_500_000_000_000_000;
+        let inactive_after_weeks = 4;
+        let now = END_OF_2022 + inactive_after_weeks * WEEK;
+        let mut user = User::new(pr(1), 1, END_OF_2022, "user".into());
+
+        assert_eq!(
+            user.attribute_badges(now, inactive_after_weeks),
+            Vec::<UserAttributeBadge>::new()
+        );
+
+        user.timestamp = END_OF_2022 - 1;
+        user.stalwart = true;
+        user.active_weeks = 13;
+        user.last_activity = 0;
+        assert_eq!(
+            user.attribute_badges(now, inactive_after_weeks),
+            vec![
+                UserAttributeBadge::Og,
+                UserAttributeBadge::Stalwart,
+                UserAttributeBadge::Frequenter,
+                UserAttributeBadge::Inactive,
+            ]
+        );
+
+        user.controllers = vec!["a".repeat(27)];
+        assert_eq!(
+            user.attribute_badges(now, inactive_after_weeks),
+            vec![
+                UserAttributeBadge::Bot,
+                UserAttributeBadge::Stalwart,
+                UserAttributeBadge::Frequenter,
+                UserAttributeBadge::Inactive,
+            ]
+        );
+
+        assert_eq!(
+            serde_json::to_string(&user.attribute_badges(now, inactive_after_weeks)).unwrap(),
+            r#"["BOT","STALWART","FREQUENTER","INACTIVE"]"#
+        );
+    }
+
+    #[test]
+    fn test_attribute_badges_activity_boundaries() {
+        let now = 5 * WEEK;
+        let mut user = User::new(pr(1), 1, now, "user".into());
+        user.active_weeks = 12;
+        user.last_activity = WEEK;
+
+        assert_eq!(user.attribute_badges(now, 4), vec![UserAttributeBadge::Og]);
+
+        user.active_weeks = 13;
+        user.last_activity -= 1;
+        assert_eq!(
+            user.attribute_badges(now, 4),
+            vec![
+                UserAttributeBadge::Og,
+                UserAttributeBadge::Frequenter,
+                UserAttributeBadge::Inactive,
+            ]
+        );
+    }
 
     #[test]
     fn test_validate_send_credits() {

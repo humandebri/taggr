@@ -76,6 +76,13 @@ struct ProfileView: View {
             Text(user.name)
                 .font(.title2.weight(.black))
                 .foregroundStyle(TaggrTheme.text)
+            UserAttributeBadgesView(
+                badges: TaggrUserBadge.badges(
+                    for: user,
+                    viewerID: state.currentUser?.id,
+                    votingPowerActivityWeeks: state.cache?.config?.votingPowerActivityWeeks
+                )
+            )
             if !user.about.isEmpty {
                 TaggrMarkdownText(text: user.about)
                     .font(.body)

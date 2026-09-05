@@ -2,7 +2,7 @@ use std::cmp::{Ordering, PartialOrd};
 
 use super::config::DOWNVOTE_REACTION_ID;
 use super::user::UserId;
-use super::*;
+use super::{user::UserAttributeBadge, *};
 use crate::mutate;
 use ic_cdk::api::msg_caller as caller;
 use serde::{Deserialize, Serialize};
@@ -60,6 +60,7 @@ pub enum Extension {
 #[derive(Default, Clone, Serialize, Deserialize)]
 pub struct Meta<'a> {
     author_name: &'a str,
+    author_badges: Vec<UserAttributeBadge>,
     author_filters: UserFilter,
     viewer_blocked: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -172,6 +173,7 @@ impl Post {
         let user = state.users.get(&self.user).expect("no user found");
         let mut meta = Meta {
             author_name: user.name.as_str(),
+            author_badges: user.attribute_badges(time(), CONFIG.voting_power_activity_weeks),
             author_filters: user.filters.noise.clone(),
             viewer_blocked: state
                 .principal_to_user(caller())

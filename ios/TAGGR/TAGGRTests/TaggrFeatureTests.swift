@@ -129,6 +129,8 @@ extension TaggrTests {
               "pinned_posts": [43],
               "settings": {"tap_and_hold": "350"},
               "controlled_realms": ["DEV"],
+              "controllers": ["aaaaa-aa"],
+              "stalwart": true,
               "bucket": "aaaaa-aa",
               "num_posts": 9,
               "active_weeks": 4,
@@ -142,10 +144,100 @@ extension TaggrTests {
         XCTAssertEqual(user.pinnedPosts, [43])
         XCTAssertEqual(user.settings["tap_and_hold"], "350")
         XCTAssertEqual(user.controlledRealms, ["DEV"])
+        XCTAssertEqual(user.controllers, ["aaaaa-aa"])
+        XCTAssertTrue(user.stalwart)
         XCTAssertEqual(user.bucket, "aaaaa-aa")
         XCTAssertEqual(user.numPosts, 9)
         XCTAssertEqual(user.activeWeeks, 4)
         XCTAssertEqual(user.deactivated, false)
+    }
+
+    func testUserBadgesMatchWebProfileRules() {
+        let user = TaggrUser(
+            id: 7,
+            name: "alice",
+            about: "",
+            principal: nil,
+            realms: [],
+            followees: [99],
+            followers: [],
+            blacklist: [],
+            controllers: [String(repeating: "a", count: 27)],
+            stalwart: true,
+            mode: nil,
+            activeWeeks: 13,
+            timestamp: LosslessInt(1_672_499_999_999_999_999),
+            lastActivity: LosslessInt(0)
+        )
+        let now = Date(timeIntervalSince1970: 5 * 7 * 24 * 60 * 60)
+
+        XCTAssertEqual(
+            TaggrUserBadge.badges(
+                for: user,
+                viewerID: 99,
+                votingPowerActivityWeeks: 4,
+                now: now
+            ),
+            [.bot, .stalwart, .frequenter, .followsYou, .inactive]
+        )
+        XCTAssertFalse(
+            TaggrUserBadge.badges(
+                for: user,
+                viewerID: user.id,
+                votingPowerActivityWeeks: 4,
+                now: now
+            ).contains(.followsYou)
+        )
+    }
+
+    func testUserBadgeBoundariesAndUnknownPostBadges() {
+        let fourWeeksNanoseconds = Int64(4 * 7 * 24 * 60 * 60) * 1_000_000_000
+        let user = TaggrUser(
+            id: 7,
+            name: "alice",
+            about: "",
+            principal: nil,
+            realms: [],
+            followees: [],
+            followers: [],
+            blacklist: [],
+            mode: nil,
+            activeWeeks: 12,
+            timestamp: LosslessInt(1_672_499_999_999_999_999),
+            lastActivity: LosslessInt(1_000_000_000)
+        )
+        let now = Date(timeIntervalSince1970: Double(1_000_000_000 + fourWeeksNanoseconds) / 1_000_000_000)
+
+        XCTAssertEqual(
+            TaggrUserBadge.badges(
+                for: user,
+                viewerID: nil,
+                votingPowerActivityWeeks: 4,
+                now: now
+            ),
+            [.og]
+        )
+        XCTAssertEqual(
+            TaggrUserBadge.decoded(from: ["OG", "FUTURE_BADGE", "INACTIVE"]),
+            [.og, .inactive]
+        )
+    }
+
+    func testBadgeFlowLayoutWrapsAndClampsOversizedBadges() {
+        let frames = BadgeFlowLayout.frames(
+            for: [
+                CGSize(width: 120, height: 20),
+                CGSize(width: 40, height: 20),
+                CGSize(width: 50, height: 24),
+            ],
+            maxWidth: 100,
+            spacing: 5
+        )
+
+        XCTAssertEqual(frames[0], CGRect(x: 0, y: 0, width: 100, height: 20))
+        XCTAssertEqual(frames[1], CGRect(x: 0, y: 25, width: 40, height: 20))
+        XCTAssertEqual(frames[2], CGRect(x: 45, y: 25, width: 50, height: 24))
+        XCTAssertTrue(frames.allSatisfy { $0.maxX <= 100 })
     }
 
     func testUserDecodesNotificationVariants() throws {
