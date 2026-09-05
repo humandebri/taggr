@@ -10,6 +10,17 @@
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
 	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>$(TAGGR_GOOGLE_REVERSED_CLIENT_ID)</string>
+			</array>
+		</dict>
+	</array>
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
@@ -22,6 +33,10 @@
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>GIDClientID</key>
+	<string>$(TAGGR_GOOGLE_CLIENT_ID)</string>
+	<key>TAGGR_GOOGLE_REVERSED_CLIENT_ID</key>
+	<string>$(TAGGR_GOOGLE_REVERSED_CLIENT_ID)</string>
 	<key>TAGGR_API_BASE_URL</key>
 	<string>$(TAGGR_API_BASE_URL)</string>
 	<key>TAGGR_DERIVATION_ORIGIN</key>

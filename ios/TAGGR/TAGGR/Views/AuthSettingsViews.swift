@@ -77,6 +77,44 @@ struct SettingsView: View {
                             walletPanel(state.currentUser)
                         }
                     }
+                    if state.youtubeUpload.auth.isEnabled {
+                        SettingsPanel(title: "YouTube") {
+                            if let channel = state.youtubeUpload.auth.channel {
+                                Label(channel.title, systemImage: "play.rectangle.fill")
+                                    .font(.subheadline.weight(.bold))
+                                    .foregroundStyle(TaggrTheme.text)
+                                Text("Videos selected in TAGGR are uploaded directly to this channel.")
+                                    .font(.footnote)
+                                    .foregroundStyle(TaggrTheme.secondaryText)
+                                Button(role: .destructive) {
+                                    state.youtubeUpload.disconnect()
+                                } label: {
+                                    Label("Disconnect YouTube", systemImage: "link.badge.minus")
+                                }
+                                .disabled(state.youtubeUpload.auth.isBusy)
+                            } else {
+                                Button {
+                                    state.youtubeUpload.auth.connect()
+                                } label: {
+                                    Label(
+                                        state.youtubeUpload.auth.isBusy ? "Connecting..." : "Connect YouTube",
+                                        systemImage: "play.rectangle"
+                                    )
+                                }
+                                .disabled(state.youtubeUpload.auth.isBusy)
+                            }
+                            if let error = state.youtubeUpload.auth.errorMessage {
+                                Text(error)
+                                    .font(.footnote)
+                                    .foregroundStyle(.red)
+                            }
+                            Link(
+                                "Manage Google permissions",
+                                destination: URL(string: "https://security.google.com/settings/security/permissions")!
+                            )
+                            .font(.footnote.weight(.semibold))
+                        }
+                    }
                     SettingsPanel(title: "Support") {
                         Link(destination: URL(string: "https://\(TaggrNavigation.canonicalHost)/#/privacy")!) {
                             Label("Privacy", systemImage: "hand.raised")

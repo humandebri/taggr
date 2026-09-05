@@ -452,7 +452,7 @@ final class TaggrTests: XCTestCase {
     }
 
     func testLedgerFutureTransferErrorUsesMainnetNullPayload() {
-        XCTAssertThrowsError(try TaggrCandidAdapter.transferResult(.err(.txCreatedInFuture))) { error in
+        XCTAssertThrowsError(try TaggrCandidAdapter.transferResult(.err(value: .txCreatedInFuture))) { error in
             XCTAssertEqual(error.localizedDescription, "ICP transfer request was created in the future.")
         }
     }

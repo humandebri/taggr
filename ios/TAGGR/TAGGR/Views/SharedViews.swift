@@ -54,6 +54,8 @@ struct TaggrBackToolbarButton: View {
 }
 
 struct TaggrAccountImageThumbnail: View {
+    private static let maximumPixelSize = 512
+
     let image: TaggrAccountImage
     let accessibilityLabel: String
     let action: () -> Void
@@ -61,7 +63,11 @@ struct TaggrAccountImageThumbnail: View {
     var body: some View {
         Button(action: action) {
             GeometryReader { proxy in
-                TaggrPostImageLoaderView(attachment: image.attachment, contentMode: .fill)
+                TaggrPostImageLoaderView(
+                    attachment: image.attachment,
+                    contentMode: .fill,
+                    maximumPixelSize: Self.maximumPixelSize
+                )
                 .frame(width: proxy.size.width, height: proxy.size.width)
                 .background(TaggrTheme.panelRaised)
                 .clipped()

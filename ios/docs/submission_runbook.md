@@ -55,6 +55,22 @@ npm run ios:review
 Review `ios/docs/app_privacy_answers.md` against the live App Store Connect
 privacy form before publishing privacy answers.
 
+### YouTube upload release gate
+
+Before building a release that exposes YouTube upload:
+
+-   Enable YouTube Data API v3 in the Google Cloud project and create an iOS
+    OAuth client for bundle ID `network.taggr.ios`.
+-   Set `TAGGR_GOOGLE_CLIENT_ID` and `TAGGR_GOOGLE_REVERSED_CLIENT_ID` in the
+    app target's Debug/Release build settings. The upload UI remains hidden when
+    either value is empty.
+-   Complete Google's OAuth verification for `youtube.upload` and
+    `youtube.readonly`, plus the YouTube API Services audit required for public
+    production uploads. Uploads from an unverified API project may be forced to
+    private visibility.
+-   Verify connect, revoke, resumable upload, background continuation, all three
+    visibility choices, and draft-link insertion with a review YouTube channel.
+
 ## 3. Local Submission Prep
 
 Run the local checks that do not require production canister access:

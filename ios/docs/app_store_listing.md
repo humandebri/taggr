@@ -33,7 +33,8 @@ The iOS app is a native SwiftUI client for the existing TAGGR production
 service. Browse the public feed without signing in, open posts and profiles,
 follow realm discussions, and use Internet Identity to access your account.
 
-Signed-in users can create posts, upload selected images, manage profile
+Signed-in users can create posts, upload selected images, connect their YouTube
+channel to upload selected videos and embed the resulting link, manage profile
 settings, read notifications, report posts or users, block users, and use
 account wallet surfaces needed for normal TAGGR use.
 

@@ -62,11 +62,10 @@ struct TaggrImagePagerView<Item: Identifiable, TopTrailingContent: View, BottomC
         }
         .background(Color.black.ignoresSafeArea())
         .onAppear {
-            imagePrefetcher.prefetchAll(
-                PostImagePreviewPrefetchPolicy.attachments(items.map(imageAttachment)),
-                api: state.api,
-                config: state.runtimeConfig
-            )
+            prefetchAdjacentImages()
+        }
+        .onChange(of: selection) { _, _ in
+            prefetchAdjacentImages()
         }
         .onDisappear {
             imagePrefetcher.cancelAll()
@@ -80,6 +79,18 @@ struct TaggrImagePagerView<Item: Identifiable, TopTrailingContent: View, BottomC
     private var selectedItem: Item? {
         guard items.indices.contains(selectedIndex) else { return nil }
         return items[selectedIndex]
+    }
+
+    private func prefetchAdjacentImages() {
+        let attachments = PostImagePreviewPrefetchPolicy.adjacentAttachments(
+            items.map(imageAttachment),
+            selectedIndex: selectedIndex
+        )
+        imagePrefetcher.prefetchAll(
+            attachments,
+            api: state.api,
+            config: state.runtimeConfig
+        )
     }
 }
 

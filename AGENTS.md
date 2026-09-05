@@ -31,6 +31,12 @@ Read the [whitepaper](./src/frontend/assets/WHITEPAPER.md) for more details.
 ## Code
 
 -   Use ICP CLI for Internet Computer commands; do not use dfx.
+-   Use the locally installed `idb` CLI for iOS Simulator and connected-device
+    discovery, app and XCTest workflows, UI automation, logs, screenshots, and
+    recordings. Start with `idb list-targets --json` and pass the selected
+    target's UDID explicitly. Use `simctl` or `devicectl` directly only when
+    `idb` does not support the required operation or when diagnosing why `idb`
+    cannot see a target.
 -   Always apply formatting (make format) and cargo check.
 
 ## iOS Native Auth

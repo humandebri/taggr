@@ -62,6 +62,7 @@ final class NavigationStore {
         if let storedValue = defaults.string(forKey: Self.homeFeedModeKey),
            let storedMode = Self.feedMode(from: storedValue) {
             lastHomeFeedMode = storedMode
+            route = .feed(storedMode)
             hasStoredHomeFeedMode = true
         }
     }

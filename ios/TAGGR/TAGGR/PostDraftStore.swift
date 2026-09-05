@@ -3,8 +3,8 @@
 import Foundation
 import SwiftUI
 
-struct PostDraftContext: Codable, Hashable {
-    enum Kind: String, Codable {
+struct PostDraftContext: Codable, Hashable, Sendable {
+    enum Kind: String, Codable, Sendable {
         case newPost
         case reply
         case edit
@@ -28,7 +28,7 @@ struct PostDraftContext: Codable, Hashable {
     }
 }
 
-struct PostDraftNamespace: Hashable {
+struct PostDraftNamespace: Codable, Hashable, Sendable {
     let canisterID: String
     let userID: Int
 }
@@ -143,6 +143,15 @@ enum PostDraftDocument {
         }
         .joined()
         return inserted ? result : (text.isEmpty ? insertion : text + "\n\n" + insertion)
+    }
+
+    static func appendingExternalURL(_ url: URL, to text: String) -> String {
+        let value = url.absoluteString
+        guard !text.split(whereSeparator: \Character.isWhitespace).contains(Substring(value)) else {
+            return text
+        }
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? value : trimmed + "\n\n" + value
     }
 
     static func removing(imageOccurrence: Int, from text: String) -> String {
@@ -551,6 +560,14 @@ final class PostDraftSession: ObservableObject {
             afterTextSegmentID: afterTextSegmentID
         )
         await flush()
+    }
+
+    @discardableResult
+    func addExternalURL(_ url: URL) async -> Bool {
+        submissionNeedsVerification = false
+        text = PostDraftDocument.appendingExternalURL(url, to: text)
+        await flush()
+        return restorationWarning != Self.saveFailureWarning
     }
 
     func removeImage(_ image: TaggrDraftImage, occurrence: Int) async {

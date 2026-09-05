@@ -510,6 +510,224 @@ extension TaggrTests {
         XCTAssertTrue(TaggrPostBodyView.containsInteractiveLink(in: body))
     }
 
+    func testYouTubeConfigurationRequiresBothClientIdentifiers() {
+        XCTAssertFalse(TaggrYouTubeConfiguration.from(info: [:]).isEnabled)
+        XCTAssertFalse(TaggrYouTubeConfiguration.from(info: [
+            "GIDClientID": "client.apps.googleusercontent.com",
+            "TAGGR_GOOGLE_REVERSED_CLIENT_ID": "$(MISSING)",
+        ]).isEnabled)
+        XCTAssertTrue(TaggrYouTubeConfiguration.from(info: [
+            "GIDClientID": "client.apps.googleusercontent.com",
+            "TAGGR_GOOGLE_REVERSED_CLIENT_ID": "com.googleusercontent.apps.client",
+        ]).isEnabled)
+    }
+
+    func testYouTubeMetadataValidationCoversRequiredAndByteLimitedFields() throws {
+        var metadata = YouTubeUploadMetadata(title: "", description: "")
+        XCTAssertEqual(metadata.validationMessage, "Enter a YouTube title.")
+
+        metadata.title = String(repeating: "a", count: 101)
+        XCTAssertEqual(metadata.validationMessage, "The YouTube title must be 100 characters or fewer.")
+
+        metadata.title = "TAGGR video"
+        metadata.description = String(repeating: "界", count: 1_667)
+        XCTAssertEqual(metadata.description.utf8.count, 5_001)
+        XCTAssertEqual(metadata.validationMessage, "The YouTube description must be 5,000 bytes or fewer.")
+
+        metadata.description = "Posted from TAGGR"
+        XCTAssertEqual(metadata.validationMessage, "Choose whether the video is made for kids.")
+        metadata.madeForKids = false
+        XCTAssertEqual(metadata.validationMessage, "Confirm that the video follows YouTube's rules.")
+        metadata.communityGuidelinesAccepted = true
+        XCTAssertNil(metadata.validationMessage)
+
+        let body = try JSONSerialization.jsonObject(with: metadata.requestBody()) as? [String: Any]
+        let status = body?["status"] as? [String: Any]
+        XCTAssertEqual(status?["privacyStatus"] as? String, "unlisted")
+        XCTAssertEqual(status?["embeddable"] as? Bool, true)
+        XCTAssertEqual(status?["selfDeclaredMadeForKids"] as? Bool, false)
+    }
+
+    func testYouTubeResumableRequestsContainUploadContract() throws {
+        var metadata = YouTubeUploadMetadata(title: "Video", description: "Description")
+        metadata.madeForKids = false
+        metadata.communityGuidelinesAccepted = true
+        var job = YouTubeUploadJob(
+            schemaVersion: YouTubeUploadJob.currentSchemaVersion,
+            id: UUID(),
+            target: YouTubeDraftTarget(
+                namespace: PostDraftNamespace(canisterID: "aaaaa-aa", userID: 7),
+                context: .newPost
+            ),
+            sourceFileName: "video.mov",
+            displayFileName: "video.mov",
+            mimeType: "video/quicktime",
+            byteCount: 20_000_000,
+            metadata: metadata,
+            sessionURL: nil,
+            acknowledgedBytes: 0,
+            retryCount: 0,
+            phase: .preparing,
+            videoID: nil,
+            failureMessage: nil,
+            createdAt: Date()
+        )
+
+        let start = try YouTubeUploadCoordinator.resumableSessionRequest(job: job, accessToken: "token")
+        let startComponents = try XCTUnwrap(URLComponents(url: try XCTUnwrap(start.url), resolvingAgainstBaseURL: false))
+        XCTAssertEqual(start.httpMethod, "POST")
+        XCTAssertEqual(start.value(forHTTPHeaderField: "Authorization"), "Bearer token")
+        XCTAssertEqual(start.value(forHTTPHeaderField: "X-Upload-Content-Length"), "20000000")
+        XCTAssertTrue(startComponents.queryItems?.contains(URLQueryItem(name: "uploadType", value: "resumable")) == true)
+
+        job.acknowledgedBytes = 8_388_608
+        let chunk = YouTubeUploadCoordinator.chunkRequest(
+            job: job,
+            sessionURL: URL(string: "https://upload.youtube.test/session")!,
+            accessToken: "refreshed",
+            chunkLength: 8_388_608
+        )
+        XCTAssertEqual(chunk.httpMethod, "PUT")
+        XCTAssertEqual(chunk.value(forHTTPHeaderField: "Authorization"), "Bearer refreshed")
+        XCTAssertEqual(chunk.value(forHTTPHeaderField: "Content-Range"), "bytes 8388608-16777215/20000000")
+    }
+
+    func testYouTubeAcknowledgedRangeAndDraftInsertionAreIdempotent() throws {
+        let response = try XCTUnwrap(HTTPURLResponse(
+            url: URL(string: "https://upload.youtube.test/session")!,
+            statusCode: 308,
+            httpVersion: nil,
+            headerFields: ["Range": "bytes=0-8388607"]
+        ))
+        XCTAssertEqual(YouTubeUploadCoordinator.acknowledgedBytes(from: response), 8_388_608)
+
+        let url = URL(string: "https://youtu.be/zG9K9Za56jI")!
+        let once = PostDraftDocument.appendingExternalURL(url, to: "hello")
+        let twice = PostDraftDocument.appendingExternalURL(url, to: once)
+        XCTAssertEqual(once, "hello\n\nhttps://youtu.be/zG9K9Za56jI")
+        XCTAssertEqual(twice, once)
+    }
+
+    func testYouTubeRecoveryQueriesStatusAfterAnInterruptedSession() {
+        var metadata = YouTubeUploadMetadata(title: "Video", description: "")
+        metadata.madeForKids = false
+        metadata.communityGuidelinesAccepted = true
+        var job = YouTubeUploadJob(
+            schemaVersion: YouTubeUploadJob.currentSchemaVersion,
+            id: UUID(),
+            target: YouTubeDraftTarget(
+                namespace: PostDraftNamespace(canisterID: "aaaaa-aa", userID: 7),
+                context: .newPost
+            ),
+            sourceFileName: "video.mov",
+            displayFileName: "video.mov",
+            mimeType: "video/quicktime",
+            byteCount: 20_000_000,
+            metadata: metadata,
+            sessionURL: nil,
+            acknowledgedBytes: 0,
+            retryCount: 0,
+            phase: .preparing,
+            videoID: nil,
+            failureMessage: nil,
+            createdAt: Date()
+        )
+
+        XCTAssertEqual(
+            YouTubeUploadCoordinator.recoveryAction(for: job, hasMatchingBackgroundTask: false),
+            .createSession
+        )
+        job.sessionURL = URL(string: "https://upload.youtube.test/session")!
+        job.phase = .uploading
+        XCTAssertEqual(
+            YouTubeUploadCoordinator.recoveryAction(for: job, hasMatchingBackgroundTask: false),
+            .queryStatus
+        )
+        XCTAssertEqual(
+            YouTubeUploadCoordinator.recoveryAction(for: job, hasMatchingBackgroundTask: true),
+            .awaitBackgroundTask
+        )
+        XCTAssertEqual(
+            YouTubeUploadCoordinator.backgroundTaskDisposition(
+                for: job,
+                taskDescription: job.id.uuidString
+            ),
+            .keep
+        )
+        XCTAssertEqual(
+            YouTubeUploadCoordinator.backgroundTaskDisposition(
+                for: job,
+                taskDescription: UUID().uuidString
+            ),
+            .cancel
+        )
+        job.phase = .completed
+        XCTAssertEqual(
+            YouTubeUploadCoordinator.recoveryAction(for: job, hasMatchingBackgroundTask: false),
+            .none
+        )
+        XCTAssertEqual(
+            YouTubeUploadCoordinator.backgroundTaskDisposition(
+                for: job,
+                taskDescription: job.id.uuidString
+            ),
+            .cancel
+        )
+        XCTAssertEqual(
+            YouTubeUploadCoordinator.backgroundTaskDisposition(for: nil, taskDescription: nil),
+            .cancel
+        )
+    }
+
+    @MainActor
+    func testYouTubeBackgroundCompletionWaitsForOwnerProcessingAndRunsOnce() async {
+        let gate = YouTubeBackgroundEventCompletionGate()
+        let completed = expectation(description: "background completion")
+        var completionCount = 0
+        gate.setHandler {
+            completionCount += 1
+            completed.fulfill()
+        }
+
+        gate.beginOwnerCallback()
+        gate.eventsDidFinish()
+        XCTAssertEqual(completionCount, 0)
+
+        gate.finishOwnerCallback()
+        await fulfillment(of: [completed], timeout: 1)
+        gate.finishOwnerCallback()
+        gate.eventsDidFinish()
+        await Task.yield()
+        XCTAssertEqual(completionCount, 1)
+    }
+
+    func testYouTubeTemporarySelectionCleanupOnlyRemovesOwnedDirectory() throws {
+        let ownedDirectory = FileManager.default.temporaryDirectory
+            .appending(
+                path: "\(YouTubeTemporarySelection.directoryPrefix)\(UUID().uuidString)",
+                directoryHint: .isDirectory
+            )
+        let unrelatedDirectory = FileManager.default.temporaryDirectory
+            .appending(path: "taggr-unrelated-\(UUID().uuidString)", directoryHint: .isDirectory)
+        defer {
+            try? FileManager.default.removeItem(at: ownedDirectory)
+            try? FileManager.default.removeItem(at: unrelatedDirectory)
+        }
+        try FileManager.default.createDirectory(at: ownedDirectory, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: unrelatedDirectory, withIntermediateDirectories: true)
+        let ownedFile = ownedDirectory.appending(path: "video.mov")
+        let unrelatedFile = unrelatedDirectory.appending(path: "video.mov")
+        try Data([1]).write(to: ownedFile)
+        try Data([2]).write(to: unrelatedFile)
+
+        YouTubeTemporarySelection.remove(at: unrelatedFile)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: unrelatedFile.path))
+
+        YouTubeTemporarySelection.remove(at: ownedFile)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: ownedDirectory.path))
+        YouTubeTemporarySelection.remove(at: ownedFile)
+    }
+
     func testMarkdownTextAutolinksBareURLsWithoutTouchingCode() {
         let attributed = TaggrMarkdownText.attributedMarkdown(
             from: "https://nico.ms/sm7037560 www.example.com WWW.example.org `https://example.com`"
@@ -664,6 +882,24 @@ extension TaggrTests {
         XCTAssertEqual(prefetched.map(\.id), attachments.map(\.id))
     }
 
+    func testImagePreviewPrefetchOnlyIncludesSelectedAndAdjacentAttachments() {
+        let attachments = (1...6).map { index in
+            TaggrPostImageAttachment(
+                id: "image\(index)",
+                url: URL(string: "https://bucket.raw.icp0.io/image?offset=\(index)&len=20")!
+            )
+        }
+
+        XCTAssertEqual(
+            PostImagePreviewPrefetchPolicy.adjacentAttachments(attachments, selectedIndex: 3).map(\.id),
+            ["image3", "image4", "image5"]
+        )
+        XCTAssertEqual(
+            PostImagePreviewPrefetchPolicy.adjacentAttachments(attachments, selectedIndex: 0).map(\.id),
+            ["image1", "image2"]
+        )
+    }
+
     func testFeedImagePrefetchIncludesCurrentAndLookAheadVisibleImages() {
         let posts = (1...8).map { id in
             samplePost(
@@ -755,6 +991,27 @@ extension TaggrTests {
             Double(width) / Double(height),
             4.0 / 3.0,
             accuracy: 0.1
+        )
+    }
+
+    func testAccountImageThumbnailDecodeIsBoundedAndUsesASizeSpecificCacheKey() async throws {
+        let renderer = UIGraphicsImageRenderer(size: CGSize(width: 1_600, height: 1_200))
+        let source = try XCTUnwrap(renderer.image { context in
+            UIColor.red.setFill()
+            context.fill(CGRect(x: 0, y: 0, width: 1_600, height: 1_200))
+        }.pngData())
+        let decodedImage = await TaggrPostImageDataLoader.decodedImage(from: source, maximumPixelSize: 512)
+        let thumbnail = try XCTUnwrap(decodedImage)
+        let thumbnailCGImage = try XCTUnwrap(thumbnail.cgImage)
+        let attachment = TaggrPostImageAttachment(
+            id: "photo",
+            url: try XCTUnwrap(URL(string: "https://example.com/photo"))
+        )
+
+        XCTAssertLessThanOrEqual(max(thumbnailCGImage.width, thumbnailCGImage.height), 512)
+        XCTAssertNotEqual(
+            TaggrPostImageDataLoader.cacheKey(for: attachment, maximumPixelSize: 512),
+            TaggrPostImageDataLoader.cacheKey(for: attachment, maximumPixelSize: nil)
         )
     }
 

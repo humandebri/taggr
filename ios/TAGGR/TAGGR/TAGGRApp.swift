@@ -1,17 +1,38 @@
 import Foundation
+import GoogleSignIn
 import SwiftUI
+import UIKit
+
+final class TAGGRAppDelegate: NSObject, UIApplicationDelegate {
+    weak static var youtubeUpload: YouTubeUploadCoordinator?
+
+    func application(
+        _ application: UIApplication,
+        handleEventsForBackgroundURLSession identifier: String,
+        completionHandler: @escaping () -> Void
+    ) {
+        guard let youtubeUpload = Self.youtubeUpload else {
+            completionHandler()
+            return
+        }
+        youtubeUpload.handleBackgroundEvents(identifier: identifier, completionHandler: completionHandler)
+    }
+}
 
 @main
 struct TAGGRApp: App {
+    @UIApplicationDelegateAdaptor(TAGGRAppDelegate.self) private var appDelegate
     @State private var state: TaggrAppCoordinator
 
     init() {
         let postDraftStore = PostDraftStore()
+        let coordinator = TaggrAppCoordinator(
+            postDraftStore: postDraftStore,
+            buildConfig: .current
+        )
+        TAGGRAppDelegate.youtubeUpload = coordinator.youtubeUpload
         _state = State(
-            initialValue: TaggrAppCoordinator(
-                postDraftStore: postDraftStore,
-                buildConfig: .current
-            )
+            initialValue: coordinator
         )
     }
 
@@ -31,7 +52,9 @@ struct TAGGRApp: App {
                     }
                 }
                 .onOpenURL { url in
-                    state.open(url)
+                    if !GIDSignIn.sharedInstance.handle(url) {
+                        state.open(url)
+                    }
                 }
         }
     }

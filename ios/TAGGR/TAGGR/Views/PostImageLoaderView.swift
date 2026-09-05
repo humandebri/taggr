@@ -1,11 +1,41 @@
 // TAGGR/Views: Shared image loader for post media across feeds, previews, and account photos.
 // Local physical-device builds cannot dereference raw.localhost bucket URLs, so they query bucket http_request via the configured IC API endpoint.
+import ImageIO
 import SwiftUI
 import UIKit
 
+private actor TaggrPostImageDecoder {
+    func image(from data: Data, maximumPixelSize: Int?) -> UIImage? {
+        guard !Task.isCancelled else { return nil }
+        guard let maximumPixelSize, maximumPixelSize > 0 else {
+            return UIImage(data: data)
+        }
+        let sourceOptions = [kCGImageSourceShouldCache: false] as CFDictionary
+        guard let source = CGImageSourceCreateWithData(data as CFData, sourceOptions) else {
+            return nil
+        }
+        let thumbnailOptions = [
+            kCGImageSourceCreateThumbnailFromImageAlways: true,
+            kCGImageSourceCreateThumbnailWithTransform: true,
+            kCGImageSourceShouldCacheImmediately: true,
+            kCGImageSourceThumbnailMaxPixelSize: maximumPixelSize,
+        ] as CFDictionary
+        guard let image = CGImageSourceCreateThumbnailAtIndex(source, 0, thumbnailOptions) else {
+            return nil
+        }
+        return UIImage(cgImage: image)
+    }
+}
+
 enum TaggrPostImageDataLoader {
+    private static let imageDecoder = TaggrPostImageDecoder()
+
     @MainActor
-    private static let imageCache = NSCache<NSString, UIImage>()
+    private static let imageCache: NSCache<NSString, UIImage> = {
+        let cache = NSCache<NSString, UIImage>()
+        cache.totalCostLimit = 32 * 1_024 * 1_024
+        return cache
+    }()
 
     static func data(for attachment: TaggrPostImageAttachment, api: TaggrAPI, config: TaggrRuntimeConfig) async throws -> Data {
         let request = URLRequest(url: attachment.url, cachePolicy: .returnCacheDataElseLoad, timeoutInterval: 20)
@@ -41,7 +71,19 @@ enum TaggrPostImageDataLoader {
 
     @MainActor
     static func storeCachedImage(_ image: UIImage, for key: String) {
-        imageCache.setObject(image, forKey: key as NSString)
+        imageCache.setObject(image, forKey: key as NSString, cost: decodedImageCost(image))
+    }
+
+    static func cacheKey(for attachment: TaggrPostImageAttachment, maximumPixelSize: Int?) -> String {
+        [
+            attachment.id,
+            attachment.url.absoluteString,
+            maximumPixelSize.map(String.init) ?? "original",
+        ].joined(separator: "|")
+    }
+
+    static func decodedImage(from data: Data, maximumPixelSize: Int?) async -> UIImage? {
+        await imageDecoder.image(from: data, maximumPixelSize: maximumPixelSize)
     }
 
     private static func validCachedImageData(for request: URLRequest) -> Data? {
@@ -51,11 +93,18 @@ enum TaggrPostImageDataLoader {
         }
         return data
     }
+
+    private static func decodedImageCost(_ image: UIImage) -> Int {
+        guard let cgImage = image.cgImage else { return 1 }
+        let result = cgImage.bytesPerRow.multipliedReportingOverflow(by: cgImage.height)
+        return result.overflow ? Int.max : max(result.partialValue, 1)
+    }
 }
 
 struct TaggrPostImageLoaderView: View {
     let attachment: TaggrPostImageAttachment
     let contentMode: ContentMode
+    private let maximumPixelSize: Int?
     private let onImageLoaded: ((CGSize) -> Void)?
     @Environment(TaggrAppCoordinator.self) private var state
     private let imageCacheKey: String
@@ -66,12 +115,17 @@ struct TaggrPostImageLoaderView: View {
     init(
         attachment: TaggrPostImageAttachment,
         contentMode: ContentMode,
+        maximumPixelSize: Int? = nil,
         onImageLoaded: ((CGSize) -> Void)? = nil
     ) {
         self.attachment = attachment
         self.contentMode = contentMode
+        self.maximumPixelSize = maximumPixelSize
         self.onImageLoaded = onImageLoaded
-        let key = Self.imageCacheKey(for: attachment)
+        let key = TaggrPostImageDataLoader.cacheKey(
+            for: attachment,
+            maximumPixelSize: maximumPixelSize
+        )
         self.imageCacheKey = key
         _uiImage = State(initialValue: TaggrPostImageDataLoader.cachedImage(for: key))
     }
@@ -105,13 +159,6 @@ struct TaggrPostImageLoaderView: View {
         ].joined(separator: "|")
     }
 
-    private static func imageCacheKey(for attachment: TaggrPostImageAttachment) -> String {
-        [
-            attachment.id,
-            attachment.url.absoluteString,
-        ].joined(separator: "|")
-    }
-
     @MainActor
     private func load() async {
         if let cachedImage = TaggrPostImageDataLoader.cachedImage(for: imageCacheKey) {
@@ -132,7 +179,12 @@ struct TaggrPostImageLoaderView: View {
                 api: state.api,
                 config: state.runtimeConfig
             )
-            guard let image = UIImage(data: data) else {
+            let decodedImage = await TaggrPostImageDataLoader.decodedImage(
+                from: data,
+                maximumPixelSize: maximumPixelSize
+            )
+            guard !Task.isCancelled else { return }
+            guard let image = decodedImage else {
                 failed = true
                 return
             }

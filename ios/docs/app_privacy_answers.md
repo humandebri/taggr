@@ -34,6 +34,8 @@ Checked against the Apple App Privacy and App Store Connect submission help on
 
 ## Third-Party SDKs
 
+-   GoogleSignIn is used only when a user explicitly connects a YouTube account
+    to upload a selected video to that user's channel.
 -   SwiftUI native app: no third-party native SDKs added for analytics or ads.
 -   Internet Identity: authentication service opened through
     `ASWebAuthenticationSession`.
@@ -80,6 +82,19 @@ off-device beyond real-time request handling.
     through `PhotosPicker`.
 -   No native microphone, camera, HealthKit, or fitness data collection.
 -   No push notification token collection in Phase 1.
+
+## YouTube Uploads
+
+-   Selected videos and user-entered YouTube metadata are transferred directly
+    from the device to YouTube; TAGGR canisters do not receive a video copy or
+    Google authorization token.
+-   The Google authorization session and resumable-upload state are retained on
+    the device until completion, cancellation, expiry cleanup, or explicit
+    disconnection.
+-   A completed video's YouTube URL becomes public only when the user submits
+    the TAGGR draft containing that URL.
+-   Recheck App Store Connect disclosures for User Content, Identifiers, and
+    third-party data handling before submitting the build.
 
 ## Pre-Submission Checks
 

@@ -496,6 +496,8 @@ struct InlineReplyComposer: View {
                 ComposePostAttachmentBar(
                     text: $draft.text,
                     selectedPhotos: $selectedPhotos,
+                    youtubeTarget: youtubeDraftTarget,
+                    insertYouTubeURL: insertYouTubeURL,
                     isSubmitting: isSubmitting || state.isBusy || imageImport.isImporting,
                     isImagePickerDisabled: isSubmitting || state.isBusy || imageImport.isImporting || !draft.isLoaded,
                     horizontalPadding: 0,
@@ -543,6 +545,10 @@ struct InlineReplyComposer: View {
         .task(id: draftNamespaceID) {
             guard let namespace = draftNamespace else { return }
             await draft.load(store: state.postDraftStore, namespace: namespace)
+            await consumeCompletedYouTubeUpload()
+        }
+        .onChange(of: state.youtubeUpload.completionRevision) { _, _ in
+            Task { await consumeCompletedYouTubeUpload() }
         }
         .confirmationDialog(
             "Clear this draft?",
@@ -552,6 +558,9 @@ struct InlineReplyComposer: View {
             Button("Clear Draft", role: .destructive) {
                 cancelImageImport()
                 Task {
+                    if hasYouTubeUploadForDraft {
+                        await state.youtubeUpload.cancel()
+                    }
                     await draft.discard()
                     focusedTextSegmentID = nil
                 }
@@ -567,7 +576,7 @@ struct InlineReplyComposer: View {
     var canSubmit: Bool {
         draft.isLoaded && state.currentUser != nil && !composedBody.isEmpty && imageWarning == nil
             && !draft.submissionNeedsVerification
-            && !imageImport.isImporting && !isSubmitting && !state.isBusy
+            && !imageImport.isImporting && !isSubmitting && !state.isBusy && !hasRunningYouTubeUpload
     }
 
     var imageWarning: String? {
@@ -696,6 +705,35 @@ struct InlineReplyComposer: View {
 
     var draftNamespaceID: String {
         draftNamespace.map { "\($0.canisterID):\($0.userID)" } ?? "signed-out"
+    }
+
+    var youtubeDraftTarget: YouTubeDraftTarget? {
+        draftNamespace.map { YouTubeDraftTarget(namespace: $0, context: .reply(post.id)) }
+    }
+
+    var hasRunningYouTubeUpload: Bool {
+        state.youtubeUpload.isRunning && hasYouTubeUploadForDraft
+    }
+
+    var hasYouTubeUploadForDraft: Bool {
+        state.youtubeUpload.job?.target == youtubeDraftTarget
+    }
+
+    func insertYouTubeURL(_ url: URL) {
+        Task {
+            let inserted = await draft.addExternalURL(url)
+            if inserted, let youtubeDraftTarget {
+                await state.youtubeUpload.acknowledgeCompletion(for: youtubeDraftTarget)
+            }
+        }
+    }
+
+    func consumeCompletedYouTubeUpload() async {
+        guard let youtubeDraftTarget,
+              let url = state.youtubeUpload.completedURL(for: youtubeDraftTarget) else { return }
+        if await draft.addExternalURL(url) {
+            await state.youtubeUpload.acknowledgeCompletion(for: youtubeDraftTarget)
+        }
     }
 }
 

@@ -216,6 +216,7 @@ final class TaggrAppCoordinator {
     let injectedIdentityAuthenticator: ICInternetIdentityAuthenticator?
     let postDraftStore: PostDraftStore
     let realmPostingPreferences: RealmPostingPreferences
+    let youtubeUpload: YouTubeUploadCoordinator
     static let maxAuthorNameCacheEntries = 500
     static let allRealmsPageSize = 20
     enum RequestScope: Hashable, Sendable {
@@ -249,6 +250,7 @@ final class TaggrAppCoordinator {
         identityAuthenticator: ICInternetIdentityAuthenticator? = nil,
         postDraftStore: PostDraftStore = PostDraftStore(),
         realmPostingPreferences: RealmPostingPreferences = RealmPostingPreferences(),
+        youtubeUpload: YouTubeUploadCoordinator? = nil,
         buildConfig: TaggrRuntimeConfig = .current,
         apiFactory: @escaping @MainActor (TaggrRuntimeConfig) -> TaggrAPI = { TaggrAPI(config: $0) },
         identityStoreFactory: @escaping @MainActor (TaggrRuntimeConfig) -> ICIdentityStore = { runtimeConfig in
@@ -281,6 +283,7 @@ final class TaggrAppCoordinator {
         self.identityAuthenticator = identityAuthenticator ?? identityAuthenticatorFactory(buildConfig)
         self.postDraftStore = postDraftStore
         self.realmPostingPreferences = realmPostingPreferences
+        self.youtubeUpload = youtubeUpload ?? YouTubeUploadCoordinator()
     }
 
     var realmPostingScope: RealmPostingScope? {
@@ -318,6 +321,7 @@ final class TaggrAppCoordinator {
     }
 
     func bootstrap() async {
+        await youtubeUpload.bootstrap()
         var loadError: Error?
         authSession = nil
         for signInMethod in runtimeConfig.availableIdentitySignInMethods {

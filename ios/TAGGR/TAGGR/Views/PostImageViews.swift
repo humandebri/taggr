@@ -38,6 +38,16 @@ enum PostImagePreviewPrefetchPolicy {
         var seenURLs = Set<URL>()
         return attachments.filter { seenURLs.insert($0.url).inserted }
     }
+
+    static func adjacentAttachments(
+        _ attachments: [TaggrPostImageAttachment],
+        selectedIndex: Int
+    ) -> [TaggrPostImageAttachment] {
+        guard attachments.indices.contains(selectedIndex) else { return [] }
+        let lowerBound = max(attachments.startIndex, selectedIndex - 1)
+        let upperBound = min(attachments.index(before: attachments.endIndex), selectedIndex + 1)
+        return self.attachments(Array(attachments[lowerBound...upperBound]))
+    }
 }
 
 @MainActor
@@ -310,10 +320,16 @@ private struct PostImageCountBadge: View {
 }
 
 private struct PostImageThumbnail: View {
+    private static let maximumPixelSize = 1_024
+
     let attachment: TaggrPostImageAttachment
 
     var body: some View {
-        TaggrPostImageLoaderView(attachment: attachment, contentMode: .fill)
+        TaggrPostImageLoaderView(
+            attachment: attachment,
+            contentMode: .fill,
+            maximumPixelSize: Self.maximumPixelSize
+        )
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(TaggrTheme.panelRaised)
             .clipped()

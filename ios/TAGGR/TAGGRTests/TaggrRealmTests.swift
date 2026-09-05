@@ -54,17 +54,20 @@ extension TaggrTests {
     }
 
     @MainActor
-    func testHomeFeedModePersistsAcrossNavigationStoreInstances() {
-        let suiteName = "taggr-feed-mode-test-\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: suiteName)!
-        let firstStore = NavigationStore(defaults: defaults)
+    func testHomeFeedModesPersistAcrossNavigationStoreInstances() {
+        for mode in [TaggrFeedMode.hot, .latest, .personal] {
+            let suiteName = "taggr-feed-mode-test-\(UUID().uuidString)"
+            let defaults = UserDefaults(suiteName: suiteName)!
+            let firstStore = NavigationStore(defaults: defaults)
 
-        XCTAssertFalse(firstStore.hasStoredHomeFeedMode)
-        firstStore.rememberHomeFeedMode(.personal)
+            XCTAssertFalse(firstStore.hasStoredHomeFeedMode)
+            firstStore.rememberHomeFeedMode(mode)
 
-        let restoredStore = NavigationStore(defaults: defaults)
-        XCTAssertTrue(restoredStore.hasStoredHomeFeedMode)
-        XCTAssertEqual(restoredStore.lastHomeFeedMode, .personal)
+            let restoredStore = NavigationStore(defaults: defaults)
+            XCTAssertTrue(restoredStore.hasStoredHomeFeedMode)
+            XCTAssertEqual(restoredStore.lastHomeFeedMode, mode)
+            XCTAssertEqual(restoredStore.route, .feed(mode))
+        }
     }
 
     @MainActor
