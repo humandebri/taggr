@@ -1145,6 +1145,28 @@ extension TaggrTests {
         )
     }
 
+    func testPostDraftDocumentPreservesImageMarkersAcrossSequentialTextReplacements() {
+        let marker = "![10x20, 1kb](/blob/first001)"
+        var document = "\(marker)うしろ"
+
+        for replacement in ["きょ", "きょう", "今日"] {
+            document = PostDraftDocument.replacingText(
+                in: document,
+                segmentID: 0,
+                with: replacement
+            )
+        }
+
+        XCTAssertEqual(document, "今日\(marker)うしろ")
+        XCTAssertEqual(
+            PostDraftDocument.segments(in: document).compactMap { segment -> String? in
+                guard case .image(_, _, _, let id) = segment else { return nil }
+                return id
+            },
+            ["first001"]
+        )
+    }
+
     func testPostDraftDocumentInsertsAndMovesImageMarkers() {
         let first = "![10x20, 1kb](/blob/first001)"
         let second = "![10x20, 1kb](/blob/second01)"

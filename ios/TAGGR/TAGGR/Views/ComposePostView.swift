@@ -74,6 +74,7 @@ struct ComposePostView: View {
                             moveImage: moveImageMarker,
                             moveImageToTextSegment: moveImageMarker
                         )
+                        .disabled(!draft.isLoaded)
                         if let realmWarning {
                             ComposePostImageWarning(
                                 text: realmWarning,
@@ -147,9 +148,6 @@ struct ComposePostView: View {
             guard phase != .active else { return }
             Task { await draft.flush() }
         }
-        .onAppear {
-            focusedTextSegmentID = 0
-        }
         .onDisappear {
             cancelImageImport()
             Task { await draft.flush() }
@@ -157,6 +155,8 @@ struct ComposePostView: View {
         .task(id: draftNamespaceID) {
             guard let namespace = draftNamespace else { return }
             await draft.load(store: state.postDraftStore, namespace: namespace)
+            guard !Task.isCancelled else { return }
+            focusedTextSegmentID = 0
             await consumeCompletedYouTubeUpload()
         }
         .onChange(of: state.youtubeUpload.completionRevision) { _, _ in
@@ -332,6 +332,9 @@ struct ComposePostView: View {
 
     private func loadPhotos(_ items: [PhotosPickerItem]) {
         guard !items.isEmpty, !imageImport.isImporting else { return }
+        let insertionSegmentID = imageInsertionSegmentID
+        focusedTextSegmentID = nil
+        imageInsertionSegmentID = nil
         imageImportWarning = nil
         let maxBytes = ImageDrafts.postImageMaximumBytes(
             serverLimit: state.cache?.config?.maxBlobSizeBytes
@@ -348,7 +351,7 @@ struct ComposePostView: View {
                     existingIDs: Set(draft.images.map(\.id))
                 )
                 if !loaded.isEmpty {
-                    await draft.addImages(loaded, afterTextSegmentID: imageInsertionSegmentID)
+                    await draft.addImages(loaded, afterTextSegmentID: insertionSegmentID)
                 }
             }
         )
@@ -680,35 +683,30 @@ struct ComposePostDocumentEditor: View {
     }
 
     private func textBlock(id: Int, value: String) -> some View {
-        ZStack(alignment: .topLeading) {
-            TextEditor(text: Binding(
-                get: { value },
-                set: { text = PostDraftDocument.replacingText(in: text, segmentID: id, with: $0) }
-            ))
-            .scrollContentBackground(.hidden)
-            .font(.title3)
-            .foregroundStyle(TaggrTheme.text)
-            .frame(minHeight: value.isEmpty ? 70 : 120)
-            .tint(TaggrTheme.clickable)
-            .focused(focusedTextSegmentID, equals: id)
-            .onTapGesture {
+        ComposePostTextSegmentEditor(
+            segmentID: id,
+            value: value,
+            placeholder: segments.count == 1 ? placeholder : nil,
+            focusedTextSegmentID: focusedTextSegmentID,
+            updateText: { replacement in
+                let updated = PostDraftDocument.replacingText(
+                    in: text,
+                    segmentID: id,
+                    with: replacement
+                )
+                guard updated != text else { return }
+                text = updated
+            },
+            activate: {
                 imageInsertionSegmentID = id
-            }
-            .dropDestination(for: PostDraftImageDragItem.self) { items, _ in
-                guard let item = items.first, accepts(item) else { return false }
+            },
+            dropImage: { item in
+                guard accepts(item) else { return false }
+                endTextEditing()
                 moveImageToTextSegment(item.occurrence, id)
-                imageInsertionSegmentID = id
                 return true
             }
-            if value.isEmpty && segments.count == 1 {
-                Text(placeholder)
-                    .font(.title3)
-                    .foregroundStyle(TaggrTheme.secondaryText)
-                    .padding(.top, 8)
-                    .padding(.leading, 5)
-                    .allowsHitTesting(false)
-            }
-        }
+        )
     }
 
     @ViewBuilder
@@ -738,6 +736,7 @@ struct ComposePostDocumentEditor: View {
                     .clipShape(RoundedRectangle(cornerRadius: 10))
             }
             Button("Remove image", systemImage: "xmark") {
+                endTextEditing()
                 removeImage(occurrence, blobID)
             }
             .labelStyle(.iconOnly)
@@ -757,6 +756,7 @@ struct ComposePostDocumentEditor: View {
         )
         .dropDestination(for: PostDraftImageDragItem.self) { items, _ in
             guard let item = items.first, accepts(item), item.occurrence != occurrence else { return false }
+            endTextEditing()
             moveImage(item.occurrence, occurrence)
             return true
         }
@@ -772,6 +772,74 @@ struct ComposePostDocumentEditor: View {
                 return occurrence == item.occurrence
             }
             return false
+        }
+    }
+
+    private func endTextEditing() {
+        focusedTextSegmentID.wrappedValue = nil
+        imageInsertionSegmentID = nil
+    }
+}
+
+private struct ComposePostTextSegmentEditor: View {
+    let segmentID: Int
+    let value: String
+    let placeholder: String?
+    let focusedTextSegmentID: FocusState<Int?>.Binding
+    let updateText: (String) -> Void
+    let activate: () -> Void
+    let dropImage: (PostDraftImageDragItem) -> Bool
+    @State private var inputText: String
+
+    init(
+        segmentID: Int,
+        value: String,
+        placeholder: String?,
+        focusedTextSegmentID: FocusState<Int?>.Binding,
+        updateText: @escaping (String) -> Void,
+        activate: @escaping () -> Void,
+        dropImage: @escaping (PostDraftImageDragItem) -> Bool
+    ) {
+        self.segmentID = segmentID
+        self.value = value
+        self.placeholder = placeholder
+        self.focusedTextSegmentID = focusedTextSegmentID
+        self.updateText = updateText
+        self.activate = activate
+        self.dropImage = dropImage
+        _inputText = State(initialValue: value)
+    }
+
+    var body: some View {
+        ZStack(alignment: .topLeading) {
+            TextEditor(text: $inputText)
+                .scrollContentBackground(.hidden)
+                .font(.title3)
+                .foregroundStyle(TaggrTheme.text)
+                .frame(minHeight: inputText.isEmpty ? 70 : 120)
+                .tint(TaggrTheme.clickable)
+                .focused(focusedTextSegmentID, equals: segmentID)
+                .onTapGesture(perform: activate)
+                .dropDestination(for: PostDraftImageDragItem.self) { items, _ in
+                    guard let item = items.first else { return false }
+                    return dropImage(item)
+                }
+            if inputText.isEmpty, let placeholder {
+                Text(placeholder)
+                    .font(.title3)
+                    .foregroundStyle(TaggrTheme.secondaryText)
+                    .padding(.top, 8)
+                    .padding(.leading, 5)
+                    .allowsHitTesting(false)
+            }
+        }
+        .onChange(of: inputText) { _, replacement in
+            guard replacement != value else { return }
+            updateText(replacement)
+        }
+        .onChange(of: value) { _, updatedValue in
+            guard inputText != updatedValue else { return }
+            inputText = updatedValue
         }
     }
 }

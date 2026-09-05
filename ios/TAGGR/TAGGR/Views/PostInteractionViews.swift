@@ -454,6 +454,7 @@ struct InlineReplyComposer: View {
                 moveImage: moveImageMarker,
                 moveImageToTextSegment: moveImageMarker
             )
+            .disabled(!draft.isLoaded)
             .padding(8)
             .background(TaggrTheme.darkPanel)
             .clipShape(RoundedRectangle(cornerRadius: 7))
@@ -610,6 +611,9 @@ struct InlineReplyComposer: View {
 
     func loadPhotos(_ items: [PhotosPickerItem]) {
         guard !items.isEmpty, !imageImport.isImporting else { return }
+        let insertionSegmentID = imageInsertionSegmentID
+        focusedTextSegmentID = nil
+        imageInsertionSegmentID = nil
         imageImportWarning = nil
         let maxBytes = ImageDrafts.postImageMaximumBytes(
             serverLimit: state.cache?.config?.maxBlobSizeBytes
@@ -626,7 +630,7 @@ struct InlineReplyComposer: View {
                     existingIDs: Set(draft.images.map(\.id))
                 )
                 if !loaded.isEmpty {
-                    await draft.addImages(loaded, afterTextSegmentID: imageInsertionSegmentID)
+                    await draft.addImages(loaded, afterTextSegmentID: insertionSegmentID)
                 }
             }
         )
