@@ -49,6 +49,10 @@ final class TaggrTests: XCTestCase {
             "https://id.ai/authorize"
         )
         XCTAssertEqual(config.derivationOrigin, TaggrRuntimeConfig.productionDerivationOrigin)
+        XCTAssertEqual(
+            config.icClientConfiguration.delegationTTLNanoseconds,
+            ICClientConfiguration.maximumDelegationTTLNanoseconds
+        )
     }
 
     func testProductionIdentitySignInMethodsUseFixedTrustedURLs() {

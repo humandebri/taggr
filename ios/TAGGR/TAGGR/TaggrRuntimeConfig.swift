@@ -69,7 +69,8 @@ struct TaggrRuntimeConfig: Equatable, Sendable {
                 apiBaseURL: apiBaseURL,
                 internetIdentityURL: identityURL,
                 derivationOrigin: derivationOrigin,
-                trustRoot: trustRoot
+                trustRoot: trustRoot,
+                delegationTTLNanoseconds: ICClientConfiguration.maximumDelegationTTLNanoseconds
             )
         } catch {
             preconditionFailure("Invalid TAGGR runtime configuration: \(error)")
