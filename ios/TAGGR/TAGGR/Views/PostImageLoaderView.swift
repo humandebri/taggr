@@ -27,6 +27,11 @@ private actor TaggrPostImageDecoder {
     }
 }
 
+enum TaggrPostImageCacheKind: Equatable {
+    case standard
+    case accountThumbnail
+}
+
 enum TaggrPostImageDataLoader {
     private static let imageDecoder = TaggrPostImageDecoder()
 
@@ -34,6 +39,13 @@ enum TaggrPostImageDataLoader {
     private static let imageCache: NSCache<NSString, UIImage> = {
         let cache = NSCache<NSString, UIImage>()
         cache.totalCostLimit = 32 * 1_024 * 1_024
+        return cache
+    }()
+
+    @MainActor
+    private static let accountThumbnailCache: NSCache<NSString, UIImage> = {
+        let cache = NSCache<NSString, UIImage>()
+        cache.totalCostLimit = 64 * 1_024 * 1_024
         return cache
     }()
 
@@ -65,13 +77,21 @@ enum TaggrPostImageDataLoader {
     }
 
     @MainActor
-    static func cachedImage(for key: String) -> UIImage? {
-        imageCache.object(forKey: key as NSString)
+    static func cachedImage(for key: String, maximumPixelSize: Int?) -> UIImage? {
+        cache(for: cacheKind(for: maximumPixelSize)).object(forKey: key as NSString)
     }
 
     @MainActor
-    static func storeCachedImage(_ image: UIImage, for key: String) {
-        imageCache.setObject(image, forKey: key as NSString, cost: decodedImageCost(image))
+    static func storeCachedImage(_ image: UIImage, for key: String, maximumPixelSize: Int?) {
+        cache(for: cacheKind(for: maximumPixelSize)).setObject(
+            image,
+            forKey: key as NSString,
+            cost: decodedImageCost(image)
+        )
+    }
+
+    static func cacheKind(for maximumPixelSize: Int?) -> TaggrPostImageCacheKind {
+        maximumPixelSize == 512 ? .accountThumbnail : .standard
     }
 
     static func cacheKey(for attachment: TaggrPostImageAttachment, maximumPixelSize: Int?) -> String {
@@ -84,6 +104,16 @@ enum TaggrPostImageDataLoader {
 
     static func decodedImage(from data: Data, maximumPixelSize: Int?) async -> UIImage? {
         await imageDecoder.image(from: data, maximumPixelSize: maximumPixelSize)
+    }
+
+    @MainActor
+    private static func cache(for kind: TaggrPostImageCacheKind) -> NSCache<NSString, UIImage> {
+        switch kind {
+        case .standard:
+            imageCache
+        case .accountThumbnail:
+            accountThumbnailCache
+        }
     }
 
     private static func validCachedImageData(for request: URLRequest) -> Data? {
@@ -127,7 +157,12 @@ struct TaggrPostImageLoaderView: View {
             maximumPixelSize: maximumPixelSize
         )
         self.imageCacheKey = key
-        _uiImage = State(initialValue: TaggrPostImageDataLoader.cachedImage(for: key))
+        _uiImage = State(
+            initialValue: TaggrPostImageDataLoader.cachedImage(
+                for: key,
+                maximumPixelSize: maximumPixelSize
+            )
+        )
     }
 
     var body: some View {
@@ -161,7 +196,10 @@ struct TaggrPostImageLoaderView: View {
 
     @MainActor
     private func load() async {
-        if let cachedImage = TaggrPostImageDataLoader.cachedImage(for: imageCacheKey) {
+        if let cachedImage = TaggrPostImageDataLoader.cachedImage(
+            for: imageCacheKey,
+            maximumPixelSize: maximumPixelSize
+        ) {
             uiImage = cachedImage
             failed = false
             onImageLoaded?(cachedImage.size)
@@ -188,7 +226,11 @@ struct TaggrPostImageLoaderView: View {
                 failed = true
                 return
             }
-            TaggrPostImageDataLoader.storeCachedImage(image, for: imageCacheKey)
+            TaggrPostImageDataLoader.storeCachedImage(
+                image,
+                for: imageCacheKey,
+                maximumPixelSize: maximumPixelSize
+            )
             uiImage = image
             onImageLoaded?(image.size)
         } catch {

@@ -107,6 +107,7 @@ run("xcodebuild", [
     `id=${deviceId}`,
     "-derivedDataPath",
     derivedDataPath,
+    "-skipPackagePluginValidation",
     "build",
     `TAGGR_CANISTER_ID=${canisterId}`,
     `TAGGR_API_BASE_URL=${apiBaseURL}`,

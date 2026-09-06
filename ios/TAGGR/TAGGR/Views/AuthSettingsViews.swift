@@ -2,6 +2,22 @@ import SwiftUI
 import ICNativeClient
 import UIKit
 
+enum YouTubeSettingsMode: Equatable {
+    case hidden
+    case disconnected
+    case connected(YouTubeChannel)
+
+    static func resolve(
+        isEnabled: Bool,
+        isConnected: Bool,
+        channel: YouTubeChannel?
+    ) -> YouTubeSettingsMode {
+        guard isEnabled else { return .hidden }
+        guard isConnected, let channel else { return .disconnected }
+        return .connected(channel)
+    }
+}
+
 struct SettingsView: View {
     @Environment(TaggrAppCoordinator.self) private var state
     @State private var accountCreationPresented = false
@@ -138,21 +154,40 @@ struct SettingsView: View {
                             walletPanel(state.currentUser)
                         }
                     }
-                    if state.youtubeUpload.auth.isConnected,
-                       let channel = state.youtubeUpload.auth.channel {
+                    let youtubeMode = YouTubeSettingsMode.resolve(
+                        isEnabled: state.youtubeUpload.auth.isEnabled,
+                        isConnected: state.youtubeUpload.auth.isConnected,
+                        channel: state.youtubeUpload.auth.channel
+                    )
+                    if youtubeMode != .hidden {
                         SettingsPanel(title: "YouTube") {
-                            Label(channel.title, systemImage: "play.rectangle.fill")
-                                .font(.subheadline.weight(.bold))
-                                .foregroundStyle(TaggrTheme.text)
-                            Text("Videos selected in TAGGR are uploaded directly to this channel.")
-                                .font(.footnote)
-                                .foregroundStyle(TaggrTheme.secondaryText)
-                            Button(role: .destructive) {
-                                state.youtubeUpload.disconnect()
-                            } label: {
-                                Label("Disconnect YouTube", systemImage: "link.badge.minus")
+                            switch youtubeMode {
+                            case .hidden:
+                                EmptyView()
+                            case .disconnected:
+                                Button {
+                                    state.youtubeUpload.auth.connect()
+                                } label: {
+                                    Label(
+                                        state.youtubeUpload.auth.isBusy ? "Connecting..." : "Connect YouTube",
+                                        systemImage: "play.rectangle"
+                                    )
+                                }
+                                .disabled(state.youtubeUpload.auth.isBusy)
+                            case .connected(let channel):
+                                Label(channel.title, systemImage: "play.rectangle.fill")
+                                    .font(.subheadline.weight(.bold))
+                                    .foregroundStyle(TaggrTheme.text)
+                                Text("Videos selected in TAGGR are uploaded directly to this channel.")
+                                    .font(.footnote)
+                                    .foregroundStyle(TaggrTheme.secondaryText)
+                                Button(role: .destructive) {
+                                    state.youtubeUpload.disconnect()
+                                } label: {
+                                    Label("Disconnect YouTube", systemImage: "link.badge.minus")
+                                }
+                                .disabled(state.youtubeUpload.auth.isBusy)
                             }
-                            .disabled(state.youtubeUpload.auth.isBusy)
                             if let error = state.youtubeUpload.auth.errorMessage {
                                 Text(error)
                                     .font(.footnote)

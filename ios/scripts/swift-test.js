@@ -87,6 +87,7 @@ const args = [
     "1",
     "-derivedDataPath",
     derivedDataPath,
+    "-skipPackagePluginValidation",
 ];
 
 if (destination.simulator) {

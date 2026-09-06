@@ -30,6 +30,19 @@ Then run:
 npm run ios:preflight
 ```
 
+### ICNativeClient build tool plugin
+
+The first build opened from Xcode may ask to trust
+`ICNativeClientBindgenPlugin`. Confirm that the package resolves to the
+revision pinned in
+`ios/TAGGR/TAGGR.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved`,
+then approve it. The plugin generates Swift Candid bindings from
+`ios/TAGGR/Candid/bindings.toml`.
+
+The non-interactive build, test, and device-build scripts pass
+`-skipPackagePluginValidation`; this avoids an interactive approval prompt
+while retaining the pinned package revision.
+
 ## 2. Fill App Review Data
 
 Use `ios/docs/app_store_review.md` as the App Store Connect Review Notes source.

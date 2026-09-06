@@ -6,6 +6,27 @@ import ICNativeClient
 @testable import TAGGR
 
 extension TaggrTests {
+    func testYouTubeSettingsModeKeepsReconnectAvailableAfterDisconnect() {
+        let channel = YouTubeChannel(id: "channel-id", title: "TAGGR")
+
+        XCTAssertEqual(
+            YouTubeSettingsMode.resolve(isEnabled: false, isConnected: false, channel: nil),
+            .hidden
+        )
+        XCTAssertEqual(
+            YouTubeSettingsMode.resolve(isEnabled: true, isConnected: false, channel: nil),
+            .disconnected
+        )
+        XCTAssertEqual(
+            YouTubeSettingsMode.resolve(isEnabled: true, isConnected: false, channel: channel),
+            .disconnected
+        )
+        XCTAssertEqual(
+            YouTubeSettingsMode.resolve(isEnabled: true, isConnected: true, channel: channel),
+            .connected(channel)
+        )
+    }
+
     func testYouTubeEmbedRequestIncludesAppReferer() throws {
         let request = try XCTUnwrap(
             YouTubeEmbedRequest.make(videoID: "zG9K9Za56jI", bundleIdentifier: "NETWORK.TAGGR.IOS")
@@ -1089,7 +1110,8 @@ extension TaggrTests {
         )
     }
 
-    func testAccountImageThumbnailDecodeIsBoundedAndUsesASizeSpecificCacheKey() async throws {
+    @MainActor
+    func testAccountImageThumbnailDecodeIsBoundedAndUsesADedicatedCache() async throws {
         let renderer = UIGraphicsImageRenderer(size: CGSize(width: 1_600, height: 1_200))
         let source = try XCTUnwrap(renderer.image { context in
             UIColor.red.setFill()
@@ -1108,6 +1130,16 @@ extension TaggrTests {
             TaggrPostImageDataLoader.cacheKey(for: attachment, maximumPixelSize: 512),
             TaggrPostImageDataLoader.cacheKey(for: attachment, maximumPixelSize: nil)
         )
+        XCTAssertEqual(TaggrPostImageDataLoader.cacheKind(for: 512), .accountThumbnail)
+        XCTAssertEqual(TaggrPostImageDataLoader.cacheKind(for: 1_024), .standard)
+        XCTAssertEqual(TaggrPostImageDataLoader.cacheKind(for: nil), .standard)
+
+        let key = TaggrPostImageDataLoader.cacheKey(for: attachment, maximumPixelSize: 512)
+        TaggrPostImageDataLoader.storeCachedImage(thumbnail, for: key, maximumPixelSize: 512)
+        XCTAssertTrue(
+            TaggrPostImageDataLoader.cachedImage(for: key, maximumPixelSize: 512) === thumbnail
+        )
+        XCTAssertNil(TaggrPostImageDataLoader.cachedImage(for: key, maximumPixelSize: 1_024))
     }
 
     func testDraftImageMarkdownUsesWebBlobFormatAndStableHashId() {

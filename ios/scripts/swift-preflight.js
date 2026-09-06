@@ -30,5 +30,6 @@ run("Swift iOS simulator build", "xcodebuild", [
     "generic/platform=iOS Simulator",
     "-derivedDataPath",
     derivedDataPath,
+    "-skipPackagePluginValidation",
     "build",
 ]);
