@@ -190,7 +190,10 @@ struct ComposePostView: View {
 
     private var canSubmit: Bool {
         guard draft.isLoaded, state.currentUser != nil else { return false }
-        guard !imageImport.isImporting, !draft.submissionNeedsVerification, !hasRunningYouTubeUpload else { return false }
+        guard !imageImport.isImporting,
+              !draft.submissionNeedsVerification,
+              !hasRunningYouTubeUpload,
+              !state.hasPendingPostSubmission else { return false }
         let body = composedBody
         guard !body.isEmpty else { return false }
         guard imageWarning == nil else { return false }
@@ -300,33 +303,37 @@ struct ComposePostView: View {
         let images = draft.images
         isSubmitting = true
         Task {
-            let outcome: TaggrPostSubmissionOutcome
+            guard await draft.markSubmissionNeedsVerification() else {
+                isSubmitting = false
+                return
+            }
+            let enqueued: Bool
             if let editingPost = mode.editingPost {
-                await state.editPost(
+                enqueued = state.enqueueEditPost(
                     post: editingPost,
                     text: body,
                     realm: selectedTargetRealm,
                     images: images,
-                    reloadMode: mode.selectedMode
+                    reloadMode: mode.selectedMode,
+                    draft: draft
                 )
-                outcome = state.errorMessage == nil ? .submitted : .retryableFailure
             } else {
-                outcome = await state.submitPost(
+                enqueued = state.enqueuePostSubmission(
                     text: body,
                     parent: mode.parentPostID,
                     realm: selectedTargetRealm,
                     images: images,
-                    reloadMode: mode.timelineModeAfterSubmit
+                    reloadMode: mode.timelineModeAfterSubmit,
+                    draft: draft
                 )
             }
             isSubmitting = false
-            if outcome == .submitted {
-                cancelImageImport()
-                await draft.discard()
-                dismiss()
-            } else if outcome == .uncertain {
-                await draft.markSubmissionNeedsVerification()
+            guard enqueued else {
+                await draft.clearSubmissionVerification()
+                return
             }
+            cancelImageImport()
+            dismiss()
         }
     }
 

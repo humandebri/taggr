@@ -153,26 +153,11 @@ struct SettingsView: View {
                                 Label("Disconnect YouTube", systemImage: "link.badge.minus")
                             }
                             .disabled(state.youtubeUpload.auth.isBusy)
-                            Link(
-                                "Manage Google access",
-                                destination: URL(
-                                    string: "https://security.google.com/settings/security/permissions"
-                                )!
-                            )
-                            .font(.footnote.weight(.semibold))
                             if let error = state.youtubeUpload.auth.errorMessage {
                                 Text(error)
                                     .font(.footnote)
                                     .foregroundStyle(.red)
                             }
-                        }
-                    }
-                    SettingsPanel(title: "Support") {
-                        Link(destination: URL(string: "https://\(TaggrNavigation.canonicalHost)/#/privacy")!) {
-                            Label("Privacy", systemImage: "hand.raised")
-                        }
-                        Link(destination: URL(string: "https://\(TaggrNavigation.canonicalHost)/#/support")!) {
-                            Label("Support", systemImage: "questionmark.circle")
                         }
                     }
                 }
@@ -197,11 +182,10 @@ struct SettingsView: View {
         } message: { invoice in
             Text("Transfers \(ICPAmount.format(invoice.e8s)) plus \(ICPAmount.format(ICPAmount.feeE8s)) fee from your ICP wallet.")
         }
-        .task {
-            if state.authSession != nil {
-                await state.refreshWallet()
-                await state.loadStorageStatus()
-            }
+        .task(id: state.authSession?.principal) {
+            guard state.authSession != nil else { return }
+            await state.refreshWallet()
+            await state.loadStorageStatus()
         }
         .task(id: principalCopied) {
             guard principalCopied else { return }

@@ -415,9 +415,13 @@ extension TaggrTests {
 
         XCTAssertEqual(outcome, .submitted)
         XCTAssertNil(state.errorMessage)
-        XCTAssertEqual(calls.map(\.method), ["add_post", "user", "last_posts"])
+        XCTAssertEqual(calls.first?.method, "add_post")
+        XCTAssertEqual(Set(calls.dropFirst().map(\.method)), Set(["user", "last_posts"]))
         XCTAssertEqual(calls.first?.arg, try TaggrCandidAdapter.addPostArguments(text: "hello", refs: [], parent: nil, realm: "DEV", extensionBlob: nil).encode())
-        XCTAssertEqual(calls.last?.arg, try TaggrCandid.jsonArguments([TaggrRuntimeConfig.productionDomain, "DEV", 0, 0, true]))
+        XCTAssertEqual(
+            calls.first { $0.method == "last_posts" }?.arg,
+            try TaggrCandid.jsonArguments([TaggrRuntimeConfig.productionDomain, "DEV", 0, 0, true])
+        )
         XCTAssertEqual(state.route, .feed(.realm("DEV")))
         XCTAssertEqual(state.currentUser?.name, "alice")
         XCTAssertEqual(preferences.recentDestinations(scope: postingScope), ["DEV"])
@@ -451,10 +455,337 @@ extension TaggrTests {
         await state.submitPost(text: "hello")
 
         XCTAssertNil(state.errorMessage)
-        XCTAssertEqual(calls.map(\.method), ["add_post", "user", "hot_posts"])
-        XCTAssertEqual(calls.last?.arg, try TaggrCandid.jsonArguments([TaggrRuntimeConfig.productionDomain, "", 0, 0, true]))
+        XCTAssertEqual(calls.first?.method, "add_post")
+        XCTAssertEqual(Set(calls.dropFirst().map(\.method)), Set(["user", "hot_posts"]))
+        XCTAssertEqual(
+            calls.first { $0.method == "hot_posts" }?.arg,
+            try TaggrCandid.jsonArguments([TaggrRuntimeConfig.productionDomain, "", 0, 0, true])
+        )
         XCTAssertEqual(state.route, .feed(.hot))
         XCTAssertEqual(preferences.recentDestinations(scope: postingScope), [""])
+    }
+
+    @MainActor
+    func testEnqueuedPostReturnsBeforeUpdateReplyAndRejectsDuplicateDraft() async throws {
+        let requestStarted = expectation(description: "add_post started")
+        let releaseRequest = DispatchSemaphore(value: 0)
+        let api = makeStubbedAPI { request in
+            let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
+            let method = self.requestMethodAndArg(from: request)?.method
+            if method == "add_post" {
+                requestStarted.fulfill()
+                _ = releaseRequest.wait(timeout: .now() + 5)
+                return (response, Self.queryReply(Self.candidAddPostResultOk(42)))
+            }
+            if request.url?.path.hasSuffix("/query") == true {
+                if method == "user" {
+                    return (response, Self.queryReply(Self.currentUserFixture()))
+                }
+                return (response, Self.queryReply(Data("[]".utf8)))
+            }
+            return (response, Self.queryReply(Data()))
+        }
+        let rootURL = URL.temporaryDirectory
+            .appending(path: "EnqueuedPostTests-\(UUID().uuidString)", directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: rootURL) }
+        let store = PostDraftStore(rootURL: rootURL)
+        let state = TaggrAppCoordinator(api: api, postDraftStore: store)
+        state.authSession = makeAuthSession(privateKey: Curve25519.Signing.PrivateKey())
+        state.currentUser = try JSONDecoder.taggr.decode(TaggrUser.self, from: Self.currentUserFixture())
+        state.route = .feed(.hot)
+        let namespace = PostDraftNamespace(canisterID: state.runtimeConfig.canisterId, userID: 7)
+        let draft = PostDraftSession(context: .newPost, initialText: "", initialRealm: "")
+        await draft.load(store: store, namespace: namespace)
+        draft.text = "hello"
+        let draftSaved = await draft.markSubmissionNeedsVerification()
+        XCTAssertTrue(draftSaved)
+
+        XCTAssertTrue(state.enqueuePostSubmission(text: "hello", reloadMode: .hot, draft: draft))
+        XCTAssertFalse(state.enqueuePostSubmission(text: "hello", reloadMode: .hot, draft: draft))
+        XCTAssertEqual(state.postSubmissionNotice?.phase, .submitting)
+        XCTAssertFalse(state.isBusy)
+        let task = try XCTUnwrap(state.postSubmissionTasks[.newPost])
+
+        await fulfillment(of: [requestStarted], timeout: 1)
+        XCTAssertTrue(state.isPostSubmissionPending(.newPost))
+        releaseRequest.signal()
+        await task.value
+
+        XCTAssertFalse(state.isPostSubmissionPending(.newPost))
+        XCTAssertEqual(state.postSubmissionNotice?.phase, .succeeded)
+        XCTAssertFalse(draft.hasChanges)
+    }
+
+    @MainActor
+    func testEnqueuedPostFinishesBeforeBackgroundReconciliation() async throws {
+        let userRefreshStarted = expectation(description: "user refresh started")
+        let releaseQueries = DispatchSemaphore(value: 0)
+        let api = makeStubbedAPI { request in
+            let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
+            let method = self.requestMethodAndArg(from: request)?.method
+            if request.url?.path.hasSuffix("/query") == true {
+                if method == "user" {
+                    userRefreshStarted.fulfill()
+                }
+                _ = releaseQueries.wait(timeout: .now() + 5)
+                let body = method == "user" ? Self.currentUserFixture() : Data("[]".utf8)
+                return (response, Self.queryReply(body))
+            }
+            return (response, Self.queryReply(Self.candidAddPostResultOk(42)))
+        }
+        let rootURL = URL.temporaryDirectory
+            .appending(path: "PostReconciliationTests-\(UUID().uuidString)", directoryHint: .isDirectory)
+        defer {
+            releaseQueries.signal()
+            releaseQueries.signal()
+            try? FileManager.default.removeItem(at: rootURL)
+        }
+        let store = PostDraftStore(rootURL: rootURL)
+        let state = TaggrAppCoordinator(api: api, postDraftStore: store)
+        state.authSession = makeAuthSession(privateKey: Curve25519.Signing.PrivateKey())
+        state.currentUser = try JSONDecoder.taggr.decode(TaggrUser.self, from: Self.currentUserFixture())
+        state.route = .feed(.hot)
+        let namespace = PostDraftNamespace(canisterID: state.runtimeConfig.canisterId, userID: 7)
+        let draft = PostDraftSession(context: .newPost, initialText: "", initialRealm: "")
+        await draft.load(store: store, namespace: namespace)
+        draft.text = "hello"
+        await draft.markSubmissionNeedsVerification()
+
+        XCTAssertTrue(state.enqueuePostSubmission(text: "hello", reloadMode: .hot, draft: draft))
+        let submission = try XCTUnwrap(state.postSubmissionTasks[.newPost])
+        await submission.value
+
+        XCTAssertFalse(state.hasPendingPostSubmission)
+        XCTAssertEqual(state.postSubmissionNotice?.phase, .succeeded)
+        XCTAssertFalse(draft.hasChanges)
+        await fulfillment(of: [userRefreshStarted], timeout: 1)
+    }
+
+    @MainActor
+    func testEnqueuedPostDoesNotRefreshStaleFeedRoute() async throws {
+        let updateStarted = expectation(description: "add_post started")
+        let userRefreshFinished = expectation(description: "user refresh finished")
+        let releaseUpdate = DispatchSemaphore(value: 0)
+        let lock = NSLock()
+        var methods: [String] = []
+        let api = makeStubbedAPI { request in
+            let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
+            let method = self.requestMethodAndArg(from: request)?.method ?? ""
+            lock.withLock { methods.append(method) }
+            if method == "add_post" {
+                updateStarted.fulfill()
+                _ = releaseUpdate.wait(timeout: .now() + 5)
+                return (response, Self.queryReply(Self.candidAddPostResultOk(42)))
+            }
+            if method == "user" {
+                userRefreshFinished.fulfill()
+                return (response, Self.queryReply(Self.currentUserFixture()))
+            }
+            return (response, Self.queryReply(Data("[]".utf8)))
+        }
+        let rootURL = URL.temporaryDirectory
+            .appending(path: "StalePostRouteTests-\(UUID().uuidString)", directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: rootURL) }
+        let store = PostDraftStore(rootURL: rootURL)
+        let state = TaggrAppCoordinator(api: api, postDraftStore: store)
+        state.authSession = makeAuthSession(privateKey: Curve25519.Signing.PrivateKey())
+        state.currentUser = try JSONDecoder.taggr.decode(TaggrUser.self, from: Self.currentUserFixture())
+        state.route = .feed(.hot)
+        state.returnFeedMode = .hot
+        let namespace = PostDraftNamespace(canisterID: state.runtimeConfig.canisterId, userID: 7)
+        let draft = PostDraftSession(context: .newPost, initialText: "", initialRealm: "")
+        await draft.load(store: store, namespace: namespace)
+        draft.text = "hello"
+        await draft.markSubmissionNeedsVerification()
+
+        XCTAssertTrue(state.enqueuePostSubmission(text: "hello", reloadMode: .hot, draft: draft))
+        let submission = try XCTUnwrap(state.postSubmissionTasks[.newPost])
+        await fulfillment(of: [updateStarted], timeout: 1)
+        state.route = .feed(.latest)
+        state.returnFeedMode = .latest
+        releaseUpdate.signal()
+        await submission.value
+        await fulfillment(of: [userRefreshFinished], timeout: 1)
+
+        XCTAssertEqual(state.route, .feed(.latest))
+        XCTAssertEqual(state.returnFeedMode, .latest)
+        XCTAssertFalse(lock.withLock { methods.contains("hot_posts") || methods.contains("last_posts") })
+    }
+
+    @MainActor
+    func testImagePostKeepsEnqueuedAPIWhenSessionChangesDuringUpload() async throws {
+        let uploadStarted = expectation(description: "bucket write started")
+        let releaseUpload = DispatchSemaphore(value: 0)
+        let lock = NSLock()
+        var originalMethods: [String] = []
+        var replacementMethods: [String] = []
+        let originalAPI = makeStubbedAPI { request in
+            let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
+            let method = self.requestMethodAndArg(from: request)?.method ?? ""
+            lock.withLock { originalMethods.append(method) }
+            if method == "write" {
+                uploadStarted.fulfill()
+                _ = releaseUpload.wait(timeout: .now() + 5)
+                return (response, Self.queryReply(Data([0, 0, 0, 0, 0, 0, 0, 7])))
+            }
+            return (response, Self.queryReply(Self.candidAddPostResultOk(42)))
+        }
+        let replacementAPI = makeStubbedAPI { request in
+            let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
+            let method = self.requestMethodAndArg(from: request)?.method ?? ""
+            lock.withLock { replacementMethods.append(method) }
+            return (response, Self.queryReply(Self.candidAddPostResultOk(99)))
+        }
+        let rootURL = URL.temporaryDirectory
+            .appending(path: "PostContextTests-\(UUID().uuidString)", directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: rootURL) }
+        let store = PostDraftStore(rootURL: rootURL)
+        let state = TaggrAppCoordinator(api: originalAPI, postDraftStore: store)
+        state.authSession = makeAuthSession(privateKey: Curve25519.Signing.PrivateKey())
+        state.currentUser = TaggrUser(
+            id: 7,
+            name: "alice",
+            about: "",
+            principal: nil,
+            realms: [],
+            followees: [],
+            followers: [],
+            blacklist: [],
+            bucket: "aaaaa-aa",
+            mode: nil
+        )
+        let namespace = PostDraftNamespace(canisterID: state.runtimeConfig.canisterId, userID: 7)
+        let draft = PostDraftSession(context: .newPost, initialText: "", initialRealm: "")
+        await draft.load(store: store, namespace: namespace)
+        let image = TaggrDraftImage(id: "abc12345", data: Data([1, 2, 3]), width: 10, height: 20)
+        draft.text = image.markdown
+        await draft.addImages([image])
+
+        XCTAssertTrue(state.enqueuePostSubmission(text: image.markdown, images: [image], draft: draft))
+        let submission = try XCTUnwrap(state.postSubmissionTasks[.newPost])
+        await fulfillment(of: [uploadStarted], timeout: 1)
+        state.api = replacementAPI
+        state.authSession = makeAuthSession(privateKey: Curve25519.Signing.PrivateKey())
+        state.currentUser = TaggrUser(
+            id: 8,
+            name: "bob",
+            about: "",
+            principal: nil,
+            realms: [],
+            followees: [],
+            followers: [],
+            blacklist: [],
+            bucket: "bbbbb-bb",
+            mode: nil
+        )
+        releaseUpload.signal()
+        await submission.value
+
+        XCTAssertEqual(lock.withLock { originalMethods }, ["write", "add_post"])
+        XCTAssertTrue(lock.withLock { replacementMethods.isEmpty })
+        XCTAssertEqual(state.currentUser?.id, 8)
+    }
+
+    @MainActor
+    func testEnqueuedPostKeepsRetryableAndUncertainDrafts() async throws {
+        let rootURL = URL.temporaryDirectory
+            .appending(path: "FailedEnqueuedPostTests-\(UUID().uuidString)", directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: rootURL) }
+        let store = PostDraftStore(rootURL: rootURL)
+        let user = try JSONDecoder.taggr.decode(TaggrUser.self, from: Self.currentUserFixture())
+        let namespace = PostDraftNamespace(canisterID: TaggrRuntimeConfig.productionCanisterId, userID: user.id)
+
+        let rejectedAPI = makeStubbedAPI { request in
+            let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
+            return (response, Self.queryReply(Self.candidResultErr("denied")))
+        }
+        let rejectedState = TaggrAppCoordinator(api: rejectedAPI, postDraftStore: store)
+        rejectedState.authSession = makeAuthSession(privateKey: Curve25519.Signing.PrivateKey())
+        rejectedState.currentUser = user
+        let retryableDraft = PostDraftSession(context: .newPost, initialText: "", initialRealm: "")
+        await retryableDraft.load(store: store, namespace: namespace)
+        retryableDraft.text = "retry me"
+        await retryableDraft.markSubmissionNeedsVerification()
+
+        XCTAssertTrue(rejectedState.enqueuePostSubmission(text: "retry me", draft: retryableDraft))
+        await rejectedState.postSubmissionTasks[.newPost]?.value
+
+        XCTAssertEqual(rejectedState.postSubmissionNotice?.phase, .retryableFailure)
+        XCTAssertTrue(retryableDraft.hasChanges)
+        XCTAssertFalse(retryableDraft.submissionNeedsVerification)
+
+        let unavailableAPI = makeStubbedAPI { request in
+            let response = HTTPURLResponse(url: request.url!, statusCode: 502, httpVersion: nil, headerFields: nil)!
+            return (response, Data("gateway unavailable".utf8))
+        }
+        let uncertainState = TaggrAppCoordinator(api: unavailableAPI, postDraftStore: store)
+        uncertainState.authSession = makeAuthSession(privateKey: Curve25519.Signing.PrivateKey())
+        uncertainState.currentUser = user
+        let uncertainDraft = PostDraftSession(context: .reply(42), initialText: "", initialRealm: "DEV")
+        await uncertainDraft.load(store: store, namespace: namespace)
+        uncertainDraft.text = "maybe sent"
+        await uncertainDraft.markSubmissionNeedsVerification()
+
+        XCTAssertTrue(uncertainState.enqueuePostSubmission(text: "maybe sent", parent: 42, realm: "DEV", draft: uncertainDraft))
+        await uncertainState.postSubmissionTasks[.reply(42)]?.value
+
+        XCTAssertEqual(uncertainState.postSubmissionNotice?.phase, .uncertain)
+        XCTAssertTrue(uncertainDraft.hasChanges)
+        XCTAssertTrue(uncertainDraft.submissionNeedsVerification)
+    }
+
+    @MainActor
+    func testEmptyRepostVerificationStateRestoresUntilConfirmed() async throws {
+        let rootURL = URL.temporaryDirectory
+            .appending(path: "RepostDraftTests-\(UUID().uuidString)", directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: rootURL) }
+        let store = PostDraftStore(rootURL: rootURL)
+        let namespace = PostDraftNamespace(canisterID: TaggrRuntimeConfig.productionCanisterId, userID: 7)
+        let context = PostDraftContext.repost(42)
+        let submittedDraft = PostDraftSession(context: context, initialText: "", initialRealm: "DEV")
+        await submittedDraft.load(store: store, namespace: namespace)
+
+        let markedForVerification = await submittedDraft.markSubmissionNeedsVerification()
+        XCTAssertTrue(markedForVerification)
+
+        let restoredDraft = PostDraftSession(context: context, initialText: "", initialRealm: "DEV")
+        await restoredDraft.load(store: store, namespace: namespace)
+        XCTAssertTrue(restoredDraft.submissionNeedsVerification)
+        XCTAssertTrue(restoredDraft.hasChanges)
+
+        await restoredDraft.discard()
+        let confirmedDraft = PostDraftSession(context: context, initialText: "", initialRealm: "DEV")
+        await confirmedDraft.load(store: store, namespace: namespace)
+        XCTAssertFalse(confirmedDraft.submissionNeedsVerification)
+        XCTAssertFalse(confirmedDraft.hasChanges)
+    }
+
+    @MainActor
+    func testRejectedRepostKeepsDraftForRetry() async throws {
+        let api = makeStubbedAPI { request in
+            let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
+            return (response, Self.queryReply(Self.candidResultErr("denied")))
+        }
+        let rootURL = URL.temporaryDirectory
+            .appending(path: "RejectedRepostDraftTests-\(UUID().uuidString)", directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: rootURL) }
+        let store = PostDraftStore(rootURL: rootURL)
+        let state = TaggrAppCoordinator(api: api, postDraftStore: store)
+        state.authSession = makeAuthSession(privateKey: Curve25519.Signing.PrivateKey())
+        state.currentUser = try JSONDecoder.taggr.decode(TaggrUser.self, from: Self.currentUserFixture())
+        let namespace = PostDraftNamespace(canisterID: state.runtimeConfig.canisterId, userID: 7)
+        let draft = PostDraftSession(context: .repost(42), initialText: "", initialRealm: "DEV")
+        await draft.load(store: store, namespace: namespace)
+        draft.text = "comment"
+        await draft.markSubmissionNeedsVerification()
+
+        XCTAssertTrue(state.enqueueRepost(postId: 42, text: draft.text, realm: "DEV", draft: draft))
+        await state.postSubmissionTasks[.repost(42)]?.value
+
+        XCTAssertEqual(state.postSubmissionNotice?.phase, .retryableFailure)
+        XCTAssertEqual(draft.text, "comment")
+        XCTAssertTrue(draft.hasChanges)
+        XCTAssertFalse(draft.submissionNeedsVerification)
     }
 
     @MainActor
@@ -532,8 +863,12 @@ extension TaggrTests {
         await state.submitPost(text: "hello #tag", reloadMode: .tags(["tag"]))
 
         XCTAssertNil(state.errorMessage)
-        XCTAssertEqual(calls.map(\.method), ["add_post", "user", "posts_by_tags"])
-        XCTAssertEqual(calls.last?.arg, try TaggrCandid.jsonArguments([TaggrRuntimeConfig.productionDomain, "", ["tag"], 0, 0]))
+        XCTAssertEqual(calls.first?.method, "add_post")
+        XCTAssertEqual(Set(calls.dropFirst().map(\.method)), Set(["user", "posts_by_tags"]))
+        XCTAssertEqual(
+            calls.first { $0.method == "posts_by_tags" }?.arg,
+            try TaggrCandid.jsonArguments([TaggrRuntimeConfig.productionDomain, "", ["tag"], 0, 0])
+        )
         XCTAssertEqual(state.route, .feed(.tags(["tag"])))
     }
 
@@ -567,7 +902,8 @@ extension TaggrTests {
         await state.submitPost(text: "reply", parent: 42, realm: "DEV", reloadMode: .latest)
 
         XCTAssertNil(state.errorMessage)
-        XCTAssertEqual(calls.map(\.method), ["add_post", "user", "thread", "thread"])
+        XCTAssertEqual(calls.first?.method, "add_post")
+        XCTAssertEqual(Set(calls.dropFirst().map(\.method)), Set(["user", "thread"]))
         XCTAssertEqual(calls.first?.arg, try TaggrCandidAdapter.addPostArguments(text: "reply", refs: [], parent: 42, realm: "DEV", extensionBlob: nil).encode())
         XCTAssertEqual(state.repliesByPostID[42], [])
     }
@@ -604,7 +940,8 @@ extension TaggrTests {
 
         let patch = TaggrEditPatch.fullReplacement(from: "updated", to: "hello")
         XCTAssertNil(state.errorMessage)
-        XCTAssertEqual(calls.map(\.method), ["edit_post", "user", "thread"])
+        XCTAssertEqual(calls.first?.method, "edit_post")
+        XCTAssertEqual(Set(calls.dropFirst().map(\.method)), Set(["user", "thread"]))
         XCTAssertEqual(
             calls.first?.arg,
             try TaggrCandidAdapter.editPostArguments(id: 42, text: "updated", refs: [], patch: patch, realm: "ART").encode()
@@ -654,7 +991,8 @@ extension TaggrTests {
 
         let patch = TaggrEditPatch.fullReplacement(from: body, to: "hello")
         XCTAssertNil(state.errorMessage)
-        XCTAssertEqual(calls.map(\.method), ["write", "edit_post", "user", "thread"])
+        XCTAssertEqual(calls.prefix(2).map(\.method), ["write", "edit_post"])
+        XCTAssertEqual(Set(calls.dropFirst(2).map(\.method)), Set(["user", "thread"]))
         XCTAssertEqual(calls.first?.arg, Data([1, 2, 3]))
         XCTAssertEqual(
             calls.dropFirst().first?.arg,
@@ -710,7 +1048,8 @@ extension TaggrTests {
         await state.submitPost(text: body, images: images, reloadMode: .hot)
 
         XCTAssertNil(state.errorMessage)
-        XCTAssertEqual(calls.map(\.method), ["write", "write", "add_post", "user", "hot_posts"])
+        XCTAssertEqual(calls.prefix(3).map(\.method), ["write", "write", "add_post"])
+        XCTAssertEqual(Set(calls.dropFirst(3).map(\.method)), Set(["user", "hot_posts"]))
         XCTAssertEqual(calls[0].arg, Data([1, 2, 3]))
         XCTAssertEqual(calls[1].arg, Data([1, 2, 3]))
         XCTAssertEqual(

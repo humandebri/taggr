@@ -672,6 +672,9 @@ extension TaggrTests {
         XCTAssertEqual(start.value(forHTTPHeaderField: "X-Upload-Content-Length"), "20000000")
         XCTAssertTrue(startComponents.queryItems?.contains(URLQueryItem(name: "uploadType", value: "resumable")) == true)
 
+        job.videoID = "zG9K9Za56jI"
+        XCTAssertEqual(job.youtubeURL?.absoluteString, "https://www.youtube.com/watch?v=zG9K9Za56jI")
+
         job.acknowledgedBytes = 8_388_608
         let chunk = YouTubeUploadCoordinator.chunkRequest(
             job: job,

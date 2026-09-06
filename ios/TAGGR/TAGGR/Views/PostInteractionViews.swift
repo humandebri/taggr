@@ -578,6 +578,7 @@ struct InlineReplyComposer: View {
         draft.isLoaded && state.currentUser != nil && !composedBody.isEmpty && imageWarning == nil
             && !draft.submissionNeedsVerification
             && !imageImport.isImporting && !isSubmitting && !state.isBusy && !hasRunningYouTubeUpload
+            && !state.hasPendingPostSubmission
     }
 
     var imageWarning: String? {
@@ -680,21 +681,25 @@ struct InlineReplyComposer: View {
         let images = draft.images
         isSubmitting = true
         Task {
-            let outcome = await state.submitPost(
+            guard await draft.markSubmissionNeedsVerification() else {
+                isSubmitting = false
+                return
+            }
+            let enqueued = state.enqueuePostSubmission(
                 text: body,
                 parent: post.id,
                 realm: post.realm,
                 images: images,
-                reloadMode: selectedMode
+                reloadMode: selectedMode,
+                draft: draft
             )
             isSubmitting = false
-            if outcome == .submitted {
-                cancelImageImport()
-                await draft.discard()
-                focusedTextSegmentID = nil
-            } else if outcome == .uncertain {
-                await draft.markSubmissionNeedsVerification()
+            guard enqueued else {
+                await draft.clearSubmissionVerification()
+                return
             }
+            cancelImageImport()
+            focusedTextSegmentID = nil
         }
     }
 
@@ -1082,10 +1087,23 @@ struct ReactionPickerView: View {
 
 struct RepostSheet: View {
     @Environment(TaggrAppCoordinator.self) private var state
+    @Environment(\.scenePhase) private var scenePhase
     let post: TaggrPost
     @Binding var isPresented: Bool
-    @State private var text = ""
+    @StateObject private var draft: PostDraftSession
     @State private var isSubmitting = false
+
+    init(post: TaggrPost, isPresented: Binding<Bool>) {
+        self.post = post
+        _isPresented = isPresented
+        _draft = StateObject(
+            wrappedValue: PostDraftSession(
+                context: .repost(post.id),
+                initialText: "",
+                initialRealm: post.realm ?? ""
+            )
+        )
+    }
 
     var body: some View {
         VStack(spacing: 14) {
@@ -1100,15 +1118,34 @@ struct RepostSheet: View {
                     .frame(height: 36)
                     .background(isSubmitting ? TaggrTheme.panelRaised : TaggrTheme.accent)
                     .clipShape(Capsule())
-                    .disabled(isSubmitting || state.isBusy)
+                    .disabled(!draft.isLoaded || isSubmitting || state.isBusy || state.hasPendingPostSubmission)
             }
-            TextEditor(text: $text)
+            TextEditor(text: draftText)
                 .scrollContentBackground(.hidden)
                 .foregroundStyle(TaggrTheme.text)
                 .frame(minHeight: 110)
                 .padding(8)
                 .background(TaggrTheme.panelRaised)
                 .clipShape(RoundedRectangle(cornerRadius: 8))
+            if let warning = draft.restorationWarning {
+                ComposePostImageWarning(text: warning, showCreateStorage: false, createStorage: {})
+            }
+            if draft.submissionNeedsVerification {
+                ComposePostImageWarning(
+                    text: "The last repost request may have been accepted, but its result was not confirmed. Check the post before retrying.",
+                    showCreateStorage: false,
+                    createStorage: {}
+                )
+                HStack(spacing: 16) {
+                    Button("I confirmed it was reposted", action: discardConfirmedSubmission)
+                    Button("Edit and retry") {
+                        Task { await draft.clearSubmissionVerification() }
+                    }
+                }
+                .font(.footnote.weight(.bold))
+                .foregroundStyle(TaggrTheme.clickable)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
             TaggrPostBodyView(text: post.displayBody, maximumLines: 4)
                 .font(.subheadline)
                 .foregroundStyle(TaggrTheme.secondaryText)
@@ -1118,17 +1155,67 @@ struct RepostSheet: View {
         .padding(16)
         .background(TaggrTheme.background)
         .presentationDetents([.medium])
+        .onChange(of: scenePhase) { _, phase in
+            guard phase != .active else { return }
+            Task { await draft.flush() }
+        }
+        .onDisappear {
+            Task { await draft.flush() }
+        }
+        .task(id: draftNamespaceID) {
+            guard let namespace = draftNamespace else { return }
+            await draft.load(store: state.postDraftStore, namespace: namespace)
+        }
     }
 
     func submit() {
         guard !isSubmitting else { return }
         isSubmitting = true
         Task {
-            await state.repost(postId: post.id, text: text, realm: post.realm)
-            isSubmitting = false
-            if state.errorMessage == nil {
-                isPresented = false
+            guard await draft.markSubmissionNeedsVerification() else {
+                isSubmitting = false
+                return
             }
+            let enqueued = state.enqueueRepost(
+                postId: post.id,
+                text: draft.text,
+                realm: draft.realm.isEmpty ? nil : draft.realm,
+                draft: draft
+            )
+            isSubmitting = false
+            guard enqueued else {
+                await draft.clearSubmissionVerification()
+                return
+            }
+            isPresented = false
+        }
+    }
+
+    private var draftNamespace: PostDraftNamespace? {
+        state.currentUser.map {
+            PostDraftNamespace(canisterID: state.runtimeConfig.canisterId, userID: $0.id)
+        }
+    }
+
+    private var draftNamespaceID: String {
+        draftNamespace.map { "\($0.canisterID):\($0.userID)" } ?? "signed-out"
+    }
+
+    private var draftText: Binding<String> {
+        Binding(
+            get: { draft.text },
+            set: { value in
+                draft.text = value
+                draft.contentDidChange()
+                draft.scheduleSave()
+            }
+        )
+    }
+
+    private func discardConfirmedSubmission() {
+        Task {
+            await draft.discard()
+            isPresented = false
         }
     }
 }

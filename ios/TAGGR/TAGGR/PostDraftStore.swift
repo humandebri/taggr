@@ -8,6 +8,7 @@ struct PostDraftContext: Codable, Hashable, Sendable {
         case newPost
         case reply
         case edit
+        case repost
     }
 
     let kind: Kind
@@ -21,6 +22,10 @@ struct PostDraftContext: Codable, Hashable, Sendable {
 
     static func edit(_ postID: Int) -> PostDraftContext {
         PostDraftContext(kind: .edit, postID: postID)
+    }
+
+    static func repost(_ postID: Int) -> PostDraftContext {
+        PostDraftContext(kind: .repost, postID: postID)
     }
 
     var storageKey: String {
@@ -515,7 +520,9 @@ final class PostDraftSession: ObservableObject {
     }
 
     private var hasContent: Bool {
-        !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !images.isEmpty
+        !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
+            !images.isEmpty ||
+            (context.kind == .repost && submissionNeedsVerification)
     }
 
     func load(
@@ -606,14 +613,14 @@ final class PostDraftSession: ObservableObject {
     func discard() async {
         saveTask?.cancel()
         saveTask = nil
-        if let store, let namespace {
-            await store.delete(namespace: namespace, context: context)
-        }
         text = initialText
         realm = initialRealm
         images = []
         submissionNeedsVerification = false
         restorationWarning = nil
+        if let store, let namespace {
+            await store.delete(namespace: namespace, context: context)
+        }
     }
 
     private func persistCurrentState() async {
@@ -639,9 +646,11 @@ final class PostDraftSession: ObservableObject {
         }
     }
 
-    func markSubmissionNeedsVerification() async {
+    @discardableResult
+    func markSubmissionNeedsVerification() async -> Bool {
         submissionNeedsVerification = true
         await flush()
+        return restorationWarning != Self.saveFailureWarning
     }
 
     func clearSubmissionVerification() async {

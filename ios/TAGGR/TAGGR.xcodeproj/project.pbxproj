@@ -304,7 +304,7 @@
 			repositoryURL = "https://github.com/humandebri/ICNativeClient.git";
 			requirement = {
 				kind = exactVersion;
-				version = 0.7.3;
+				version = 0.7.5;
 			};
 		};
 		01000C000000000000000002 /* XCRemoteSwiftPackageReference "libwebp-Xcode" */ = {

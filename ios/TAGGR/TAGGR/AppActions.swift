@@ -9,47 +9,137 @@ enum TaggrPostSubmissionOutcome: Equatable {
     case uncertain
 }
 
-extension TaggrAppCoordinator {
-    func submitPost(text: String, parent: Int? = nil, realm: String? = nil, images: [TaggrDraftImage] = [], reloadMode: TaggrFeedMode? = nil) async -> TaggrPostSubmissionOutcome {
-        let operationID = UUID()
-        activeOperationIDs.insert(operationID)
-        latestOperationID = operationID
-        isBusy = !activeOperationIDs.isEmpty
-        errorMessage = nil
-        defer {
-            activeOperationIDs.remove(operationID)
-            isBusy = !activeOperationIDs.isEmpty
+private struct TaggrPostSubmissionResult {
+    let outcome: TaggrPostSubmissionOutcome
+    let errorMessage: String?
+}
+
+private struct TaggrPostSubmissionContext {
+    let api: TaggrAPI
+    let authSession: ICAuthSession?
+    let bucketID: String?
+    let userID: Int?
+    let runtimeGeneration: Int
+    let realmPostingScope: RealmPostingScope?
+    let route: TaggrRoute
+}
+
+private enum TaggrPostReconciliation {
+    case rootPost
+    case reply(Int)
+    case mutation
+}
+
+@MainActor
+private final class TaggrPostBackgroundTask {
+    private var identifier = UIBackgroundTaskIdentifier.invalid
+
+    func begin(expiration: @escaping @MainActor () -> Void) {
+        identifier = UIApplication.shared.beginBackgroundTask(
+            withName: "TAGGR post submission"
+        ) { [weak self] in
+            Task { @MainActor in
+                expiration()
+                self?.end()
+            }
         }
+    }
+
+    func end() {
+        guard identifier != .invalid else { return }
+        UIApplication.shared.endBackgroundTask(identifier)
+        identifier = .invalid
+    }
+}
+
+extension TaggrAppCoordinator {
+    func submitPost(text: String, parent: Int? = nil, realm: String? = nil, images: [TaggrDraftImage] = [], reloadMode _: TaggrFeedMode? = nil) async -> TaggrPostSubmissionOutcome {
+        errorMessage = nil
+        let context = postSubmissionContext()
+        let result = await performPostSubmission(
+            text: text,
+            parent: parent,
+            realm: realm,
+            images: images,
+            context: context
+        )
+        if result.outcome == .submitted {
+            await reconcilePostSubmission(
+                parent.map(TaggrPostReconciliation.reply) ?? .rootPost,
+                context: context
+            )
+        }
+        errorMessage = result.errorMessage
+        return result.outcome
+    }
+
+    @discardableResult
+    func enqueuePostSubmission(
+        text: String,
+        parent: Int? = nil,
+        realm: String? = nil,
+        images: [TaggrDraftImage] = [],
+        reloadMode _: TaggrFeedMode? = nil,
+        draft: PostDraftSession
+    ) -> Bool {
+        let key = parent.map(TaggrPostSubmissionKey.reply) ?? .newPost
+        let context = postSubmissionContext()
+        let reconciliation = parent.map(TaggrPostReconciliation.reply) ?? .rootPost
+        return enqueuePostSubmission(key: key, draft: draft, reconciliation: {
+            await self.reconcilePostSubmission(reconciliation, context: context)
+        }) { [weak self] in
+            guard let self else {
+                return TaggrPostSubmissionResult(outcome: .retryableFailure, errorMessage: "Posting was interrupted.")
+            }
+            return await self.performPostSubmission(
+                text: text,
+                parent: parent,
+                realm: realm,
+                images: images,
+                context: context
+            )
+        }
+    }
+
+    private func performPostSubmission(
+        text: String,
+        parent: Int?,
+        realm: String?,
+        images: [TaggrDraftImage],
+        context: TaggrPostSubmissionContext
+    ) async -> TaggrPostSubmissionResult {
         do {
             let body = text.trimmingCharacters(in: .whitespacesAndNewlines)
-            let refs = try await uploadBlobs(referencedNewBlobs(in: body, draftImages: images, existingBlobIDs: []))
-            let postingScope = realmPostingScope
+            let refs = try await uploadBlobs(
+                referencedNewBlobs(in: body, draftImages: images, existingBlobIDs: []),
+                context: context
+            )
             do {
-                _ = try await api.addPost(text: body, refs: refs, parent: parent, realm: realm, identity: authSession)
+                _ = try await context.api.addPost(
+                    text: body,
+                    refs: refs,
+                    parent: parent,
+                    realm: realm,
+                    identity: context.authSession
+                )
             } catch {
-                guard !isCancellation(error) else { return .retryableFailure }
-                errorMessage = error.localizedDescription
-                return isUncertainPostSubmissionError(error) ? .uncertain : .retryableFailure
+                guard !isCancellation(error) else {
+                    return TaggrPostSubmissionResult(outcome: .retryableFailure, errorMessage: "Posting was interrupted.")
+                }
+                return TaggrPostSubmissionResult(
+                    outcome: isUncertainPostSubmissionError(error) ? .uncertain : .retryableFailure,
+                    errorMessage: error.localizedDescription
+                )
             }
-            if parent == nil, let postingScope {
+            if parent == nil, let postingScope = context.realmPostingScope {
                 realmPostingPreferences.record(destination: realm, scope: postingScope)
             }
-            if let parent {
-                repliesByPostID[parent] = nil
-                await updateCurrentUserIfPossible()
-                await loadCurrentRoute()
-                await refreshReplyThread(postID: parent)
-            } else {
-                await updateCurrentUserIfPossible()
-                await reloadAfterRootPost(mode: reloadMode)
-                refreshLoadedProfileAfterOwnPost()
-            }
-            errorMessage = nil
-            return .submitted
+            return TaggrPostSubmissionResult(outcome: .submitted, errorMessage: nil)
         } catch {
-            guard !isCancellation(error) else { return .retryableFailure }
-            errorMessage = error.localizedDescription
-            return .retryableFailure
+            guard !isCancellation(error) else {
+                return TaggrPostSubmissionResult(outcome: .retryableFailure, errorMessage: "Posting was interrupted.")
+            }
+            return TaggrPostSubmissionResult(outcome: .retryableFailure, errorMessage: error.localizedDescription)
         }
     }
 
@@ -116,6 +206,215 @@ extension TaggrAppCoordinator {
         }
     }
 
+    func isPostSubmissionPending(_ key: TaggrPostSubmissionKey) -> Bool {
+        postSubmissionTasks[key] != nil
+    }
+
+    var hasPendingPostSubmission: Bool {
+        !postSubmissionTasks.isEmpty
+    }
+
+    func dismissPostSubmissionNotice() {
+        postSubmissionNoticeDismissTask?.cancel()
+        postSubmissionNoticeDismissTask = nil
+        postSubmissionNotice = nil
+    }
+
+    private func enqueuePostSubmission(
+        key: TaggrPostSubmissionKey,
+        draft: PostDraftSession?,
+        reconciliation: @escaping @MainActor () async -> Void,
+        operation: @escaping @MainActor () async -> TaggrPostSubmissionResult
+    ) -> Bool {
+        guard postSubmissionTasks.isEmpty else { return false }
+        postSubmissionNoticeDismissTask?.cancel()
+        postSubmissionNoticeDismissTask = nil
+        let noticeID = UUID()
+        postSubmissionNotice = TaggrPostSubmissionNotice(
+            id: noticeID,
+            phase: .submitting,
+            message: "Posting…"
+        )
+        let backgroundTask = TaggrPostBackgroundTask()
+        backgroundTask.begin { [weak self] in
+            guard self?.postSubmissionNotice?.id == noticeID else { return }
+            self?.postSubmissionNotice = TaggrPostSubmissionNotice(
+                id: noticeID,
+                phase: .uncertain,
+                message: "Posting is taking longer than iOS allows in the background. Check before retrying."
+            )
+        }
+        postSubmissionTasks[key] = Task { [weak self] in
+            guard let self else {
+                backgroundTask.end()
+                return
+            }
+            let result = await operation()
+            await self.finishPostSubmission(key: key, noticeID: noticeID, result: result, draft: draft)
+            backgroundTask.end()
+            if result.outcome == .submitted {
+                Task { await reconciliation() }
+            }
+        }
+        return true
+    }
+
+    private func finishPostSubmission(
+        key: TaggrPostSubmissionKey,
+        noticeID: UUID,
+        result: TaggrPostSubmissionResult,
+        draft: PostDraftSession?
+    ) async {
+        switch result.outcome {
+        case .submitted:
+            await draft?.discard()
+        case .retryableFailure:
+            await draft?.clearSubmissionVerification()
+        case .uncertain:
+            break
+        }
+        postSubmissionTasks[key] = nil
+        guard postSubmissionTasks.isEmpty else {
+            postSubmissionNotice = TaggrPostSubmissionNotice(
+                id: postSubmissionNotice?.id ?? noticeID,
+                phase: .submitting,
+                message: "Posting…"
+            )
+            return
+        }
+        let notice: TaggrPostSubmissionNotice
+        let submissionName = if case .repost = key { "Repost" } else { "Post" }
+        switch result.outcome {
+        case .submitted:
+            notice = TaggrPostSubmissionNotice(id: noticeID, phase: .succeeded, message: "Posted.")
+        case .retryableFailure:
+            notice = TaggrPostSubmissionNotice(
+                id: noticeID,
+                phase: .retryableFailure,
+                message: "\(submissionName) failed. Your draft was kept. \(result.errorMessage ?? "Try again.")"
+            )
+        case .uncertain:
+            notice = TaggrPostSubmissionNotice(
+                id: noticeID,
+                phase: .uncertain,
+                message: "The post result could not be confirmed. Check your recent posts before retrying."
+            )
+        }
+        postSubmissionNotice = notice
+        guard result.outcome == .submitted else { return }
+        postSubmissionNoticeDismissTask = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(2))
+            guard !Task.isCancelled, self?.postSubmissionNotice?.id == noticeID else { return }
+            self?.postSubmissionNotice = nil
+            self?.postSubmissionNoticeDismissTask = nil
+        }
+    }
+
+    private func postSubmissionContext() -> TaggrPostSubmissionContext {
+        TaggrPostSubmissionContext(
+            api: api,
+            authSession: authSession,
+            bucketID: currentUser?.bucket,
+            userID: currentUser?.id,
+            runtimeGeneration: runtimeGeneration,
+            realmPostingScope: realmPostingScope,
+            route: route
+        )
+    }
+
+    private func canReconcilePostSubmission(_ context: TaggrPostSubmissionContext) -> Bool {
+        runtimeGeneration == context.runtimeGeneration &&
+            api === context.api &&
+            currentUser?.id == context.userID
+    }
+
+    private func reconcilePostSubmission(
+        _ reconciliation: TaggrPostReconciliation,
+        context: TaggrPostSubmissionContext
+    ) async {
+        guard canReconcilePostSubmission(context) else { return }
+        async let userRefresh: Void = refreshSubmittingUser(context: context)
+        async let contentRefresh: Void = refreshSubmittedContent(reconciliation, context: context)
+        _ = await (userRefresh, contentRefresh)
+        guard canReconcilePostSubmission(context) else { return }
+        refreshLoadedProfileAfterOwnPost()
+    }
+
+    private func refreshSubmittingUser(context: TaggrPostSubmissionContext) async {
+        guard let identity = context.authSession else { return }
+        do {
+            let loadedUser = try await context.api.signedQuery(
+                "user",
+                args: [context.api.domain, []],
+                identity: identity,
+                as: Optional<TaggrUser>.self
+            ) ?? nil
+            guard canReconcilePostSubmission(context) else { return }
+            currentUser = loadedUser
+            storageCreationState = Self.storageCreationState(from: loadedUser?.settings)
+            if let loadedUser {
+                cacheAuthorName(loadedUser.name, userID: loadedUser.id)
+            }
+        } catch {
+            guard canReconcilePostSubmission(context), !isCancellation(error) else { return }
+            NSLog("TAGGR current user refresh after posting failed: %@", error.localizedDescription)
+        }
+    }
+
+    private func refreshSubmittedContent(
+        _ reconciliation: TaggrPostReconciliation,
+        context: TaggrPostSubmissionContext
+    ) async {
+        switch reconciliation {
+        case .reply(let postID):
+            repliesByPostID[postID] = nil
+            do {
+                let thread = try await loadPostEnvelopes(
+                    "thread",
+                    args: [postID],
+                    identity: nil,
+                    api: context.api
+                )
+                guard canReconcilePostSubmission(context) else { return }
+                repliesByPostID[postID] = Array(thread.dropFirst())
+            } catch {
+                guard canReconcilePostSubmission(context), !isCancellation(error) else { return }
+                NSLog("TAGGR reply refresh after posting failed: %@", error.localizedDescription)
+            }
+        case .rootPost, .mutation:
+            await refreshSubmissionRouteIfUnchanged(context: context)
+        }
+    }
+
+    private func refreshSubmissionRouteIfUnchanged(context: TaggrPostSubmissionContext) async {
+        guard canReconcilePostSubmission(context), route == context.route else { return }
+        let scope: RequestScope?
+        switch context.route {
+        case .feed:
+            scope = .feed
+        case .post:
+            scope = .post
+        case .realm:
+            scope = .realm
+        default:
+            scope = nil
+        }
+        if let scope, let activeRequest = requestTasks[scope] {
+            await activeRequest.value
+        }
+        guard canReconcilePostSubmission(context), route == context.route else { return }
+        switch context.route {
+        case .feed(let mode):
+            await loadFeed(mode: mode, reset: true, showsBusyOverlay: false)
+        case .post(let id):
+            await loadPost(id, showsBusyOverlay: false)
+        case .realm(let name) where !name.isEmpty:
+            await loadRealm(name, showsBusyOverlay: false)
+        default:
+            break
+        }
+    }
+
     func postingRealmColors(_ names: [String]) async -> [String: String] {
         guard !names.isEmpty else { return [:] }
         let generation = runtimeGeneration
@@ -137,27 +436,122 @@ extension TaggrAppCoordinator {
         }
     }
 
-    func editPost(post: TaggrPost, text: String, realm: String?, images: [TaggrDraftImage] = [], reloadMode: TaggrFeedMode? = nil) async {
-        await runBusy {
+    func editPost(post: TaggrPost, text: String, realm: String?, images: [TaggrDraftImage] = [], reloadMode _: TaggrFeedMode? = nil) async {
+        errorMessage = nil
+        let context = postSubmissionContext()
+        let result = await performEditPost(post: post, text: text, realm: realm, images: images, context: context)
+        if result.outcome == .submitted {
+            await reconcilePostSubmission(.mutation, context: context)
+        }
+        errorMessage = result.errorMessage
+    }
+
+    @discardableResult
+    func enqueueEditPost(
+        post: TaggrPost,
+        text: String,
+        realm: String?,
+        images: [TaggrDraftImage] = [],
+        reloadMode _: TaggrFeedMode? = nil,
+        draft: PostDraftSession
+    ) -> Bool {
+        let context = postSubmissionContext()
+        return enqueuePostSubmission(key: .edit(post.id), draft: draft, reconciliation: {
+            await self.reconcilePostSubmission(.mutation, context: context)
+        }) { [weak self] in
+            guard let self else {
+                return TaggrPostSubmissionResult(outcome: .retryableFailure, errorMessage: "Posting was interrupted.")
+            }
+            return await self.performEditPost(post: post, text: text, realm: realm, images: images, context: context)
+        }
+    }
+
+    private func performEditPost(
+        post: TaggrPost,
+        text: String,
+        realm: String?,
+        images: [TaggrDraftImage],
+        context: TaggrPostSubmissionContext
+    ) async -> TaggrPostSubmissionResult {
+        do {
             let body = text.trimmingCharacters(in: .whitespacesAndNewlines)
-            let refs = try await uploadBlobs(referencedNewBlobs(in: body, draftImages: images, existingBlobIDs: Self.blobIDs(in: post.files)))
+            let refs = try await uploadBlobs(
+                referencedNewBlobs(in: body, draftImages: images, existingBlobIDs: Self.blobIDs(in: post.files)),
+                context: context
+            )
             let patch = TaggrEditPatch.fullReplacement(from: body, to: post.body)
-            _ = try await api.editPost(id: post.id, text: body, refs: refs, patch: patch, realm: realm, identity: authSession)
-            await updateCurrentUserIfPossible()
-            await loadCurrentRoute()
+            do {
+                _ = try await context.api.editPost(
+                    id: post.id,
+                    text: body,
+                    refs: refs,
+                    patch: patch,
+                    realm: realm,
+                    identity: context.authSession
+                )
+            } catch {
+                guard !isCancellation(error) else {
+                    return TaggrPostSubmissionResult(outcome: .retryableFailure, errorMessage: "Posting was interrupted.")
+                }
+                return TaggrPostSubmissionResult(
+                    outcome: isUncertainPostSubmissionError(error) ? .uncertain : .retryableFailure,
+                    errorMessage: error.localizedDescription
+                )
+            }
+            return TaggrPostSubmissionResult(outcome: .submitted, errorMessage: nil)
+        } catch {
+            guard !isCancellation(error) else {
+                return TaggrPostSubmissionResult(outcome: .retryableFailure, errorMessage: "Posting was interrupted.")
+            }
+            return TaggrPostSubmissionResult(outcome: .retryableFailure, errorMessage: error.localizedDescription)
         }
     }
 
     func repost(postId: Int, text: String, realm: String?) async {
-        await runBusy {
-            _ = try await api.repost(
+        errorMessage = nil
+        let context = postSubmissionContext()
+        let result = await performRepost(postId: postId, text: text, realm: realm, context: context)
+        if result.outcome == .submitted {
+            await reconcilePostSubmission(.mutation, context: context)
+        }
+        errorMessage = result.errorMessage
+    }
+
+    @discardableResult
+    func enqueueRepost(postId: Int, text: String, realm: String?, draft: PostDraftSession) -> Bool {
+        let context = postSubmissionContext()
+        return enqueuePostSubmission(key: .repost(postId), draft: draft, reconciliation: {
+            await self.reconcilePostSubmission(.mutation, context: context)
+        }) { [weak self] in
+            guard let self else {
+                return TaggrPostSubmissionResult(outcome: .retryableFailure, errorMessage: "Posting was interrupted.")
+            }
+            return await self.performRepost(postId: postId, text: text, realm: realm, context: context)
+        }
+    }
+
+    private func performRepost(
+        postId: Int,
+        text: String,
+        realm: String?,
+        context: TaggrPostSubmissionContext
+    ) async -> TaggrPostSubmissionResult {
+        do {
+            _ = try await context.api.repost(
                 postId: postId,
                 text: text.trimmingCharacters(in: .whitespacesAndNewlines),
                 realm: realm,
-                identity: authSession
+                identity: context.authSession
             )
-            await updateCurrentUserIfPossible()
-            await loadCurrentRoute()
+            return TaggrPostSubmissionResult(outcome: .submitted, errorMessage: nil)
+        } catch {
+            guard !isCancellation(error) else {
+                return TaggrPostSubmissionResult(outcome: .retryableFailure, errorMessage: "Posting was interrupted.")
+            }
+            return TaggrPostSubmissionResult(
+                outcome: isUncertainPostSubmissionError(error) ? .uncertain : .retryableFailure,
+                errorMessage: error.localizedDescription
+            )
         }
     }
 
@@ -697,12 +1091,33 @@ extension TaggrAppCoordinator {
         guard let bucket = currentUser?.bucket, !bucket.isEmpty else {
             throw TaggrAPIError.rejected("No personal media bucket configured. Set one up under Settings > Storage.")
         }
+        return try await uploadBlobs(blobs, api: api, authSession: authSession, bucketID: bucket)
+    }
+
+    private func uploadBlobs(
+        _ blobs: [(id: String, data: Data)],
+        context: TaggrPostSubmissionContext
+    ) async throws -> [TaggrCandid.FileRef] {
+        guard !blobs.isEmpty else { return [] }
+        guard let authSession = context.authSession else {
+            throw TaggrAPIError.missingIdentity
+        }
+        guard let bucket = context.bucketID, !bucket.isEmpty else {
+            throw TaggrAPIError.rejected("No personal media bucket configured. Set one up under Settings > Storage.")
+        }
+        return try await uploadBlobs(blobs, api: context.api, authSession: authSession, bucketID: bucket)
+    }
+
+    private func uploadBlobs(
+        _ blobs: [(id: String, data: Data)],
+        api activeAPI: TaggrAPI,
+        authSession activeSession: ICAuthSession,
+        bucketID bucket: String
+    ) async throws -> [TaggrCandid.FileRef] {
         // Bucket updates are serialized by the canister, but several requests can be
         // in flight while the client waits for their certificates. Keep the window
         // bounded so a large photo selection does not monopolize the connection.
         let maxConcurrentUploads = 4
-        let activeAPI = api
-        let activeSession = authSession
         let indexedRefs = try await withThrowingTaskGroup(
             of: (Int, TaggrCandid.FileRef).self,
             returning: [(Int, TaggrCandid.FileRef)].self
@@ -961,17 +1376,6 @@ extension TaggrAppCoordinator {
     func refreshLoadedProfileAfterOwnPost() {
         guard let currentUser, profile?.id == currentUser.id else { return }
         profile = currentUser
-    }
-
-    func reloadAfterRootPost(mode reloadMode: TaggrFeedMode?) async {
-        switch route {
-        case .feed(let mode):
-            await loadFeed(mode: reloadMode ?? mode, reset: true)
-        case .realm:
-            await loadCurrentRoute()
-        default:
-            break
-        }
     }
 
     func isCurrentRuntimeGeneration(_ generation: Int) -> Bool {

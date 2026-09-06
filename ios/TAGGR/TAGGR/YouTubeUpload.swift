@@ -154,7 +154,7 @@ struct YouTubeUploadJob: Codable, Equatable, Sendable {
     let createdAt: Date
 
     var youtubeURL: URL? {
-        videoID.flatMap { URL(string: "https://youtu.be/\($0)") }
+        videoID.flatMap { URL(string: "https://www.youtube.com/watch?v=\($0)") }
     }
 }
 

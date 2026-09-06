@@ -58,15 +58,39 @@ struct RootView: View {
             }
         }
         .overlay(alignment: .top) {
-            if let message = state.errorMessage {
-                Text(message)
-                    .font(.footnote.weight(.semibold))
+            VStack(spacing: 8) {
+                if let message = state.errorMessage {
+                    Text(message)
+                        .font(.footnote.weight(.semibold))
+                        .padding(10)
+                        .background(.red)
+                        .foregroundStyle(.white)
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                }
+                if let notice = state.postSubmissionNotice {
+                    HStack(spacing: 8) {
+                        if notice.phase == .submitting {
+                            ProgressView()
+                                .tint(.white)
+                                .accessibilityHidden(true)
+                        }
+                        Text(notice.message)
+                            .font(.footnote.weight(.semibold))
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        if notice.phase != .submitting && notice.phase != .succeeded {
+                            Button("Dismiss", systemImage: "xmark", action: state.dismissPostSubmissionNotice)
+                                .labelStyle(.iconOnly)
+                                .foregroundStyle(.white)
+                        }
+                    }
                     .padding(10)
-                    .background(.red)
+                    .background(postSubmissionNoticeColor(notice.phase))
                     .foregroundStyle(.white)
                     .clipShape(RoundedRectangle(cornerRadius: 8))
-                    .padding()
+                    .accessibilityElement(children: .contain)
+                }
             }
+            .padding()
         }
         .confirmationDialog(
             "Sign in with Internet Identity",
@@ -90,6 +114,19 @@ struct RootView: View {
         }
         .tint(TaggrTheme.clickable)
         .preferredColorScheme(.dark)
+    }
+
+    private func postSubmissionNoticeColor(_ phase: TaggrPostSubmissionPhase) -> Color {
+        switch phase {
+        case .submitting:
+            TaggrTheme.panelRaised
+        case .succeeded:
+            .green
+        case .retryableFailure:
+            .red
+        case .uncertain:
+            .orange
+        }
     }
 
     private var tab: RootTab {

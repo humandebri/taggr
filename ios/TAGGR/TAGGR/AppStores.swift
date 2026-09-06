@@ -117,6 +117,7 @@ final class SessionStore {
     var cache: TaggrBackendCache?
     var isBusy = false
     var errorMessage: String?
+    var postSubmissionNotice: TaggrPostSubmissionNotice?
     var isAuthenticatingIdentity = false
     var identitySignInMethodPickerPresented = false
     var identitySignInReason: String?
@@ -125,6 +126,26 @@ final class SessionStore {
     init(config: TaggrRuntimeConfig) {
         runtimeConfig = config
     }
+}
+
+enum TaggrPostSubmissionPhase: Equatable, Sendable {
+    case submitting
+    case succeeded
+    case retryableFailure
+    case uncertain
+}
+
+struct TaggrPostSubmissionNotice: Identifiable, Equatable, Sendable {
+    let id: UUID
+    let phase: TaggrPostSubmissionPhase
+    let message: String
+}
+
+enum TaggrPostSubmissionKey: Hashable, Sendable {
+    case newPost
+    case reply(Int)
+    case edit(Int)
+    case repost(Int)
 }
 
 @MainActor

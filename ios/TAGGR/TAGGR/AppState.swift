@@ -121,6 +121,10 @@ final class TaggrAppCoordinator {
         get { sessionStore.errorMessage }
         set { sessionStore.errorMessage = newValue }
     }
+    var postSubmissionNotice: TaggrPostSubmissionNotice? {
+        get { sessionStore.postSubmissionNotice }
+        set { sessionStore.postSubmissionNotice = newValue }
+    }
     var isAuthenticatingIdentity: Bool {
         get { sessionStore.isAuthenticatingIdentity }
         set { sessionStore.isAuthenticatingIdentity = newValue }
@@ -243,6 +247,8 @@ final class TaggrAppCoordinator {
     var tagCostCache: [[String]: Int] = [:]
     var tagCostRequestSequence = 0
     var tagCostTask: Task<Int, Error>?
+    var postSubmissionTasks: [TaggrPostSubmissionKey: Task<Void, Never>] = [:]
+    var postSubmissionNoticeDismissTask: Task<Void, Never>?
 
     init(
         api: TaggrAPI? = nil,
@@ -441,13 +447,13 @@ final class TaggrAppCoordinator {
         }
     }
 
-    func loadFeed(mode: TaggrFeedMode, reset: Bool) async {
+    func loadFeed(mode: TaggrFeedMode, reset: Bool, showsBusyOverlay: Bool = true) async {
         let request = beginRequest(.feed)
         let activeAPI = api
         returnFeedMode = mode
         navigationStore.rememberHomeFeedMode(mode)
         await executeRequest(request) {
-            await self.runBusy(validWhile: { self.isCurrentRequest(request) }) {
+            let load = {
                 let pageSize = self.cache?.config?.feedPageSize ?? 30
                 let page = reset ? 0 : max(self.feed.count / max(pageSize, 1), 0)
                 let offset = reset ? 0 : (self.feed.first?.id ?? 0)
@@ -471,6 +477,16 @@ final class TaggrAppCoordinator {
                 guard self.isCurrentRequest(request) else { return }
                 self.feed = reset ? posts : self.feed + posts
                 self.canLoadMoreFeed = posts.count >= pageSize
+            }
+            if showsBusyOverlay {
+                await self.runBusy(validWhile: { self.isCurrentRequest(request) }, load)
+            } else {
+                do {
+                    try await load()
+                } catch {
+                    guard self.isCurrentRequest(request), !self.isCancellation(error) else { return }
+                    NSLog("TAGGR background feed refresh failed: %@", error.localizedDescription)
+                }
             }
         }
     }
@@ -611,15 +627,25 @@ final class TaggrAppCoordinator {
         }
     }
 
-    func loadPost(_ id: Int) async {
+    func loadPost(_ id: Int, showsBusyOverlay: Bool = true) async {
         let request = beginRequest(.post)
         let activeAPI = api
         await executeRequest(request) {
-            await self.runBusy(validWhile: { self.isCurrentRequest(request) }) {
+            let load = {
                 let thread = try await self.loadPostEnvelopes("thread", args: [id], identity: nil, api: activeAPI)
                 guard self.isCurrentRequest(request) else { return }
                 self.focusedPost = thread.last
                 self.feed = thread
+            }
+            if showsBusyOverlay {
+                await self.runBusy(validWhile: { self.isCurrentRequest(request) }, load)
+            } else {
+                do {
+                    try await load()
+                } catch {
+                    guard self.isCurrentRequest(request), !self.isCancellation(error) else { return }
+                    NSLog("TAGGR background post refresh failed: %@", error.localizedDescription)
+                }
             }
         }
     }
@@ -649,7 +675,7 @@ final class TaggrAppCoordinator {
         }
     }
 
-    func refreshReplyThread(postID: Int) async {
+    func refreshReplyThread(postID: Int, reportsErrors: Bool = true) async {
         let generation = runtimeGeneration
         let activeAPI = api
         loadingReplyPostIDs.insert(postID)
@@ -662,7 +688,9 @@ final class TaggrAppCoordinator {
             guard isCurrentRuntimeGeneration(generation) else { return }
             guard !isCancellation(error) else { return }
             NSLog("TAGGR reply thread refresh failed: %@", error.localizedDescription)
-            errorMessage = error.localizedDescription
+            if reportsErrors {
+                errorMessage = error.localizedDescription
+            }
         }
     }
 
@@ -782,7 +810,7 @@ final class TaggrAppCoordinator {
         }
     }
 
-    func loadRealm(_ name: String) async {
+    func loadRealm(_ name: String, showsBusyOverlay: Bool = true) async {
         let request = beginRequest(.realm)
         let activeAPI = api
         let normalized = normalizedRealmName(name)
@@ -793,7 +821,7 @@ final class TaggrAppCoordinator {
         }
         returnFeedMode = .realm(normalized)
         await executeRequest(request) {
-            await self.runBusy(validWhile: { self.isCurrentRequest(request) }) {
+            let load = {
                 let values = try await activeAPI.query("realms", args: [[normalized]], as: [TaggrRealm].self) ?? []
                 let posts = try await self.loadPostEnvelopes("last_posts", args: [activeAPI.domain, normalized, 0, 0, true], identity: nil, api: activeAPI)
                 guard self.isCurrentRequest(request) else { return }
@@ -801,6 +829,16 @@ final class TaggrAppCoordinator {
                     realm.renamed(realm.name.isEmpty ? normalized : realm.name)
                 }
                 self.feed = posts
+            }
+            if showsBusyOverlay {
+                await self.runBusy(validWhile: { self.isCurrentRequest(request) }, load)
+            } else {
+                do {
+                    try await load()
+                } catch {
+                    guard self.isCurrentRequest(request), !self.isCancellation(error) else { return }
+                    NSLog("TAGGR background realm refresh failed: %@", error.localizedDescription)
+                }
             }
         }
     }

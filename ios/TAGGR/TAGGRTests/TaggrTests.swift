@@ -443,11 +443,7 @@ final class TaggrTests: XCTestCase {
             value: .record(actualStatusFields, statusValues)
         )
 
-        let decoded = try TaggrCanister._ICBindgenSupport.decode(
-            actual,
-            as: ManagementCanisterStatus.self,
-            context: "canister_status"
-        )
+        let decoded = try CandidReply(values: [actual]).decode(ManagementCanisterStatus.self)
         XCTAssertEqual(decoded.cycles.decimal, "2")
     }
 
