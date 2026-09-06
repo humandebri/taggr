@@ -369,14 +369,9 @@ extension TaggrAppCoordinator {
         case .reply(let postID):
             repliesByPostID[postID] = nil
             do {
-                let thread = try await loadPostEnvelopes(
-                    "thread",
-                    args: [postID],
-                    identity: nil,
-                    api: context.api
-                )
+                let snapshot = try await loadReplySnapshot(postID: postID, api: context.api)
                 guard canReconcilePostSubmission(context) else { return }
-                repliesByPostID[postID] = Array(thread.dropFirst())
+                applyReplySnapshot(snapshot)
             } catch {
                 guard canReconcilePostSubmission(context), !isCancellation(error) else { return }
                 NSLog("TAGGR reply refresh after posting failed: %@", error.localizedDescription)

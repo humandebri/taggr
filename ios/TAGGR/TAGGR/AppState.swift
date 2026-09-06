@@ -633,9 +633,21 @@ final class TaggrAppCoordinator {
         await executeRequest(request) {
             let load = {
                 let thread = try await self.loadPostEnvelopes("thread", args: [id], identity: nil, api: activeAPI)
+                var refreshedReplies: [TaggrPost]?
+                if self.repliesByPostID[id] != nil, let post = thread.last {
+                    do {
+                        refreshedReplies = try await self.loadDirectReplies(for: post, api: activeAPI)
+                    } catch {
+                        guard !self.isCancellation(error) else { return }
+                        NSLog("TAGGR replies refresh during post load failed: %@", error.localizedDescription)
+                    }
+                }
                 guard self.isCurrentRequest(request) else { return }
                 self.focusedPost = thread.last
                 self.feed = thread
+                if let refreshedReplies {
+                    self.repliesByPostID[id] = refreshedReplies
+                }
             }
             if showsBusyOverlay {
                 await self.runBusy(validWhile: { self.isCurrentRequest(request) }, load)
@@ -659,12 +671,7 @@ final class TaggrAppCoordinator {
         loadingReplyPostIDs.insert(post.id)
         defer { loadingReplyPostIDs.remove(post.id) }
         do {
-            let replies: [TaggrPost]
-            if !post.children.isEmpty {
-                replies = try await loadPostEnvelopes("posts", args: [post.children], identity: nil, api: activeAPI)
-            } else {
-                replies = []
-            }
+            let replies = try await loadDirectReplies(for: post, api: activeAPI)
             guard isCurrentRuntimeGeneration(generation) else { return }
             repliesByPostID[post.id] = replies
         } catch {
@@ -675,23 +682,45 @@ final class TaggrAppCoordinator {
         }
     }
 
-    func refreshReplyThread(postID: Int, reportsErrors: Bool = true) async {
+    func refreshReplies(postID: Int, reportsErrors: Bool = true) async {
         let generation = runtimeGeneration
         let activeAPI = api
         loadingReplyPostIDs.insert(postID)
         defer { loadingReplyPostIDs.remove(postID) }
         do {
-            let thread = try await loadPostEnvelopes("thread", args: [postID], identity: nil, api: activeAPI)
+            let snapshot = try await loadReplySnapshot(postID: postID, api: activeAPI)
             guard isCurrentRuntimeGeneration(generation) else { return }
-            repliesByPostID[postID] = Array(thread.dropFirst())
+            applyReplySnapshot(snapshot)
         } catch {
             guard isCurrentRuntimeGeneration(generation) else { return }
             guard !isCancellation(error) else { return }
-            NSLog("TAGGR reply thread refresh failed: %@", error.localizedDescription)
+            NSLog("TAGGR replies refresh failed: %@", error.localizedDescription)
             if reportsErrors {
                 errorMessage = error.localizedDescription
             }
         }
+    }
+
+    func loadReplySnapshot(postID: Int, api activeAPI: TaggrAPI) async throws -> (parent: TaggrPost, replies: [TaggrPost]) {
+        guard let parent = try await loadPostEnvelopes(
+            "posts",
+            args: [[postID]],
+            identity: nil,
+            api: activeAPI
+        ).first else {
+            throw TaggrAPIError.invalidResponse("Reply parent was not found.")
+        }
+        return (parent, try await loadDirectReplies(for: parent, api: activeAPI))
+    }
+
+    func loadDirectReplies(for post: TaggrPost, api activeAPI: TaggrAPI) async throws -> [TaggrPost] {
+        guard !post.children.isEmpty else { return [] }
+        return try await loadPostEnvelopes("posts", args: [post.children], identity: nil, api: activeAPI)
+    }
+
+    func applyReplySnapshot(_ snapshot: (parent: TaggrPost, replies: [TaggrPost])) {
+        updatePost(snapshot.parent.id) { _ in snapshot.parent }
+        repliesByPostID[snapshot.parent.id] = snapshot.replies
     }
 
     func loadProfile(_ handle: String) async {

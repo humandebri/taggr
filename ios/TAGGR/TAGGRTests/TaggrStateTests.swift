@@ -880,32 +880,119 @@ extension TaggrTests {
     }
 
     @MainActor
-    func testReplyPostPassesParentAndReloadsCurrentRoute() async throws {
+    func testReplyPostPassesParentAndRefreshesDirectReplies() async throws {
         var calls: [(method: String, arg: Data)] = []
         let api = makeStubbedAPI { request in
-            if let call = self.requestMethodAndArg(from: request) {
+            let call = self.requestMethodAndArg(from: request)
+            if let call {
                 calls.append(call)
             }
             let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
             if request.url?.path.hasSuffix("/query") == true {
-                if calls.last?.method == "user" {
+                if call?.method == "user" {
                     return (response, Self.queryReply(Self.currentUserFixture()))
                 }
-                return (response, Self.queryReply(Data("[]".utf8)))
+                if call?.arg == (try TaggrCandid.jsonArguments([[42]])) {
+                    let body = Data("[\(String(data: self.postEnvelopeFixture(id: 42, children: [43]), encoding: .utf8)!)]".utf8)
+                    return (response, Self.queryReply(body))
+                }
+                let body = Data("[\(String(data: self.postEnvelopeFixture(id: 43, parent: 42), encoding: .utf8)!)]".utf8)
+                return (response, Self.queryReply(body))
             }
             return (response, Self.queryReply(Self.candidAddPostResultOk(43)))
         }
         let state = TaggrAppCoordinator(api: api)
         state.authSession = makeAuthSession(privateKey: Curve25519.Signing.PrivateKey())
         state.route = .post(42)
+        let parent = samplePost(id: 42, body: "parent", files: [:])
+        state.feed = [parent]
+        state.focusedPost = parent
 
         await state.submitPost(text: "reply", parent: 42, realm: "DEV", reloadMode: .latest)
 
         XCTAssertNil(state.errorMessage)
         XCTAssertEqual(calls.first?.method, "add_post")
-        XCTAssertEqual(Set(calls.dropFirst().map(\.method)), Set(["user", "thread"]))
+        XCTAssertEqual(Set(calls.dropFirst().map(\.method)), Set(["user", "posts"]))
         XCTAssertEqual(calls.first?.arg, try TaggrCandidAdapter.addPostArguments(text: "reply", refs: [], parent: 42, realm: "DEV", extensionBlob: nil).encode())
+        XCTAssertEqual(state.repliesByPostID[42]?.map(\.id), [43])
+        XCTAssertEqual(state.focusedPost?.children, [43])
+    }
+
+    @MainActor
+    func testRefreshRepliesForNestedReplyDoesNotReturnParentAsItsOwnChild() async throws {
+        var calls: [(method: String, arg: Data)] = []
+        let api = makeStubbedAPI { request in
+            let call = try XCTUnwrap(self.requestMethodAndArg(from: request))
+            calls.append(call)
+            let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
+            if call.arg == (try TaggrCandid.jsonArguments([[42]])) {
+                let body = Data("[\(String(data: self.postEnvelopeFixture(id: 42, parent: 10, children: [43]), encoding: .utf8)!)]".utf8)
+                return (response, Self.queryReply(body))
+            }
+            let body = Data("[\(String(data: self.postEnvelopeFixture(id: 43, parent: 42), encoding: .utf8)!)]".utf8)
+            return (response, Self.queryReply(body))
+        }
+        let state = TaggrAppCoordinator(api: api)
+        let staleParent = samplePost(id: 42, parent: 10, body: "parent reply", files: [:])
+        state.feed = [staleParent]
+        state.focusedPost = staleParent
+        state.repliesByPostID[42] = [staleParent]
+
+        await state.refreshReplies(postID: 42)
+
+        XCTAssertEqual(calls.map(\.method), ["posts", "posts"])
+        XCTAssertEqual(calls.map(\.arg), [
+            try TaggrCandid.jsonArguments([[42]]),
+            try TaggrCandid.jsonArguments([[43]]),
+        ])
+        XCTAssertEqual(state.repliesByPostID[42]?.map(\.id), [43])
+        XCTAssertEqual(state.focusedPost?.children, [43])
+        XCTAssertNil(state.errorMessage)
+    }
+
+    @MainActor
+    func testRefreshRepliesWithNoChildrenSkipsChildQuery() async throws {
+        var calls: [(method: String, arg: Data)] = []
+        let api = makeStubbedAPI { request in
+            let call = try XCTUnwrap(self.requestMethodAndArg(from: request))
+            calls.append(call)
+            let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
+            let body = Data("[\(String(data: self.postEnvelopeFixture(id: 42), encoding: .utf8)!)]".utf8)
+            return (response, Self.queryReply(body))
+        }
+        let state = TaggrAppCoordinator(api: api)
+
+        await state.refreshReplies(postID: 42)
+
+        XCTAssertEqual(calls.map(\.method), ["posts"])
         XCTAssertEqual(state.repliesByPostID[42], [])
+        XCTAssertNil(state.errorMessage)
+    }
+
+    @MainActor
+    func testFailedReplyRefreshLeavesCacheRetryable() async {
+        var requestCount = 0
+        let api = makeStubbedAPI { request in
+            requestCount += 1
+            if requestCount == 1 {
+                throw URLError(.timedOut)
+            }
+            let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
+            let body = Data("[\(String(data: self.postEnvelopeFixture(id: 43, parent: 42), encoding: .utf8)!)]".utf8)
+            return (response, Self.queryReply(body))
+        }
+        let state = TaggrAppCoordinator(api: api)
+
+        await state.refreshReplies(postID: 42)
+
+        XCTAssertNil(state.repliesByPostID[42])
+        XCTAssertNotNil(state.errorMessage)
+
+        let parent = samplePost(id: 42, body: "parent", children: [43], files: [:])
+        await state.loadReplies(for: parent)
+
+        XCTAssertEqual(requestCount, 2)
+        XCTAssertEqual(state.repliesByPostID[42]?.map(\.id), [43])
     }
 
     @MainActor
@@ -1298,6 +1385,33 @@ extension TaggrTests {
         XCTAssertEqual(state.feed.map(\.id), [100, 101])
         XCTAssertEqual(state.focusedPost?.id, 101)
         XCTAssertEqual(state.focusedPost?.parent, 100)
+    }
+
+    @MainActor
+    func testLoadPostRefreshesPreviouslyLoadedDirectReplies() async throws {
+        var calls: [String] = []
+        let api = makeStubbedAPI { request in
+            let method = try XCTUnwrap(self.requestMethodAndArg(from: request)?.method)
+            calls.append(method)
+            let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
+            let fixture: Data
+            if method == "thread" {
+                fixture = self.postEnvelopeFixture(id: 42, children: [43])
+            } else {
+                fixture = self.postEnvelopeFixture(id: 43, parent: 42)
+            }
+            let body = Data("[\(String(data: fixture, encoding: .utf8)!)]".utf8)
+            return (response, Self.queryReply(body))
+        }
+        let state = TaggrAppCoordinator(api: api)
+        state.repliesByPostID[42] = [samplePost(id: 41, parent: 42, body: "stale", files: [:])]
+
+        await state.loadPost(42)
+
+        XCTAssertEqual(calls, ["thread", "posts"])
+        XCTAssertEqual(state.focusedPost?.children, [43])
+        XCTAssertEqual(state.repliesByPostID[42]?.map(\.id), [43])
+        XCTAssertNil(state.errorMessage)
     }
 
     @MainActor

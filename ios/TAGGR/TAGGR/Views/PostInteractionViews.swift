@@ -466,7 +466,9 @@ struct InlineReplyComposer: View {
                     createStorage: {}
                 )
             }
-            if draft.submissionNeedsVerification {
+            if draft.submissionNeedsVerification,
+               !isSubmitting,
+               !state.isPostSubmissionPending(.reply(post.id)) {
                 ComposePostImageWarning(
                     text: "The last reply request may have been accepted, but its result was not confirmed. Check the thread before choosing what to do with this draft.",
                     showCreateStorage: false,

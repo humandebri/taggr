@@ -1010,8 +1010,14 @@ extension TaggrTests {
         return data
     }
 
-    nonisolated func postEnvelopeFixture(id: Int = 42, parent: Int? = nil, extensionJSON: String = "null") -> Data {
+    nonisolated func postEnvelopeFixture(
+        id: Int = 42,
+        parent: Int? = nil,
+        children: [Int] = [],
+        extensionJSON: String = "null"
+    ) -> Data {
         let parentJSON = parent.map(String.init) ?? "null"
+        let childrenJSON = children.map(String.init).joined(separator: ",")
         return Data(
             """
             [
@@ -1021,7 +1027,7 @@ extension TaggrTests {
                 "user": 7,
                 "body": "hello",
                 "timestamp": "123",
-                "children": [],
+                "children": [\(childrenJSON)],
                 "reactions": {},
                 "watchers": [],
                 "reposts": [],
