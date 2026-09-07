@@ -3,6 +3,8 @@ import SwiftUI
 struct ProfileView: View {
     @Environment(TaggrAppCoordinator.self) private var state
     @State private var showingReport = false
+    @State private var blockConfirmationPresented = false
+    @State private var presentedRealmList: ProfileRealmList?
     @State private var journalPosts: [TaggrPost] = []
     @State private var journalPage = 0
     @State private var journalOffset = 0
@@ -26,8 +28,7 @@ struct ProfileView: View {
                                     .background(TaggrTheme.panel)
                                     .clipShape(RoundedRectangle(cornerRadius: 8))
                             }
-                            if canModerate(user) { moderationControls(user) }
-                            if canShowPhotos(user) { profilePhotosButton(user) }
+                            profileActionRow(user)
                             profileStats(user)
                             profileDetails(user)
                         } else {
@@ -62,8 +63,28 @@ struct ProfileView: View {
         .sheet(isPresented: $showingReport) {
             if let user = state.profile {
                 ReportUserSheet(user: user, isPresented: $showingReport)
-                    .environment(state)
+                .environment(state)
             }
+        }
+        .sheet(item: $presentedRealmList) { list in
+            ProfileRealmListSheet(list: list) { realm in
+                presentedRealmList = nil
+                state.navigateToRealm(realm)
+            }
+        }
+        .confirmationDialog(
+            blockConfirmationTitle,
+            isPresented: $blockConfirmationPresented,
+            titleVisibility: .visible
+        ) {
+            if let user = state.profile {
+                Button(isBlocked(user) ? "Unblock" : "Block", role: isBlocked(user) ? nil : .destructive) {
+                    Task { await state.toggleBlock(userId: user.id) }
+                }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text(blockConfirmationMessage)
         }
     }
 
@@ -96,31 +117,52 @@ struct ProfileView: View {
         .clipShape(RoundedRectangle(cornerRadius: 8))
     }
 
-    private func moderationControls(_ user: TaggrUser) -> some View {
-        HStack(spacing: 10) {
-            Button {
-                Task { await state.toggleBlock(userId: user.id) }
-            } label: {
-                Label(isBlocked(user) ? "Unblock" : "Block", systemImage: isBlocked(user) ? "person.crop.circle.badge.checkmark" : "person.crop.circle.badge.xmark")
-                    .font(.subheadline.weight(.bold))
-                    .foregroundStyle(.white)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 42)
-                    .background(TaggrTheme.panelRaised)
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
+    @ViewBuilder private func profileActionRow(_ user: TaggrUser) -> some View {
+        if canShowPhotos(user) || canModerate(user) {
+            HStack(spacing: 10) {
+                if canShowPhotos(user) { profilePhotosButton(user) }
+                if canModerate(user) { profileMoreActionsMenu(user) }
             }
-            .disabled(state.isBusy)
-            Button(role: .destructive) { showingReport = true } label: {
-                Label("Report", systemImage: "exclamationmark.bubble")
-                    .font(.subheadline.weight(.bold))
-                    .foregroundStyle(.white)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 42)
-                    .background(Color.red)
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
-            }
-            .disabled(state.isBusy)
         }
+    }
+
+    private func profileMoreActionsMenu(_ user: TaggrUser) -> some View {
+        Menu {
+            Button(role: isBlocked(user) ? nil : .destructive) {
+                blockConfirmationPresented = true
+            } label: {
+                Label(
+                    isBlocked(user) ? "Unblock" : "Block",
+                    systemImage: isBlocked(user) ? "person.crop.circle.badge.checkmark" : "person.crop.circle.badge.xmark"
+                )
+            }
+            Button(role: .destructive) {
+                showingReport = true
+            } label: {
+                Label("Report", systemImage: "exclamationmark.bubble")
+            }
+        } label: {
+            Label("More actions", systemImage: "ellipsis")
+                .labelStyle(.iconOnly)
+                .font(.subheadline.weight(.bold))
+                .foregroundStyle(TaggrTheme.text)
+                .frame(width: 42, height: 42)
+                .background(TaggrTheme.panelRaised)
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+        }
+        .disabled(state.isBusy)
+    }
+
+    private var blockConfirmationTitle: String {
+        guard let user = state.profile else { return "Block user?" }
+        return isBlocked(user) ? "Unblock \(user.name)?" : "Block \(user.name)?"
+    }
+
+    private var blockConfirmationMessage: String {
+        guard let user = state.profile else { return "" }
+        return isBlocked(user)
+            ? "You will be able to see \(user.name)'s content again."
+            : "\(user.name)'s content will be hidden from your feed."
     }
 
     private func profilePhotosButton(_ user: TaggrUser) -> some View {
@@ -162,26 +204,6 @@ struct ProfileView: View {
                     .foregroundStyle(TaggrTheme.text)
                     .textSelection(.enabled)
             }
-            if !user.realms.isEmpty {
-                Text("Realms")
-                    .font(.caption.weight(.bold))
-                    .foregroundStyle(TaggrTheme.secondaryText)
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 88), spacing: 8)], alignment: .leading, spacing: 8) {
-                    ForEach(user.realms, id: \.self) { realm in
-                        realmButton(realm)
-                    }
-                }
-            }
-            if !user.controlledRealms.isEmpty {
-                Text("Controls realms")
-                    .font(.caption.weight(.bold))
-                    .foregroundStyle(TaggrTheme.secondaryText)
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 88), spacing: 8)], alignment: .leading, spacing: 8) {
-                    ForEach(user.controlledRealms, id: \.self) { realm in
-                        realmButton(realm)
-                    }
-                }
-            }
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -191,12 +213,12 @@ struct ProfileView: View {
 
     private func profileStats(_ user: TaggrUser) -> some View {
         let follows = max(0, user.followees.count - (user.followees.contains(user.id) ? 1 : 0))
-        let stats = [
+        let stats: [ProfileStatistic] = [
             profileStat("Posts", value: user.numPosts ?? 0),
             profileStat("Follows", value: follows),
             profileStat("Followers", value: user.followers.count),
-            profileStat("Joined realms", value: user.realms.count),
-            profileStat("Controls realms", value: user.controlledRealms.count),
+            profileStat("Joined realms", value: user.realms.count, realms: user.realms),
+            profileStat("Controls realms", value: user.controlledRealms.count, realms: user.controlledRealms),
             profileStat("Bookmarks", value: user.bookmarks.count),
             profileStat("Pinned", value: user.pinnedPosts.count),
             profileStat("Active weeks", value: user.activeWeeks ?? 0),
@@ -204,19 +226,8 @@ struct ProfileView: View {
             profileTokenStat("Balance", value: user.balance ?? 0),
         ].compactMap { $0 }
         return LazyVGrid(columns: [GridItem(.adaptive(minimum: 104), spacing: 8)], spacing: 8) {
-            ForEach(stats, id: \.0) { label, value in
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(label.uppercased())
-                        .font(.caption2.weight(.bold))
-                        .foregroundStyle(TaggrTheme.secondaryText)
-                    Text(value)
-                        .font(.headline.weight(.black))
-                        .foregroundStyle(TaggrTheme.text)
-                }
-                .padding(12)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(TaggrTheme.panel)
-                .clipShape(RoundedRectangle(cornerRadius: 8))
+            ForEach(stats) { stat in
+                profileStatCard(stat)
             }
         }
     }
@@ -257,27 +268,41 @@ struct ProfileView: View {
         }
     }
 
-    private func profileStat(_ label: String, value: Int) -> (String, String)? {
-        value > 0 ? (label, value.formatted()) : nil
+    private func profileStat(_ label: String, value: Int, realms: [String] = []) -> ProfileStatistic? {
+        guard value > 0 else { return nil }
+        return ProfileStatistic(label: label, value: value.formatted(), realms: realms)
     }
 
-    private func profileTokenStat(_ label: String, value: Int) -> (String, String)? {
-        value > 0 ? (label, TaggrTokenAmount.format(value, decimals: state.cache?.config?.tokenDecimals)) : nil
+    private func profileTokenStat(_ label: String, value: Int) -> ProfileStatistic? {
+        value > 0 ? ProfileStatistic(label: label, value: TaggrTokenAmount.format(value, decimals: state.cache?.config?.tokenDecimals)) : nil
     }
 
-    private func realmButton(_ realm: String) -> some View {
-        Button {
-            state.navigateToRealm(realm)
-        } label: {
-            Text("#\(realm.lowercased())")
-                .font(.caption.weight(.bold))
-                .foregroundStyle(TaggrTheme.text)
-                .padding(.horizontal, 9)
-                .frame(height: 30)
-                .background(TaggrTheme.panelRaised)
-                .clipShape(RoundedRectangle(cornerRadius: 7))
+    @ViewBuilder private func profileStatCard(_ stat: ProfileStatistic) -> some View {
+        if !stat.realms.isEmpty {
+            Button {
+                presentedRealmList = ProfileRealmList(title: stat.label, realms: stat.realms)
+            } label: {
+                profileStatCardContent(stat)
+            }
+            .buttonStyle(.plain)
+        } else {
+            profileStatCardContent(stat)
         }
-        .buttonStyle(.plain)
+    }
+
+    private func profileStatCardContent(_ stat: ProfileStatistic) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(stat.label.uppercased())
+                .font(.caption2.weight(.bold))
+                .foregroundStyle(TaggrTheme.secondaryText)
+            Text(stat.value)
+                .font(.headline.weight(.black))
+                .foregroundStyle(TaggrTheme.text)
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, minHeight: 96, maxHeight: .infinity, alignment: .topLeading)
+        .background(TaggrTheme.panel)
+        .clipShape(RoundedRectangle(cornerRadius: 8))
     }
 
     private func profileLinks(_ user: TaggrUser) -> [(label: String, url: String)] {
@@ -363,6 +388,7 @@ private struct ReportUserSheet: View {
     @Binding var isPresented: Bool
     @State private var reason = ""
     @State private var isSubmitting = false
+    @State private var reportConfirmationPresented = false
 
     var body: some View {
         VStack(spacing: 14) {
@@ -370,7 +396,7 @@ private struct ReportUserSheet: View {
                 Button("Cancel") { isPresented = false }
                     .foregroundStyle(TaggrTheme.secondaryText)
                 Spacer()
-                Button("Report") { submit() }
+                Button("Report") { reportConfirmationPresented = true }
                     .font(.subheadline.weight(.bold))
                     .foregroundStyle(.white)
                     .padding(.horizontal, 16)
@@ -395,6 +421,16 @@ private struct ReportUserSheet: View {
         .padding(16)
         .background(TaggrTheme.background)
         .presentationDetents([.medium])
+        .confirmationDialog(
+            "Report \(user.name)?",
+            isPresented: $reportConfirmationPresented,
+            titleVisibility: .visible
+        ) {
+            Button("Report", role: .destructive) { submit() }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This sends your report to TAGGR moderators.")
+        }
     }
 
     private var canSubmit: Bool {
@@ -411,4 +447,66 @@ private struct ReportUserSheet: View {
             if state.errorMessage == nil { isPresented = false }
         }
     }
+}
+
+private struct ProfileRealmList: Identifiable {
+    let title: String
+    let realms: [String]
+
+    var id: String { title }
+}
+
+private struct ProfileRealmListSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    let list: ProfileRealmList
+    let selectRealm: (String) -> Void
+
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                TaggrTheme.background.ignoresSafeArea()
+                ScrollView {
+                    LazyVStack(spacing: 8) {
+                        ForEach(list.realms, id: \.self) { realm in
+                            Button {
+                                selectRealm(realm)
+                            } label: {
+                                Text("#\(realm.lowercased())")
+                                    .font(.body.weight(.semibold))
+                                    .foregroundStyle(TaggrTheme.text)
+                                    .padding(.horizontal, 14)
+                                    .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                                    .background(TaggrTheme.panel)
+                                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .padding(16)
+                }
+            }
+            .navigationTitle(list.title)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Done") { dismiss() }
+                }
+            }
+        }
+        .presentationDetents([.medium, .large])
+    }
+}
+
+private struct ProfileStatistic: Identifiable {
+    let label: String
+    let value: String
+    let realms: [String]
+
+    init(label: String, value: String, realms: [String] = []) {
+        self.label = label
+        self.value = value
+        self.realms = realms
+    }
+
+    var id: String { label }
 }

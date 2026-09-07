@@ -1,5 +1,4 @@
-const APP_URL = "https://6qfxa-ryaaa-aaaai-qbhsq-cai.icp0.io";
-const SUPPORT_URL = `${APP_URL}/#/realm/HELP`;
+const SOURCE_URL = "https://github.com/TaggrNetwork/Taggr";
 const POLICY_EFFECTIVE_DATE = "September 7, 2026";
 
 const styles = `
@@ -87,13 +86,13 @@ footer { padding: 26px 0 42px; border-top: 1px solid var(--line); color: var(--m
 const header = `
 <header>
   <a class="brand" href="/" aria-label="TAGGR home"><span class="mark" aria-hidden="true">#</span><span class="wordmark">TAGGR</span></a>
-  <nav aria-label="Legal and support"><a href="/privacy">Privacy</a><a href="/terms">Terms</a><a href="${SUPPORT_URL}">Support</a></nav>
+  <nav aria-label="Legal information"><a href="/privacy-policy">Privacy</a><a href="/terms">Terms</a></nav>
 </header>`;
 
 const footer = `
 <footer>
   <div>TAGGR is a decentralized social network on the Internet Computer.</div>
-  <div><a href="${APP_URL}">Open TAGGR</a> · <a href="/privacy">Privacy</a> · <a href="/terms">Terms</a></div>
+  <div><a href="/privacy-policy">Privacy</a> · <a href="/terms">Terms</a> · <a href="${SOURCE_URL}">Open-source project</a></div>
 </footer>`;
 
 function layout({ title, description, body, legal = false }) {
@@ -118,18 +117,26 @@ const home = layout({
     description:
         "Official information, privacy policy, and terms for the TAGGR iOS app.",
     body: `
-      <div class="eyebrow">Internet Computer · Since 2021</div>
-      <h1>Social publishing, owned by its community.</h1>
-      <p class="lead">TAGGR is a decentralized social network running on the Internet Computer. The iOS app lets people read and publish posts, participate in communities, and optionally upload a selected video directly to their own YouTube channel.</p>
-      <div class="actions"><a class="button primary" href="${APP_URL}">Open TAGGR</a><a class="button" href="/privacy">Read the privacy policy</a></div>
+      <div class="eyebrow">Official TAGGR iOS app information</div>
+      <h1>TAGGR is a decentralized social network and publishing app.</h1>
+      <p class="lead">TAGGR runs on the Internet Computer. Its iOS app lets people read and publish posts, join topic-based communities, manage their public profile and wallet, and optionally upload a video they select to their own YouTube channel.</p>
+      <p>This public website explains the TAGGR app, its optional Google and YouTube integration, and its data practices. Every page on this website is publicly accessible.</p>
+      <div class="actions"><a class="button primary" href="/privacy-policy">Read the TAGGR Privacy Policy</a><a class="button" href="/terms">Read the Terms of Use</a></div>
+      <h2>What the TAGGR iOS app does</h2>
+      <ul>
+        <li>Displays public TAGGR posts, profiles, reactions, and communities.</li>
+        <li>Lets a TAGGR user create posts and interact with communities.</li>
+        <li>Lets a user review wallet information and initiate supported wallet actions.</li>
+        <li>Optionally connects the user’s Google account so the user can upload a selected video to their own YouTube channel.</li>
+      </ul>
       <div class="facts" aria-label="TAGGR principles">
         <div class="fact"><strong>Public by design</strong><span>Posts and profiles can be stored on-chain and visible to anyone.</span></div>
         <div class="fact"><strong>User initiated</strong><span>Wallet actions and YouTube uploads happen only when a signed-in user starts them.</span></div>
         <div class="fact"><strong>No ad tracking</strong><span>The iOS app contains no advertising or analytics SDK.</span></div>
       </div>
       <h2>YouTube connection</h2>
-      <p>YouTube connection is optional. TAGGR requests only the permissions required to identify the destination channel and upload a video selected by the user. Videos and Google authorization tokens are not sent to TAGGR canisters.</p>
-      <p>Details about access, storage, sharing, and deletion are in the <a href="/privacy">Privacy Policy</a>.</p>
+      <p>YouTube connection is optional. TAGGR requests Google user data only to identify the YouTube channel chosen by the signed-in user and to upload a video when that user explicitly starts an upload. TAGGR does not use Google user data for advertising, analytics, or unrelated features.</p>
+      <p>The selected video is transferred directly from the iOS device to YouTube. Videos and Google authorization tokens are not sent to TAGGR canisters or a developer-operated server. Full details about the Google data accessed, its use, device storage, sharing, retention, revocation, and deletion are in the <a href="/privacy-policy">TAGGR Privacy Policy</a>.</p>
     `,
 });
 
@@ -140,9 +147,19 @@ const privacy = layout({
     legal: true,
     body: `
       <div class="eyebrow">Legal</div>
-      <h1>Privacy Policy</h1>
+      <h1>TAGGR iOS App Privacy Policy</h1>
       <p class="meta">Effective ${POLICY_EFFECTIVE_DATE}</p>
-      <p class="lead">This policy explains how the TAGGR iOS app accesses, uses, stores, and shares information. TAGGR is a decentralized social network, so information a user publishes can be public and stored on-chain.</p>
+      <p class="lead">This policy applies specifically to the TAGGR iOS app and explains how it accesses, uses, stores, shares, retains, and deletes information, including Google and YouTube user data. TAGGR is a decentralized social network, so information a user chooses to publish can be public and stored on-chain.</p>
+      <p>This is the official privacy policy for the TAGGR iOS app, maintained by the TAGGR open-source project. It is not a template or a policy for an unrelated service.</p>
+
+      <h2>Google user data disclosure summary</h2>
+      <ul>
+        <li><strong>Data collected or accessed:</strong> the connected YouTube channel ID and title, Google authorization credentials, and the video and metadata the user explicitly selects for upload.</li>
+        <li><strong>Purpose:</strong> to display the destination channel and upload the selected video to that channel only when the user requests it.</li>
+        <li><strong>Storage:</strong> Google credentials and temporary upload state remain in protected storage on the user’s iOS device; they are not stored in a TAGGR canister or developer-operated server.</li>
+        <li><strong>Sharing:</strong> the selected upload data is transferred only to Google/YouTube to perform the requested upload. TAGGR does not sell it or disclose it to advertisers or data brokers.</li>
+        <li><strong>Retention and deletion:</strong> incomplete local upload jobs expire after seven days. Disconnecting YouTube revokes authorization and deletes local YouTube upload state.</li>
+      </ul>
 
       <h2>Information handled by TAGGR</h2>
       <ul>
@@ -187,7 +204,7 @@ const privacy = layout({
       <p>TAGGR is not directed to children under the age required to consent to online services in their jurisdiction.</p>
 
       <h2>Changes and contact</h2>
-      <p>This policy may be updated when TAGGR’s data practices change. The effective date above identifies the current version. Privacy or support questions can be posted in the public <a href="${SUPPORT_URL}">TAGGR HELP realm</a>.</p>
+      <p>This policy may be updated when TAGGR’s data practices change. The effective date above identifies the current version. Privacy questions, support requests, and public issue reports can be submitted through the <a href="${SOURCE_URL}/issues">TAGGR open-source project issue tracker</a>.</p>
     `,
 });
 
@@ -218,19 +235,24 @@ const terms = layout({
       <p>TAGGR is provided on an “as is” and “as available” basis to the extent permitted by law. No guarantee is made that the service will be uninterrupted, error-free, or suitable for a particular purpose. Nothing on TAGGR constitutes financial, legal, or investment advice.</p>
 
       <h2>Changes and support</h2>
-      <p>These terms may be updated as the service changes. The effective date above identifies the current version. Questions can be posted in the public <a href="${SUPPORT_URL}">TAGGR HELP realm</a>.</p>
+      <p>These terms may be updated as the service changes. The effective date above identifies the current version. Questions and public issue reports can be submitted through the <a href="${SOURCE_URL}/issues">TAGGR open-source project issue tracker</a>.</p>
     `,
 });
 
 const pages = new Map([
     ["/", home],
+    ["/about", home],
+    ["/about/", home],
     ["/privacy", privacy],
     ["/privacy/", privacy],
+    ["/privacy-policy", privacy],
+    ["/privacy-policy/", privacy],
     ["/terms", terms],
     ["/terms/", terms],
 ]);
 
 const securityHeaders = {
+    "cache-control": "public, max-age=0, must-revalidate, no-transform",
     "content-security-policy":
         "default-src 'none'; style-src 'unsafe-inline'; img-src 'self' data:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
     "permissions-policy": "camera=(), geolocation=(), microphone=()",

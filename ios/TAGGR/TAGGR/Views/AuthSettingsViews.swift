@@ -32,6 +32,23 @@ struct SettingsView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 18) {
                     SettingsPanel(title: "Identity") {
+                        if let user = state.currentUser {
+                            Button {
+                                state.navigateToProfile(user.name)
+                            } label: {
+                                Text(user.name)
+                                    .font(.subheadline.weight(.bold))
+                                    .foregroundStyle(TaggrTheme.clickable)
+                            }
+                            .buttonStyle(.plain)
+                            UserAttributeBadgesView(
+                                badges: TaggrUserBadge.badges(
+                                    for: user,
+                                    viewerID: user.id,
+                                    votingPowerActivityWeeks: state.cache?.config?.votingPowerActivityWeeks
+                                )
+                            )
+                        }
                         if let message = state.errorMessage {
                             Text(message)
                                 .font(.footnote)
@@ -70,27 +87,7 @@ struct SettingsView: View {
                                         .font(.subheadline.weight(.bold))
                                 }
                             } else if let user = state.currentUser {
-                                Label(user.name, systemImage: "checkmark.seal")
-                                    .font(.subheadline.weight(.bold))
-                                    .foregroundStyle(TaggrTheme.text)
-                                UserAttributeBadgesView(
-                                    badges: TaggrUserBadge.badges(
-                                        for: user,
-                                        viewerID: user.id,
-                                        votingPowerActivityWeeks: state.cache?.config?.votingPowerActivityWeeks
-                                    )
-                                )
                                 HStack(spacing: 10) {
-                                    Button {
-                                        state.navigateToProfile(user.name)
-                                    } label: {
-                                        Label("Open journal", systemImage: "person.crop.square")
-                                            .labelStyle(.iconOnly)
-                                            .frame(width: 44, height: 44)
-                                            .background(TaggrTheme.panelRaised)
-                                            .clipShape(RoundedRectangle(cornerRadius: 8))
-                                    }
-                                    .buttonStyle(.plain)
                                     Button {
                                         state.route = .userPhotos(user.name)
                                     } label: {
@@ -101,36 +98,10 @@ struct SettingsView: View {
                                             .clipShape(RoundedRectangle(cornerRadius: 8))
                                     }
                                     .buttonStyle(.plain)
+                                    signOutButton
                                 }
-                            }
-                            Divider()
-                                .overlay(TaggrTheme.panelRaised)
-                            Button {
-                                signOutConfirmationPresented = true
-                            } label: {
-                                Label("Sign out", systemImage: "rectangle.portrait.and.arrow.right")
-                                    .font(.subheadline.bold())
-                                    .frame(maxWidth: .infinity)
-                                    .frame(minHeight: 44)
-                                    .background(.red.opacity(0.08))
-                                    .overlay {
-                                        RoundedRectangle(cornerRadius: 8)
-                                            .stroke(.red.opacity(0.85), lineWidth: 1)
-                                    }
-                            }
-                            .buttonStyle(.plain)
-                            .foregroundStyle(.red)
-                            .confirmationDialog(
-                                "Sign out?",
-                                isPresented: $signOutConfirmationPresented,
-                                titleVisibility: .visible
-                            ) {
-                                Button("Sign out", role: .destructive) {
-                                    state.signOut()
-                                }
-                                Button("Cancel", role: .cancel) {}
-                            } message: {
-                                Text("This removes the saved Internet Identity session from this device. Your TAGGR account and posts remain.")
+                            } else {
+                                signOutButton
                             }
                         } else {
                             Button {
@@ -145,13 +116,13 @@ struct SettingsView: View {
                         }
                     }
                     if state.authSession != nil {
+                        SettingsPanel(title: "Wallet") {
+                            walletPanel(state.currentUser)
+                        }
                         if let user = state.currentUser {
                             SettingsPanel(title: "Storage") {
                                 StorageSettingsPanel(user: user)
                             }
-                        }
-                        SettingsPanel(title: "Wallet") {
-                            walletPanel(state.currentUser)
                         }
                     }
                     let youtubeMode = YouTubeSettingsMode.resolve(
@@ -227,6 +198,36 @@ struct SettingsView: View {
             try? await Task.sleep(for: .seconds(1.5))
             guard !Task.isCancelled else { return }
             principalCopied = false
+        }
+    }
+
+    private var signOutButton: some View {
+        Button {
+            signOutConfirmationPresented = true
+        } label: {
+            Label("Sign out", systemImage: "rectangle.portrait.and.arrow.right")
+                .labelStyle(.iconOnly)
+                .frame(width: 44, height: 44)
+                .background(.red.opacity(0.08))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 8)
+                        .stroke(.red.opacity(0.85), lineWidth: 1)
+                }
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(.red)
+        .confirmationDialog(
+            "Sign out?",
+            isPresented: $signOutConfirmationPresented,
+            titleVisibility: .visible
+        ) {
+            Button("Sign out", role: .destructive) {
+                state.signOut()
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This removes the saved Internet Identity session from this device. Your TAGGR account and posts remain.")
         }
     }
 
