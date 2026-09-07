@@ -1,0 +1,14 @@
+{
+    "$schema": "./node_modules/wrangler/config-schema.json",
+    "name": "taggr-oauth-site",
+    "account_id": "9029b5f9de5b2e820eaf4ed562bcb0e7",
+    "main": "src/index.mjs",
+    "compatibility_date": "2026-07-09",
+    "workers_dev": true,
+    "routes": [
+        {
+            "pattern": "taggr.kasane.network",
+            "custom_domain": true,
+        },
+    ],
+}

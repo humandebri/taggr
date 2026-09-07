@@ -15,6 +15,7 @@
 
 # local build outputs
 .build/
+.wrangler/
 *.xcresult/
 *.ipa
 *.dSYM/

@@ -1,0 +1,14 @@
+{
+    "name": "taggr-oauth-site",
+    "version": "1.0.0",
+    "private": true,
+    "type": "module",
+    "scripts": {
+        "test": "node --test test/site.test.mjs",
+        "check": "wrangler deploy --dry-run",
+        "deploy": "wrangler deploy"
+    },
+    "devDependencies": {
+        "wrangler": "4.129.0"
+    }
+}
