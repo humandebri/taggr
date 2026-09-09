@@ -1,0 +1,44 @@
+{
+  "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/ios/TAGGR/TAGGR/AppActions.swift" : {
+    "const-values" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/icnativeclient-077/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphoneos/TAGGR.build/Objects-normal/arm64/AppActions.swiftconstvalues",
+    "dependencies" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/icnativeclient-077/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphoneos/TAGGR.build/Objects-normal/arm64/AppActions.d",
+    "diagnostics" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/icnativeclient-077/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphoneos/TAGGR.build/Objects-normal/arm64/AppActions.dia",
+    "object" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/icnativeclient-077/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphoneos/TAGGR.build/Objects-normal/arm64/AppActions.o",
+    "swift-dependencies" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/icnativeclient-077/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphoneos/TAGGR.build/Objects-normal/arm64/AppActions.swiftdeps"
+  },
+  "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/ios/TAGGR/TAGGR/AppState.swift" : {
+    "const-values" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/icnativeclient-077/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphoneos/TAGGR.build/Objects-normal/arm64/AppState.swiftconstvalues",
+    "dependencies" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/icnativeclient-077/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphoneos/TAGGR.build/Objects-normal/arm64/AppState.d",
+    "diagnostics" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/icnativeclient-077/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphoneos/TAGGR.build/Objects-normal/arm64/AppState.dia",
+    "object" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/icnativeclient-077/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphoneos/TAGGR.build/Objects-normal/arm64/AppState.o",
+    "swift-dependencies" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/icnativeclient-077/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphoneos/TAGGR.build/Objects-normal/arm64/AppState.swiftdeps"
+  },
+  "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/ios/TAGGR/TAGGR/AppStores.swift" : {
+    "const-values" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/icnativeclient-077/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphoneos/TAGGR.build/Objects-normal/arm64/AppStores.swiftconstvalues",
+    "dependencies" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/icnativeclient-077/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphoneos/TAGGR.build/Objects-normal/arm64/AppStores.d",
+    "diagnostics" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/icnativeclient-077/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphoneos/TAGGR.build/Objects-normal/arm64/AppStores.dia",
+    "object" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/icnativeclient-077/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphoneos/TAGGR.build/Objects-normal/arm64/AppStores.o",
+    "swift-dependencies" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/icnativeclient-077/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphoneos/TAGGR.build/Objects-normal/arm64/AppStores.swiftdeps"
+  },
+  "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/ios/TAGGR/TAGGR/TAGGRApp.swift" : {
+    "const-values" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/icnativeclient-077/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphoneos/TAGGR.build/Objects-normal/arm64/TAGGRApp.swiftconstvalues",
+    "dependencies" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/icnativeclient-077/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphoneos/TAGGR.build/Objects-normal/arm64/TAGGRApp.d",
+    "diagnostics" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/icnativeclient-077/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphoneos/TAGGR.build/Objects-normal/arm64/TAGGRApp.dia",
+    "object" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/icnativeclient-077/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphoneos/TAGGR.build/Objects-normal/arm64/TAGGRApp.o",
+    "swift-dependencies" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/icnativeclient-077/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphoneos/TAGGR.build/Objects-normal/arm64/TAGGRApp.swiftdeps"
+  },
+  "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/ios/TAGGR/TAGGR/TaggrSafetyStore.swift" : {
+    "const-values" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/icnativeclient-077/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphoneos/TAGGR.build/Objects-normal/arm64/TaggrSafetyStore.swiftconstvalues",
+    "dependencies" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/icnativeclient-077/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphoneos/TAGGR.build/Objects-normal/arm64/TaggrSafetyStore.d",
+    "diagnostics" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/icnativeclient-077/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphoneos/TAGGR.build/Objects-normal/arm64/TaggrSafetyStore.dia",
+    "object" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/icnativeclient-077/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphoneos/TAGGR.build/Objects-normal/arm64/TaggrSafetyStore.o",
+    "swift-dependencies" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/icnativeclient-077/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphoneos/TAGGR.build/Objects-normal/arm64/TaggrSafetyStore.swiftdeps"
+  },
+  "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/ios/TAGGR/TAGGR/TaggrSeedPhrase.swift" : {
+    "const-values" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/icnativeclient-077/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphoneos/TAGGR.build/Objects-normal/arm64/TaggrSeedPhrase.swiftconstvalues",
+    "dependencies" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/icnativeclient-077/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphoneos/TAGGR.build/Objects-normal/arm64/TaggrSeedPhrase.d",
+    "diagnostics" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/icnativeclient-077/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphoneos/TAGGR.build/Objects-normal/arm64/TaggrSeedPhrase.dia",
+    "object" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/icnativeclient-077/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphoneos/TAGGR.build/Objects-normal/arm64/TaggrSeedPhrase.o",
+    "swift-dependencies" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/icnativeclient-077/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphoneos/TAGGR.build/Objects-normal/arm64/TaggrSeedPhrase.swiftdeps"
+  }
+}

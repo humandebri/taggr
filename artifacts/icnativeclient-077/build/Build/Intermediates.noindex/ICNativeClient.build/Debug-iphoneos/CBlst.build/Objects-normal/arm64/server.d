@@ -1,0 +1,34 @@
+dependencies: \
+  /Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/icnativeclient-077/SourcePackages/checkouts/ICNativeClient/Vendor/blst/src/server.c \
+  /Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/icnativeclient-077/SourcePackages/checkouts/ICNativeClient/Vendor/blst/src/keygen.c \
+  /Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/icnativeclient-077/SourcePackages/checkouts/ICNativeClient/Vendor/blst/src/consts.h \
+  /Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/icnativeclient-077/SourcePackages/checkouts/ICNativeClient/Vendor/blst/src/vect.h \
+  /Applications/Xcode-26.5.0.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/clang/21/include/module.modulemap \
+  /Applications/Xcode-26.5.0.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS.sdk/usr/include/DarwinFoundation3.modulemap \
+  /Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/icnativeclient-077/SourcePackages/checkouts/ICNativeClient/Vendor/blst/src/bytes.h \
+  /Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/icnativeclient-077/SourcePackages/checkouts/ICNativeClient/Vendor/blst/src/sha256.h \
+  /Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/icnativeclient-077/SourcePackages/checkouts/ICNativeClient/Vendor/blst/src/hash_to_field.c \
+  /Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/icnativeclient-077/SourcePackages/checkouts/ICNativeClient/Vendor/blst/src/e1.c \
+  /Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/icnativeclient-077/SourcePackages/checkouts/ICNativeClient/Vendor/blst/src/point.h \
+  /Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/icnativeclient-077/SourcePackages/checkouts/ICNativeClient/Vendor/blst/src/fields.h \
+  /Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/icnativeclient-077/SourcePackages/checkouts/ICNativeClient/Vendor/blst/src/errors.h \
+  /Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/icnativeclient-077/SourcePackages/checkouts/ICNativeClient/Vendor/blst/src/ec_ops.h \
+  /Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/icnativeclient-077/SourcePackages/checkouts/ICNativeClient/Vendor/blst/src/ec_mult.h \
+  /Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/icnativeclient-077/SourcePackages/checkouts/ICNativeClient/Vendor/blst/src/map_to_g1.c \
+  /Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/icnativeclient-077/SourcePackages/checkouts/ICNativeClient/Vendor/blst/src/e2.c \
+  /Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/icnativeclient-077/SourcePackages/checkouts/ICNativeClient/Vendor/blst/src/map_to_g2.c \
+  /Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/icnativeclient-077/SourcePackages/checkouts/ICNativeClient/Vendor/blst/src/fp12_tower.c \
+  /Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/icnativeclient-077/SourcePackages/checkouts/ICNativeClient/Vendor/blst/src/pairing.c \
+  /Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/icnativeclient-077/SourcePackages/checkouts/ICNativeClient/Vendor/blst/src/aggregate.c \
+  /Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/icnativeclient-077/SourcePackages/checkouts/ICNativeClient/Vendor/blst/src/exp.c \
+  /Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/icnativeclient-077/SourcePackages/checkouts/ICNativeClient/Vendor/blst/src/sqrt.c \
+  /Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/icnativeclient-077/SourcePackages/checkouts/ICNativeClient/Vendor/blst/src/sqrt-addchain.h \
+  /Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/icnativeclient-077/SourcePackages/checkouts/ICNativeClient/Vendor/blst/src/recip.c \
+  /Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/icnativeclient-077/SourcePackages/checkouts/ICNativeClient/Vendor/blst/src/recip-addchain.h \
+  /Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/icnativeclient-077/SourcePackages/checkouts/ICNativeClient/Vendor/blst/src/bulk_addition.c \
+  /Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/icnativeclient-077/SourcePackages/checkouts/ICNativeClient/Vendor/blst/src/multi_scalar.c \
+  /Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/icnativeclient-077/SourcePackages/checkouts/ICNativeClient/Vendor/blst/src/consts.c \
+  /Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/icnativeclient-077/SourcePackages/checkouts/ICNativeClient/Vendor/blst/src/vect.c \
+  /Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/icnativeclient-077/SourcePackages/checkouts/ICNativeClient/Vendor/blst/src/exports.c \
+  /Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/icnativeclient-077/SourcePackages/checkouts/ICNativeClient/Vendor/blst/src/rb_tree.c \
+  /Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/icnativeclient-077/SourcePackages/checkouts/ICNativeClient/Vendor/blst/src/cpuid.c

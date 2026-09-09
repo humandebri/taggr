@@ -1,0 +1,4 @@
+module CBlst {
+umbrella "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/icnativeclient-077/SourcePackages/checkouts/ICNativeClient/Vendor/blst/bindings"
+export *
+}

@@ -1,0 +1,6 @@
+{
+  "emailRouting": {
+    "enabled": false,
+    "status": "unconfigured"
+  }
+}

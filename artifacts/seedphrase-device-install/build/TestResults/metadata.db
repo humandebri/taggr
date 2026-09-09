@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>FormatVersion</key>
+	<integer>1</integer>
+	<key>Store</key>
+	<dict>
+		<key>TAGGRTests</key>
+		<dict>
+			<key>TaggrTests</key>
+			<dict>
+				<key>testSafetyBlockRemainsEffectiveWhenNotificationFails</key>
+				<dict>
+					<key>mrnet</key>
+					<real>0.13977909088134766</real>
+				</dict>
+				<key>testSafetyConsentPolicyAndBlocksAreIndependent</key>
+				<dict>
+					<key>mrnet</key>
+					<real>0.15557897090911865</real>
+				</dict>
+				<key>testSafetyOutageAndPolicyValidity</key>
+				<dict>
+					<key>mrnet</key>
+					<real>0.11133003234863281</real>
+				</dict>
+				<key>testSafetyPendingBlockAndAgreementSurviveRestart</key>
+				<dict>
+					<key>mrnet</key>
+					<real>0.0095859766006469727</real>
+				</dict>
+				<key>testSafetyRecoveryReloadsVisibleFeedWithoutNavigation</key>
+				<dict>
+					<key>mrnet</key>
+					<real>1.1416009664535522</real>
+				</dict>
+				<key>testSafetyRejectsNSFWAndSuspendedPublishing</key>
+				<dict>
+					<key>mrnet</key>
+					<real>0.15845704078674316</real>
+				</dict>
+				<key>testSafetyRejectsRestrictedRepostBeforeCanisterWrite</key>
+				<dict>
+					<key>mrnet</key>
+					<real>0.051304936408996582</real>
+				</dict>
+				<key>testSafetyRetryRejectsInvalidPolicyAndRecovers</key>
+				<dict>
+					<key>mrnet</key>
+					<real>0.033082962036132812</real>
+				</dict>
+				<key>testSafetyRetryReports404AndRecoversWithoutLosingConsent</key>
+				<dict>
+					<key>mrnet</key>
+					<real>0.024067044258117676</real>
+				</dict>
+			</dict>
+		</dict>
+	</dict>
+</dict>
+</plist>

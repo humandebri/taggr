@@ -1,0 +1,25 @@
+dependencies: \
+  /Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/icnativeclient-077/SourcePackages/checkouts/libwebp-Xcode/libwebp/src/dec/io_dec.c \
+  /Applications/Xcode-26.5.0.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS.sdk/usr/include/DarwinFoundation1.modulemap \
+  /Applications/Xcode-26.5.0.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/clang/21/include/module.modulemap \
+  /Applications/Xcode-26.5.0.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS.sdk/usr/include/DarwinFoundation3.modulemap \
+  /Applications/Xcode-26.5.0.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS.sdk/usr/include/DarwinFoundation2.modulemap \
+  /Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/icnativeclient-077/SourcePackages/checkouts/libwebp-Xcode/libwebp/src/dec/vp8_dec.h \
+  /Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/icnativeclient-077/SourcePackages/checkouts/libwebp-Xcode/libwebp/src/webp/decode.h \
+  /Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/icnativeclient-077/SourcePackages/checkouts/libwebp-Xcode/libwebp/src/webp/./types.h \
+  /Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/icnativeclient-077/SourcePackages/checkouts/libwebp-Xcode/libwebp/src/webp/types.h \
+  /Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/icnativeclient-077/SourcePackages/checkouts/libwebp-Xcode/libwebp/src/dec/vp8i_dec.h \
+  /Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/icnativeclient-077/SourcePackages/checkouts/libwebp-Xcode/libwebp/src/dec/common_dec.h \
+  /Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/icnativeclient-077/SourcePackages/checkouts/libwebp-Xcode/libwebp/src/dec/vp8li_dec.h \
+  /Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/icnativeclient-077/SourcePackages/checkouts/libwebp-Xcode/libwebp/src/dec/webpi_dec.h \
+  /Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/icnativeclient-077/SourcePackages/checkouts/libwebp-Xcode/libwebp/src/utils/rescaler_utils.h \
+  /Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/icnativeclient-077/SourcePackages/checkouts/libwebp-Xcode/libwebp/src/utils/bit_reader_utils.h \
+  /Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/icnativeclient-077/SourcePackages/checkouts/libwebp-Xcode/libwebp/src/dsp/cpu.h \
+  /Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/icnativeclient-077/SourcePackages/checkouts/libwebp-Xcode/libwebp/src/utils/color_cache_utils.h \
+  /Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/icnativeclient-077/SourcePackages/checkouts/libwebp-Xcode/libwebp/src/dsp/dsp.h \
+  /Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/icnativeclient-077/SourcePackages/checkouts/libwebp-Xcode/libwebp/src/utils/huffman_utils.h \
+  /Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/icnativeclient-077/SourcePackages/checkouts/libwebp-Xcode/libwebp/src/webp/format_constants.h \
+  /Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/icnativeclient-077/SourcePackages/checkouts/libwebp-Xcode/libwebp/src/utils/random_utils.h \
+  /Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/icnativeclient-077/SourcePackages/checkouts/libwebp-Xcode/libwebp/src/utils/thread_utils.h \
+  /Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/icnativeclient-077/SourcePackages/checkouts/libwebp-Xcode/libwebp/src/dsp/yuv.h \
+  /Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/icnativeclient-077/SourcePackages/checkouts/libwebp-Xcode/libwebp/src/utils/utils.h

@@ -1,0 +1,23 @@
+{
+  "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/ios/TAGGR/TAGGR/Views/PostInteractionViews.swift" : {
+    "const-values" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGR.build/Objects-normal/arm64/PostInteractionViews.swiftconstvalues",
+    "dependencies" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGR.build/Objects-normal/arm64/PostInteractionViews.d",
+    "diagnostics" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGR.build/Objects-normal/arm64/PostInteractionViews.dia",
+    "object" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGR.build/Objects-normal/arm64/PostInteractionViews.o",
+    "swift-dependencies" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGR.build/Objects-normal/arm64/PostInteractionViews.swiftdeps"
+  },
+  "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/ios/TAGGR/TAGGR/Views/PostReactionDetailsView.swift" : {
+    "const-values" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGR.build/Objects-normal/arm64/PostReactionDetailsView.swiftconstvalues",
+    "dependencies" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGR.build/Objects-normal/arm64/PostReactionDetailsView.d",
+    "diagnostics" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGR.build/Objects-normal/arm64/PostReactionDetailsView.dia",
+    "object" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGR.build/Objects-normal/arm64/PostReactionDetailsView.o",
+    "swift-dependencies" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGR.build/Objects-normal/arm64/PostReactionDetailsView.swiftdeps"
+  },
+  "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/ios/TAGGR/TAGGR/Views/RealmListViews.swift" : {
+    "const-values" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGR.build/Objects-normal/arm64/RealmListViews.swiftconstvalues",
+    "dependencies" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGR.build/Objects-normal/arm64/RealmListViews.d",
+    "diagnostics" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGR.build/Objects-normal/arm64/RealmListViews.dia",
+    "object" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGR.build/Objects-normal/arm64/RealmListViews.o",
+    "swift-dependencies" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGR.build/Objects-normal/arm64/RealmListViews.swiftdeps"
+  }
+}

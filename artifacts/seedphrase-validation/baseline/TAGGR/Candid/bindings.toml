@@ -1,0 +1,28 @@
+[[canister]]
+name = "Taggr"
+did = "Candid/taggr.did"
+canister_id = "6qfxa-ryaaa-aaaai-qbhsq-cai"
+methods = ["add_post", "edit_post", "bucket_wasm"]
+
+[[canister]]
+name = "Ledger"
+did = "Candid/production/ledger.did"
+canister_id = "ryjl3-tyaaa-aaaaa-aaaba-cai"
+methods = ["account_balance", "transfer"]
+
+[[canister]]
+name = "CMC"
+did = "Candid/production/cmc.did"
+canister_id = "rkp4c-7iaaa-aaaaa-aaaca-cai"
+methods = ["notify_create_canister", "notify_top_up"]
+
+[[canister]]
+name = "Management"
+did = "Candid/production/management.did"
+canister_id = "aaaaa-aa"
+methods = ["install_code", "canister_status", "update_settings"]
+
+[[canister]]
+name = "Bucket"
+did = "Candid/production/bucket.did"
+methods = ["http_request", "update_internal_controllers"]

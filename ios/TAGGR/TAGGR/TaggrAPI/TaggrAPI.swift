@@ -2,7 +2,7 @@ import Foundation
 @preconcurrency import ICNativeClient
 
 enum TaggrAPIError: Error, LocalizedError {
-    static let signInRequiredMessage = "Sign in with Internet Identity to use this action."
+    static let signInRequiredMessage = "Sign in to use this action."
 
     case invalidCanisterId
     case invalidIdentity(String)

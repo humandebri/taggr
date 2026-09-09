@@ -18,6 +18,10 @@ struct ProfileView: View {
                 LazyVStack(alignment: .leading, spacing: 0) {
                     VStack(alignment: .leading, spacing: 18) {
                         if let user = state.profile {
+                            if state.isUserRestricted(user.id) {
+                                Text("This user's content is unavailable.")
+                                profileMoreActionsMenu(user)
+                            } else {
                             profileHeader(user)
                             if user.deactivated == true {
                                 Text("This account is deactivated.")
@@ -31,6 +35,7 @@ struct ProfileView: View {
                             profileActionRow(user)
                             profileStats(user)
                             profileDetails(user)
+                            }
                         } else {
                             Text("No profile")
                                 .font(.headline)
@@ -39,7 +44,7 @@ struct ProfileView: View {
                         }
                     }
                     .padding(16)
-                    if state.profile != nil {
+                    if let user = state.profile, !state.isUserRestricted(user.id) {
                         journalSection()
                     }
                 }
@@ -161,8 +166,8 @@ struct ProfileView: View {
     private var blockConfirmationMessage: String {
         guard let user = state.profile else { return "" }
         return isBlocked(user)
-            ? "You will be able to see \(user.name)'s content again."
-            : "\(user.name)'s content will be hidden from your feed."
+            ? "Your personal block of \(user.name) will be removed."
+            : "\(user.name)'s content will immediately be hidden in this app."
     }
 
     private func profilePhotosButton(_ user: TaggrUser) -> some View {
@@ -316,8 +321,7 @@ struct ProfileView: View {
     }
 
     private func canModerate(_ user: TaggrUser) -> Bool {
-        guard state.authSession != nil, let currentUser = state.currentUser else { return false }
-        return currentUser.id != user.id
+        state.currentUser?.id != user.id
     }
 
     private func canShowPhotos(_ user: TaggrUser) -> Bool {
@@ -325,7 +329,7 @@ struct ProfileView: View {
     }
 
     private func isBlocked(_ user: TaggrUser) -> Bool {
-        state.currentUser?.blacklist.contains(user.id) == true
+        state.isUserBlocked(user.id)
     }
 
     private var profileHandle: String? {
@@ -383,69 +387,11 @@ struct ProfileView: View {
 }
 
 private struct ReportUserSheet: View {
-    @Environment(TaggrAppCoordinator.self) private var state
     let user: TaggrUser
     @Binding var isPresented: Bool
-    @State private var reason = ""
-    @State private var isSubmitting = false
-    @State private var reportConfirmationPresented = false
 
     var body: some View {
-        VStack(spacing: 14) {
-            HStack {
-                Button("Cancel") { isPresented = false }
-                    .foregroundStyle(TaggrTheme.secondaryText)
-                Spacer()
-                Button("Report") { reportConfirmationPresented = true }
-                    .font(.subheadline.weight(.bold))
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 16)
-                    .frame(height: 36)
-                    .background(canSubmit ? .red : TaggrTheme.panelRaised)
-                    .clipShape(Capsule())
-                    .disabled(!canSubmit || isSubmitting || state.isBusy)
-            }
-            Text(user.name)
-                .font(.subheadline.weight(.bold))
-                .foregroundStyle(TaggrTheme.text)
-                .frame(maxWidth: .infinity, alignment: .leading)
-            TextEditor(text: $reason)
-                .scrollContentBackground(.hidden)
-                .foregroundStyle(TaggrTheme.text)
-                .frame(minHeight: 150)
-                .padding(8)
-                .background(TaggrTheme.panelRaised)
-                .clipShape(RoundedRectangle(cornerRadius: 8))
-            Spacer()
-        }
-        .padding(16)
-        .background(TaggrTheme.background)
-        .presentationDetents([.medium])
-        .confirmationDialog(
-            "Report \(user.name)?",
-            isPresented: $reportConfirmationPresented,
-            titleVisibility: .visible
-        ) {
-            Button("Report", role: .destructive) { submit() }
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text("This sends your report to TAGGR moderators.")
-        }
-    }
-
-    private var canSubmit: Bool {
-        !reason.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-    }
-
-    private func submit() {
-        let trimmed = reason.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty, !isSubmitting else { return }
-        isSubmitting = true
-        Task {
-            await state.report(userId: user.id, reason: trimmed)
-            isSubmitting = false
-            if state.errorMessage == nil { isPresented = false }
-        }
+        ContentReportSheet(userID: user.id, postID: nil, isPresented: $isPresented)
     }
 }
 

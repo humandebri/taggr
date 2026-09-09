@@ -46,15 +46,16 @@ while retaining the pinned package revision.
 ## 2. Fill App Review Data
 
 Use `ios/docs/app_store_review.md` as the App Store Connect Review Notes source.
-The TestFlight upload is complete, but final review submission still needs one
-production invite code after the production follow-up deploy.
+The seed-phrase login change must pass code review, owner approval, publication
+of its ICNativeClient dependency, and validation in the distributed iOS build.
 Use `ios/docs/app_store_listing.md` for product-page copy, URLs, keywords, and
 the screenshot capture plan.
 
-Use either a reviewer-only Internet Identity sign-in procedure with the expected
-TAGGR username, or keep the existing instruction that App Review should use the
-invite code flow. The invite code must be a production code with enough credits
-to create a reviewer account and test report/block flows.
+Create a dedicated production review account once with the website's Seed Phrase
+method. Verify **Account > Sign in > Seed phrase** opens the same account on iOS,
+then provide its expected username and phrase privately in App Store Connect.
+Keep enough credits available for review. Do not store credentials in this repo.
+The same account can be reused across reviews; a new invite is not required.
 
 Support/contact is already documented as `Links > HELP Realm` and
 `Links > OpenChat Community`.
@@ -202,8 +203,8 @@ before adding the build to internal or external TestFlight testing.
 
 ## 7. Final Completion Gate
 
-Run this only after the deferred production follow-up deploy, production invite
-code, and device verification are complete.
+Run this only after the deferred production follow-up deploy, production review
+account credentials, and device verification are complete.
 
 Use the lightweight blocker check when only external submission gates need a
 quick recheck:

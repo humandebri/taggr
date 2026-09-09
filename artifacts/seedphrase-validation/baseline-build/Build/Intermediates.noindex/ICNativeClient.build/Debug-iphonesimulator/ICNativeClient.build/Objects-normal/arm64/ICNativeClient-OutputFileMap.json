@@ -1,0 +1,129 @@
+{
+  "" : {
+    "diagnostics" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/baseline-build/Build/Intermediates.noindex/ICNativeClient.build/Debug-iphonesimulator/ICNativeClient.build/Objects-normal/arm64/ICNativeClient-primary.dia",
+    "emit-module-dependencies" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/baseline-build/Build/Intermediates.noindex/ICNativeClient.build/Debug-iphonesimulator/ICNativeClient.build/Objects-normal/arm64/ICNativeClient-primary-emit-module.d",
+    "emit-module-diagnostics" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/baseline-build/Build/Intermediates.noindex/ICNativeClient.build/Debug-iphonesimulator/ICNativeClient.build/Objects-normal/arm64/ICNativeClient-primary-emit-module.dia",
+    "pch" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/baseline-build/Build/Intermediates.noindex/ICNativeClient.build/Debug-iphonesimulator/ICNativeClient.build/Objects-normal/arm64/ICNativeClient-primary-Bridging-header.pch",
+    "swift-dependencies" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/baseline-build/Build/Intermediates.noindex/ICNativeClient.build/Debug-iphonesimulator/ICNativeClient.build/Objects-normal/arm64/ICNativeClient-primary.swiftdeps"
+  },
+  "/Volumes/KINGSTON/ICP/ICNativeClient/Sources/ICNativeClient/CBOR.swift" : {
+    "const-values" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/baseline-build/Build/Intermediates.noindex/ICNativeClient.build/Debug-iphonesimulator/ICNativeClient.build/Objects-normal/arm64/CBOR.swiftconstvalues",
+    "dependencies" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/baseline-build/Build/Intermediates.noindex/ICNativeClient.build/Debug-iphonesimulator/ICNativeClient.build/Objects-normal/arm64/CBOR.d",
+    "diagnostics" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/baseline-build/Build/Intermediates.noindex/ICNativeClient.build/Debug-iphonesimulator/ICNativeClient.build/Objects-normal/arm64/CBOR.dia",
+    "index-unit-output-path" : "/ICNativeClient.build/Debug-iphonesimulator/ICNativeClient.build/Objects-normal/arm64/CBOR.o",
+    "llvm-bc" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/baseline-build/Build/Intermediates.noindex/ICNativeClient.build/Debug-iphonesimulator/ICNativeClient.build/Objects-normal/arm64/CBOR.bc",
+    "object" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/baseline-build/Build/Intermediates.noindex/ICNativeClient.build/Debug-iphonesimulator/ICNativeClient.build/Objects-normal/arm64/CBOR.o",
+    "swift-dependencies" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/baseline-build/Build/Intermediates.noindex/ICNativeClient.build/Debug-iphonesimulator/ICNativeClient.build/Objects-normal/arm64/CBOR.swiftdeps",
+    "swiftmodule" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/baseline-build/Build/Intermediates.noindex/ICNativeClient.build/Debug-iphonesimulator/ICNativeClient.build/Objects-normal/arm64/CBOR~partial.swiftmodule"
+  },
+  "/Volumes/KINGSTON/ICP/ICNativeClient/Sources/ICNativeClient/Candid.swift" : {
+    "const-values" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/baseline-build/Build/Intermediates.noindex/ICNativeClient.build/Debug-iphonesimulator/ICNativeClient.build/Objects-normal/arm64/Candid.swiftconstvalues",
+    "dependencies" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/baseline-build/Build/Intermediates.noindex/ICNativeClient.build/Debug-iphonesimulator/ICNativeClient.build/Objects-normal/arm64/Candid.d",
+    "diagnostics" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/baseline-build/Build/Intermediates.noindex/ICNativeClient.build/Debug-iphonesimulator/ICNativeClient.build/Objects-normal/arm64/Candid.dia",
+    "index-unit-output-path" : "/ICNativeClient.build/Debug-iphonesimulator/ICNativeClient.build/Objects-normal/arm64/Candid.o",
+    "llvm-bc" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/baseline-build/Build/Intermediates.noindex/ICNativeClient.build/Debug-iphonesimulator/ICNativeClient.build/Objects-normal/arm64/Candid.bc",
+    "object" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/baseline-build/Build/Intermediates.noindex/ICNativeClient.build/Debug-iphonesimulator/ICNativeClient.build/Objects-normal/arm64/Candid.o",
+    "swift-dependencies" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/baseline-build/Build/Intermediates.noindex/ICNativeClient.build/Debug-iphonesimulator/ICNativeClient.build/Objects-normal/arm64/Candid.swiftdeps",
+    "swiftmodule" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/baseline-build/Build/Intermediates.noindex/ICNativeClient.build/Debug-iphonesimulator/ICNativeClient.build/Objects-normal/arm64/Candid~partial.swiftmodule"
+  },
+  "/Volumes/KINGSTON/ICP/ICNativeClient/Sources/ICNativeClient/CandidCodec.swift" : {
+    "const-values" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/baseline-build/Build/Intermediates.noindex/ICNativeClient.build/Debug-iphonesimulator/ICNativeClient.build/Objects-normal/arm64/CandidCodec.swiftconstvalues",
+    "dependencies" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/baseline-build/Build/Intermediates.noindex/ICNativeClient.build/Debug-iphonesimulator/ICNativeClient.build/Objects-normal/arm64/CandidCodec.d",
+    "diagnostics" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/baseline-build/Build/Intermediates.noindex/ICNativeClient.build/Debug-iphonesimulator/ICNativeClient.build/Objects-normal/arm64/CandidCodec.dia",
+    "index-unit-output-path" : "/ICNativeClient.build/Debug-iphonesimulator/ICNativeClient.build/Objects-normal/arm64/CandidCodec.o",
+    "llvm-bc" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/baseline-build/Build/Intermediates.noindex/ICNativeClient.build/Debug-iphonesimulator/ICNativeClient.build/Objects-normal/arm64/CandidCodec.bc",
+    "object" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/baseline-build/Build/Intermediates.noindex/ICNativeClient.build/Debug-iphonesimulator/ICNativeClient.build/Objects-normal/arm64/CandidCodec.o",
+    "swift-dependencies" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/baseline-build/Build/Intermediates.noindex/ICNativeClient.build/Debug-iphonesimulator/ICNativeClient.build/Objects-normal/arm64/CandidCodec.swiftdeps",
+    "swiftmodule" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/baseline-build/Build/Intermediates.noindex/ICNativeClient.build/Debug-iphonesimulator/ICNativeClient.build/Objects-normal/arm64/CandidCodec~partial.swiftmodule"
+  },
+  "/Volumes/KINGSTON/ICP/ICNativeClient/Sources/ICNativeClient/CandidSubtype.swift" : {
+    "const-values" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/baseline-build/Build/Intermediates.noindex/ICNativeClient.build/Debug-iphonesimulator/ICNativeClient.build/Objects-normal/arm64/CandidSubtype.swiftconstvalues",
+    "dependencies" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/baseline-build/Build/Intermediates.noindex/ICNativeClient.build/Debug-iphonesimulator/ICNativeClient.build/Objects-normal/arm64/CandidSubtype.d",
+    "diagnostics" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/baseline-build/Build/Intermediates.noindex/ICNativeClient.build/Debug-iphonesimulator/ICNativeClient.build/Objects-normal/arm64/CandidSubtype.dia",
+    "index-unit-output-path" : "/ICNativeClient.build/Debug-iphonesimulator/ICNativeClient.build/Objects-normal/arm64/CandidSubtype.o",
+    "llvm-bc" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/baseline-build/Build/Intermediates.noindex/ICNativeClient.build/Debug-iphonesimulator/ICNativeClient.build/Objects-normal/arm64/CandidSubtype.bc",
+    "object" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/baseline-build/Build/Intermediates.noindex/ICNativeClient.build/Debug-iphonesimulator/ICNativeClient.build/Objects-normal/arm64/CandidSubtype.o",
+    "swift-dependencies" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/baseline-build/Build/Intermediates.noindex/ICNativeClient.build/Debug-iphonesimulator/ICNativeClient.build/Objects-normal/arm64/CandidSubtype.swiftdeps",
+    "swiftmodule" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/baseline-build/Build/Intermediates.noindex/ICNativeClient.build/Debug-iphonesimulator/ICNativeClient.build/Objects-normal/arm64/CandidSubtype~partial.swiftmodule"
+  },
+  "/Volumes/KINGSTON/ICP/ICNativeClient/Sources/ICNativeClient/Certificate.swift" : {
+    "const-values" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/baseline-build/Build/Intermediates.noindex/ICNativeClient.build/Debug-iphonesimulator/ICNativeClient.build/Objects-normal/arm64/Certificate.swiftconstvalues",
+    "dependencies" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/baseline-build/Build/Intermediates.noindex/ICNativeClient.build/Debug-iphonesimulator/ICNativeClient.build/Objects-normal/arm64/Certificate.d",
+    "diagnostics" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/baseline-build/Build/Intermediates.noindex/ICNativeClient.build/Debug-iphonesimulator/ICNativeClient.build/Objects-normal/arm64/Certificate.dia",
+    "index-unit-output-path" : "/ICNativeClient.build/Debug-iphonesimulator/ICNativeClient.build/Objects-normal/arm64/Certificate.o",
+    "llvm-bc" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/baseline-build/Build/Intermediates.noindex/ICNativeClient.build/Debug-iphonesimulator/ICNativeClient.build/Objects-normal/arm64/Certificate.bc",
+    "object" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/baseline-build/Build/Intermediates.noindex/ICNativeClient.build/Debug-iphonesimulator/ICNativeClient.build/Objects-normal/arm64/Certificate.o",
+    "swift-dependencies" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/baseline-build/Build/Intermediates.noindex/ICNativeClient.build/Debug-iphonesimulator/ICNativeClient.build/Objects-normal/arm64/Certificate.swiftdeps",
+    "swiftmodule" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/baseline-build/Build/Intermediates.noindex/ICNativeClient.build/Debug-iphonesimulator/ICNativeClient.build/Objects-normal/arm64/Certificate~partial.swiftmodule"
+  },
+  "/Volumes/KINGSTON/ICP/ICNativeClient/Sources/ICNativeClient/Configuration.swift" : {
+    "const-values" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/baseline-build/Build/Intermediates.noindex/ICNativeClient.build/Debug-iphonesimulator/ICNativeClient.build/Objects-normal/arm64/Configuration.swiftconstvalues",
+    "dependencies" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/baseline-build/Build/Intermediates.noindex/ICNativeClient.build/Debug-iphonesimulator/ICNativeClient.build/Objects-normal/arm64/Configuration.d",
+    "diagnostics" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/baseline-build/Build/Intermediates.noindex/ICNativeClient.build/Debug-iphonesimulator/ICNativeClient.build/Objects-normal/arm64/Configuration.dia",
+    "index-unit-output-path" : "/ICNativeClient.build/Debug-iphonesimulator/ICNativeClient.build/Objects-normal/arm64/Configuration.o",
+    "llvm-bc" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/baseline-build/Build/Intermediates.noindex/ICNativeClient.build/Debug-iphonesimulator/ICNativeClient.build/Objects-normal/arm64/Configuration.bc",
+    "object" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/baseline-build/Build/Intermediates.noindex/ICNativeClient.build/Debug-iphonesimulator/ICNativeClient.build/Objects-normal/arm64/Configuration.o",
+    "swift-dependencies" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/baseline-build/Build/Intermediates.noindex/ICNativeClient.build/Debug-iphonesimulator/ICNativeClient.build/Objects-normal/arm64/Configuration.swiftdeps",
+    "swiftmodule" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/baseline-build/Build/Intermediates.noindex/ICNativeClient.build/Debug-iphonesimulator/ICNativeClient.build/Objects-normal/arm64/Configuration~partial.swiftmodule"
+  },
+  "/Volumes/KINGSTON/ICP/ICNativeClient/Sources/ICNativeClient/Errors.swift" : {
+    "const-values" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/baseline-build/Build/Intermediates.noindex/ICNativeClient.build/Debug-iphonesimulator/ICNativeClient.build/Objects-normal/arm64/Errors.swiftconstvalues",
+    "dependencies" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/baseline-build/Build/Intermediates.noindex/ICNativeClient.build/Debug-iphonesimulator/ICNativeClient.build/Objects-normal/arm64/Errors.d",
+    "diagnostics" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/baseline-build/Build/Intermediates.noindex/ICNativeClient.build/Debug-iphonesimulator/ICNativeClient.build/Objects-normal/arm64/Errors.dia",
+    "index-unit-output-path" : "/ICNativeClient.build/Debug-iphonesimulator/ICNativeClient.build/Objects-normal/arm64/Errors.o",
+    "llvm-bc" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/baseline-build/Build/Intermediates.noindex/ICNativeClient.build/Debug-iphonesimulator/ICNativeClient.build/Objects-normal/arm64/Errors.bc",
+    "object" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/baseline-build/Build/Intermediates.noindex/ICNativeClient.build/Debug-iphonesimulator/ICNativeClient.build/Objects-normal/arm64/Errors.o",
+    "swift-dependencies" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/baseline-build/Build/Intermediates.noindex/ICNativeClient.build/Debug-iphonesimulator/ICNativeClient.build/Objects-normal/arm64/Errors.swiftdeps",
+    "swiftmodule" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/baseline-build/Build/Intermediates.noindex/ICNativeClient.build/Debug-iphonesimulator/ICNativeClient.build/Objects-normal/arm64/Errors~partial.swiftmodule"
+  },
+  "/Volumes/KINGSTON/ICP/ICNativeClient/Sources/ICNativeClient/ICClient.swift" : {
+    "const-values" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/baseline-build/Build/Intermediates.noindex/ICNativeClient.build/Debug-iphonesimulator/ICNativeClient.build/Objects-normal/arm64/ICClient.swiftconstvalues",
+    "dependencies" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/baseline-build/Build/Intermediates.noindex/ICNativeClient.build/Debug-iphonesimulator/ICNativeClient.build/Objects-normal/arm64/ICClient.d",
+    "diagnostics" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/baseline-build/Build/Intermediates.noindex/ICNativeClient.build/Debug-iphonesimulator/ICNativeClient.build/Objects-normal/arm64/ICClient.dia",
+    "index-unit-output-path" : "/ICNativeClient.build/Debug-iphonesimulator/ICNativeClient.build/Objects-normal/arm64/ICClient.o",
+    "llvm-bc" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/baseline-build/Build/Intermediates.noindex/ICNativeClient.build/Debug-iphonesimulator/ICNativeClient.build/Objects-normal/arm64/ICClient.bc",
+    "object" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/baseline-build/Build/Intermediates.noindex/ICNativeClient.build/Debug-iphonesimulator/ICNativeClient.build/Objects-normal/arm64/ICClient.o",
+    "swift-dependencies" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/baseline-build/Build/Intermediates.noindex/ICNativeClient.build/Debug-iphonesimulator/ICNativeClient.build/Objects-normal/arm64/ICClient.swiftdeps",
+    "swiftmodule" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/baseline-build/Build/Intermediates.noindex/ICNativeClient.build/Debug-iphonesimulator/ICNativeClient.build/Objects-normal/arm64/ICClient~partial.swiftmodule"
+  },
+  "/Volumes/KINGSTON/ICP/ICNativeClient/Sources/ICNativeClient/ICRC167.swift" : {
+    "const-values" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/baseline-build/Build/Intermediates.noindex/ICNativeClient.build/Debug-iphonesimulator/ICNativeClient.build/Objects-normal/arm64/ICRC167.swiftconstvalues",
+    "dependencies" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/baseline-build/Build/Intermediates.noindex/ICNativeClient.build/Debug-iphonesimulator/ICNativeClient.build/Objects-normal/arm64/ICRC167.d",
+    "diagnostics" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/baseline-build/Build/Intermediates.noindex/ICNativeClient.build/Debug-iphonesimulator/ICNativeClient.build/Objects-normal/arm64/ICRC167.dia",
+    "index-unit-output-path" : "/ICNativeClient.build/Debug-iphonesimulator/ICNativeClient.build/Objects-normal/arm64/ICRC167.o",
+    "llvm-bc" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/baseline-build/Build/Intermediates.noindex/ICNativeClient.build/Debug-iphonesimulator/ICNativeClient.build/Objects-normal/arm64/ICRC167.bc",
+    "object" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/baseline-build/Build/Intermediates.noindex/ICNativeClient.build/Debug-iphonesimulator/ICNativeClient.build/Objects-normal/arm64/ICRC167.o",
+    "swift-dependencies" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/baseline-build/Build/Intermediates.noindex/ICNativeClient.build/Debug-iphonesimulator/ICNativeClient.build/Objects-normal/arm64/ICRC167.swiftdeps",
+    "swiftmodule" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/baseline-build/Build/Intermediates.noindex/ICNativeClient.build/Debug-iphonesimulator/ICNativeClient.build/Objects-normal/arm64/ICRC167~partial.swiftmodule"
+  },
+  "/Volumes/KINGSTON/ICP/ICNativeClient/Sources/ICNativeClient/Identity.swift" : {
+    "const-values" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/baseline-build/Build/Intermediates.noindex/ICNativeClient.build/Debug-iphonesimulator/ICNativeClient.build/Objects-normal/arm64/Identity.swiftconstvalues",
+    "dependencies" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/baseline-build/Build/Intermediates.noindex/ICNativeClient.build/Debug-iphonesimulator/ICNativeClient.build/Objects-normal/arm64/Identity.d",
+    "diagnostics" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/baseline-build/Build/Intermediates.noindex/ICNativeClient.build/Debug-iphonesimulator/ICNativeClient.build/Objects-normal/arm64/Identity.dia",
+    "index-unit-output-path" : "/ICNativeClient.build/Debug-iphonesimulator/ICNativeClient.build/Objects-normal/arm64/Identity.o",
+    "llvm-bc" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/baseline-build/Build/Intermediates.noindex/ICNativeClient.build/Debug-iphonesimulator/ICNativeClient.build/Objects-normal/arm64/Identity.bc",
+    "object" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/baseline-build/Build/Intermediates.noindex/ICNativeClient.build/Debug-iphonesimulator/ICNativeClient.build/Objects-normal/arm64/Identity.o",
+    "swift-dependencies" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/baseline-build/Build/Intermediates.noindex/ICNativeClient.build/Debug-iphonesimulator/ICNativeClient.build/Objects-normal/arm64/Identity.swiftdeps",
+    "swiftmodule" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/baseline-build/Build/Intermediates.noindex/ICNativeClient.build/Debug-iphonesimulator/ICNativeClient.build/Objects-normal/arm64/Identity~partial.swiftmodule"
+  },
+  "/Volumes/KINGSTON/ICP/ICNativeClient/Sources/ICNativeClient/InternetIdentityAuthenticator.swift" : {
+    "const-values" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/baseline-build/Build/Intermediates.noindex/ICNativeClient.build/Debug-iphonesimulator/ICNativeClient.build/Objects-normal/arm64/InternetIdentityAuthenticator.swiftconstvalues",
+    "dependencies" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/baseline-build/Build/Intermediates.noindex/ICNativeClient.build/Debug-iphonesimulator/ICNativeClient.build/Objects-normal/arm64/InternetIdentityAuthenticator.d",
+    "diagnostics" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/baseline-build/Build/Intermediates.noindex/ICNativeClient.build/Debug-iphonesimulator/ICNativeClient.build/Objects-normal/arm64/InternetIdentityAuthenticator.dia",
+    "index-unit-output-path" : "/ICNativeClient.build/Debug-iphonesimulator/ICNativeClient.build/Objects-normal/arm64/InternetIdentityAuthenticator.o",
+    "llvm-bc" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/baseline-build/Build/Intermediates.noindex/ICNativeClient.build/Debug-iphonesimulator/ICNativeClient.build/Objects-normal/arm64/InternetIdentityAuthenticator.bc",
+    "object" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/baseline-build/Build/Intermediates.noindex/ICNativeClient.build/Debug-iphonesimulator/ICNativeClient.build/Objects-normal/arm64/InternetIdentityAuthenticator.o",
+    "swift-dependencies" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/baseline-build/Build/Intermediates.noindex/ICNativeClient.build/Debug-iphonesimulator/ICNativeClient.build/Objects-normal/arm64/InternetIdentityAuthenticator.swiftdeps",
+    "swiftmodule" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/baseline-build/Build/Intermediates.noindex/ICNativeClient.build/Debug-iphonesimulator/ICNativeClient.build/Objects-normal/arm64/InternetIdentityAuthenticator~partial.swiftmodule"
+  },
+  "/Volumes/KINGSTON/ICP/ICNativeClient/Sources/ICNativeClient/Primitives.swift" : {
+    "const-values" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/baseline-build/Build/Intermediates.noindex/ICNativeClient.build/Debug-iphonesimulator/ICNativeClient.build/Objects-normal/arm64/Primitives.swiftconstvalues",
+    "dependencies" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/baseline-build/Build/Intermediates.noindex/ICNativeClient.build/Debug-iphonesimulator/ICNativeClient.build/Objects-normal/arm64/Primitives.d",
+    "diagnostics" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/baseline-build/Build/Intermediates.noindex/ICNativeClient.build/Debug-iphonesimulator/ICNativeClient.build/Objects-normal/arm64/Primitives.dia",
+    "index-unit-output-path" : "/ICNativeClient.build/Debug-iphonesimulator/ICNativeClient.build/Objects-normal/arm64/Primitives.o",
+    "llvm-bc" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/baseline-build/Build/Intermediates.noindex/ICNativeClient.build/Debug-iphonesimulator/ICNativeClient.build/Objects-normal/arm64/Primitives.bc",
+    "object" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/baseline-build/Build/Intermediates.noindex/ICNativeClient.build/Debug-iphonesimulator/ICNativeClient.build/Objects-normal/arm64/Primitives.o",
+    "swift-dependencies" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/baseline-build/Build/Intermediates.noindex/ICNativeClient.build/Debug-iphonesimulator/ICNativeClient.build/Objects-normal/arm64/Primitives.swiftdeps",
+    "swiftmodule" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/baseline-build/Build/Intermediates.noindex/ICNativeClient.build/Debug-iphonesimulator/ICNativeClient.build/Objects-normal/arm64/Primitives~partial.swiftmodule"
+  }
+}

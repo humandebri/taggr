@@ -1,0 +1,226 @@
+diff --git a/ios/TAGGR/TAGGR/Views/AuthSettingsViews.swift b/ios/TAGGR/TAGGR/Views/AuthSettingsViews.swift
+index 536814c3..72418255 100644
+--- a/ios/TAGGR/TAGGR/Views/AuthSettingsViews.swift
++++ b/ios/TAGGR/TAGGR/Views/AuthSettingsViews.swift
+@@ -108,7 +108,7 @@ struct SettingsView: View {
+                                 state.presentIdentitySignInMethodPicker()
+                             } label: {
+                                 Label(
+-                                    state.isAuthenticatingIdentity ? "Signing in..." : "Sign in with Internet Identity",
++                                    state.isAuthenticatingIdentity ? "Signing in..." : "Sign in",
+                                     systemImage: "infinity"
+                                 )
+                             }
+@@ -125,6 +125,10 @@ struct SettingsView: View {
+                             }
+                         }
+                     }
++                    SettingsPanel(title: "Terms & safety") {
++                        SafetyLinksView()
++                        Link("Contact / appeal a restriction", destination: TaggrSafetyStore.siteURL.appendingPathComponent("safety"))
++                    }
+                     let youtubeMode = YouTubeSettingsMode.resolve(
+                         isEnabled: state.youtubeUpload.auth.isEnabled,
+                         isConnected: state.youtubeUpload.auth.isConnected,
+diff --git a/ios/TAGGR/TAGGR/Views/RootView.swift b/ios/TAGGR/TAGGR/Views/RootView.swift
+index 39fbcbe2..50e31e94 100644
+--- a/ios/TAGGR/TAGGR/Views/RootView.swift
++++ b/ios/TAGGR/TAGGR/Views/RootView.swift
+@@ -4,8 +4,42 @@ import UIKit
+ struct RootView: View {
+     @Environment(TaggrAppCoordinator.self) private var state
+     @State private var feedScrollToTopRevision = 0
++    @State private var seedPhrasePresented = false
++    @Environment(\.scenePhase) private var scenePhase
+ 
+     var body: some View {
++        TimelineView(.periodic(from: .now, by: 1)) { timeline in
++            if !state.acceptedSafetyTerms {
++                SafetyGateView()
++            } else {
++                tabs(restrictContent: !state.canAccessUGC || state.safetyPolicy.map({ $0.expiresAt <= timeline.date.timeIntervalSince1970 }) != false)
++                    .id("\(state.safetyScope):\(state.safety.contentRevision)")
++            }
++        }
++        .task(id: "\(state.safetyScope):\(scenePhase)") {
++            guard ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil,
++                  ProcessInfo.processInfo.environment["XCTestBundlePath"] == nil else { return }
++            guard scenePhase == .active else { return }
++            while !Task.isCancelled {
++                await state.safety.refresh(canisterID: state.runtimeConfig.canisterId)
++                if state.safetySuspended { await state.youtubeUpload.cancel() }
++                do { try await Task.sleep(for: .seconds(60)) } catch { break }
++            }
++        }
++        .task(id: "\(state.safetyScope):\(scenePhase)") {
++            guard ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil,
++                  ProcessInfo.processInfo.environment["XCTestBundlePath"] == nil,
++                  scenePhase == .active else { return }
++            while !Task.isCancelled {
++                await state.safety.flushBlockNotifications()
++                do { try await Task.sleep(for: .seconds(60)) } catch { break }
++            }
++        }
++        .tint(TaggrTheme.clickable)
++        .preferredColorScheme(.dark)
++    }
++
++    private func tabs(restrictContent: Bool) -> some View {
+         TabView(selection: Binding(
+             get: { tab },
+             set: { next in
+@@ -16,20 +50,32 @@ struct RootView: View {
+             }
+         )) {
+             NavigationStack {
+-                FeedRouteView(scrollToTopRevision: feedScrollToTopRevision)
++                if restrictContent {
++                    SafetyGateView()
++                } else {
++                    FeedRouteView(scrollToTopRevision: feedScrollToTopRevision)
++                }
+             }
+             .background(FeedTabReselectionObserver(action: handleFeedTabReselection))
+             .tabItem { Label("Feed", systemImage: "list.bullet") }
+             .tag(RootTab.feed)
+ 
+             NavigationStack {
+-                RealmRouteView()
++                if restrictContent {
++                    SafetyGateView()
++                } else {
++                    RealmRouteView()
++                }
+             }
+             .tabItem { Label("Realms", systemImage: "circle.grid.2x2") }
+             .tag(RootTab.realms)
+ 
+             NavigationStack {
+-                InboxView()
++                if restrictContent {
++                    SafetyGateView()
++                } else {
++                    InboxView()
++                }
+             }
+             .tabItem { Label("Inbox", systemImage: "bell") }
+             .badge(state.unreadNotificationCount)
+@@ -48,8 +94,8 @@ struct RootView: View {
+             state.navigate(to: route)
+             return .handled
+         })
+-        .task(id: RouteLoadKey(route: state.route, revision: state.routeLoadRevision)) {
+-            guard state.routeLoadRevision > 0 else { return }
++        .task(id: RouteLoadKey(route: state.route, revision: state.routeLoadRevision, restrictContent: restrictContent)) {
++            guard !restrictContent else { return }
+             await state.loadCurrentRoute()
+         }
+         .overlay(alignment: .top) {
+@@ -93,13 +139,18 @@ struct RootView: View {
+             .padding()
+         }
+         .confirmationDialog(
+-            "Sign in with Internet Identity",
++            "Sign in",
+             isPresented: Binding(
+                 get: { state.identitySignInMethodPickerPresented },
+                 set: { state.identitySignInMethodPickerPresented = $0 }
+             ),
+             titleVisibility: .visible
+         ) {
++            Button("Seed phrase") {
++                state.identitySignInMethodPickerPresented = false
++                state.identitySignInReason = nil
++                seedPhrasePresented = true
++            }
+             ForEach(state.runtimeConfig.availableIdentitySignInMethods, id: \.self) { method in
+                 Button(method.title) {
+                     state.startIdentitySignIn(method, reason: state.identitySignInReason)
+@@ -112,6 +163,11 @@ struct RootView: View {
+                 Text("Choose a sign-in method.")
+             }
+         }
++        .sheet(isPresented: $seedPhrasePresented) {
++            SeedPhraseSignInSheet { phrase in
++                try await state.signInWithSeedPhrase(phrase)
++            }
++        }
+         .tint(TaggrTheme.clickable)
+         .preferredColorScheme(.dark)
+     }
+@@ -172,6 +228,67 @@ struct RootView: View {
+     }
+ }
+ 
++struct SafetyLinksView: View {
++    var body: some View {
++        Link("Terms of Use", destination: TaggrSafetyStore.siteURL.appendingPathComponent("terms"))
++        Link("Privacy Policy", destination: TaggrSafetyStore.siteURL.appendingPathComponent("privacy-policy"))
++    }
++}
++
++private struct SafetyGateView: View {
++    @Environment(TaggrAppCoordinator.self) private var state
++    @State private var agrees = false
++    @State private var retrying = false
++
++    var body: some View {
++        ScrollView {
++            VStack(alignment: .leading, spacing: 20) {
++                Text(state.acceptedSafetyTerms ? (state.safetySuspended ? "Account suspended" : "Safety check unavailable") : "Terms & safety")
++                    .font(.largeTitle.bold())
++                if !state.acceptedSafetyTerms {
++                    Text("Objectionable content and abusive behavior are not tolerated. Do not post pornography, exploitation, threats, hateful abuse, harassment, or illegal material. NSFW posts are unavailable in this iOS app.")
++                    Text("Report posts or users without a token or credit requirement. Blocking immediately hides their content and notifies the iOS operator. The operator reviews reports and acts on violations within 24 hours, removing content and suspending responsible users in the official iOS app. These actions do not delete data or accounts from the decentralized TAGGR network.")
++                    SafetyLinksView()
++                    Toggle("I agree to the Terms of Use and safety rules", isOn: $agrees)
++                    Button("Agree and continue") { state.safety.accept(scope: state.safetyScope) }
++                        .buttonStyle(.borderedProminent)
++                        .disabled(!agrees)
++                } else {
++                    Text(state.safetySuspended ? "Your access to the official TAGGR iOS app is suspended. To appeal, open Account → Terms & safety → Contact / appeal a restriction. Your on-chain account is not deleted." : "Your agreement is saved. Posts are temporarily unavailable while we cannot verify the safety policy. Account and settings remain available.")
++                    SafetyLinksView()
++                    Button("Go to Account") { state.selectRootRoute(.settings) }
++                        .buttonStyle(.borderedProminent)
++                        .accessibilityIdentifier("safetyGoToAccount")
++                    Button("Retry safety check") {
++                        guard !retrying else { return }
++                        retrying = true
++                        Task {
++                            defer { retrying = false }
++                            if state.safetyUserUnconfirmed { await state.refreshCurrentUser() }
++                            await state.safety.refresh(canisterID: state.runtimeConfig.canisterId)
++                        }
++                    }
++                    .disabled(retrying || state.safety.isRefreshing(canisterID: state.runtimeConfig.canisterId))
++                    .accessibilityIdentifier("safetyRetry")
++                    if retrying || state.safety.isRefreshing(canisterID: state.runtimeConfig.canisterId) {
++                        ProgressView("Checking…")
++                    }
++                    if let error = state.safety.refreshErrors[state.runtimeConfig.canisterId] {
++                        Text(error)
++                            .font(.footnote)
++                            .foregroundStyle(.red)
++                            .accessibilityIdentifier("safetyRefreshError")
++                    }
++                }
++                if state.authSession != nil { Button("Sign out", role: .destructive) { state.signOut() } }
++            }
++            .padding(24)
++        }
++        .background(TaggrTheme.background)
++        .onChange(of: state.safetyScope) { _, _ in agrees = false }
++    }
++}
++
+ enum FeedTabReselectionAction: Equatable {
+     case returnToHomeFeed
+     case scrollToTop
+@@ -180,6 +297,7 @@ enum FeedTabReselectionAction: Equatable {
+ private struct RouteLoadKey: Hashable {
+     let route: TaggrRoute
+     let revision: Int
++    let restrictContent: Bool
+ }
+ 
+ private struct FeedRouteView: View {

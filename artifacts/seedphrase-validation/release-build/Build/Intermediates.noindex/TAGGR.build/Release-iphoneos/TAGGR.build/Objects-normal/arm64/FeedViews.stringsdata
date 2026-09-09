@@ -1,0 +1,176 @@
+{
+  "source": "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/ios/TAGGR/TAGGR/Views/FeedViews.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "Create TAGGR user",
+        "location": {
+          "startingColumn": 72,
+          "startingLine": 74
+        }
+      },
+      {
+        "comment": "",
+        "key": "Post",
+        "location": {
+          "startingColumn": 94,
+          "startingLine": 74
+        }
+      },
+      {
+        "comment": "",
+        "key": "Feed",
+        "location": {
+          "startingColumn": 24,
+          "startingLine": 225
+        }
+      },
+      {
+        "comment": "",
+        "key": "Back to feed",
+        "location": {
+          "startingColumn": 41,
+          "startingLine": 232
+        }
+      },
+      {
+        "comment": "",
+        "key": "No posts",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 301
+        }
+      },
+      {
+        "comment": "",
+        "key": "Pull to refresh or switch channels.",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 304
+        }
+      },
+      {
+        "comment": "",
+        "key": "Translated",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 357
+        }
+      },
+      {
+        "comment": "",
+        "key": "Post unavailable in the iOS app.",
+        "location": {
+          "startingColumn": 32,
+          "startingLine": 381
+        }
+      },
+      {
+        "comment": "",
+        "key": "Open realm %@",
+        "location": {
+          "startingColumn": 45,
+          "startingLine": 417
+        }
+      },
+      {
+        "comment": "",
+        "key": "Show full post",
+        "location": {
+          "startingColumn": 35,
+          "startingLine": 435
+        }
+      },
+      {
+        "comment": "",
+        "key": "#%@",
+        "location": {
+          "startingColumn": 14,
+          "startingLine": 689
+        }
+      },
+      {
+        "comment": "",
+        "key": "Poll",
+        "location": {
+          "startingColumn": 23,
+          "startingLine": 765
+        }
+      },
+      {
+        "comment": "",
+        "key": "1 vote",
+        "location": {
+          "startingColumn": 40,
+          "startingLine": 769
+        }
+      },
+      {
+        "comment": "",
+        "key": "%lld votes",
+        "location": {
+          "startingColumn": 51,
+          "startingLine": 769
+        }
+      },
+      {
+        "comment": "",
+        "key": "Vote",
+        "location": {
+          "startingColumn": 28,
+          "startingLine": 787
+        }
+      },
+      {
+        "comment": "",
+        "key": "Vote anonymously",
+        "location": {
+          "startingColumn": 28,
+          "startingLine": 791
+        }
+      },
+      {
+        "comment": "",
+        "key": "%lld%%",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 847
+        }
+      },
+      {
+        "comment": "",
+        "key": "Repost",
+        "location": {
+          "startingColumn": 31,
+          "startingLine": 888
+        }
+      },
+      {
+        "comment": "",
+        "key": "Proposal",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 934
+        }
+      },
+      {
+        "comment": "",
+        "key": "#%lld",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 937
+        }
+      },
+      {
+        "comment": "",
+        "key": "Loading replies",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 1038
+        }
+      }
+    ]
+  },
+  "version": 1
+}

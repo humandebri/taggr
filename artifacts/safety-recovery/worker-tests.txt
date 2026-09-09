@@ -1,0 +1,19 @@
+✔ anonymous reports are durable, idempotent, do not auto-restrict, and emails omit report text (90.763875ms)
+✔ rejects malformed targets, cross-origin writes, overlong input and rate excess (22.6115ms)
+safety_notification_failed { reportID: '617978ff-a700-4e72-8d45-93419c4b4b03', stage: 0 }
+✔ notification failure retains report, retries, sends reminders once, and purges closed reports (6.912166ms)
+✔ admin verifies signature, audience, expiry and exact allowed email (335.783833ms)
+✔ authenticated decisions are audited, published and reversible; anonymous writes fail (52.8585ms)
+✔ missing database never returns a usable policy or receipt (2.512208ms)
+✔ serves every public policy route (50.7105ms)
+✔ homepage is a public app-information page (1.161333ms)
+✔ privacy policy comprehensively discloses Google data handling (1.803583ms)
+✔ supports crawlers and rejects unsupported methods (3.019042ms)
+ℹ tests 10
+ℹ suites 0
+ℹ pass 10
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 626.377958

@@ -1,0 +1,51 @@
+{
+  "" : {
+    "const-values" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/GTMAppAuth.build/Release-iphoneos/GTMAppAuth.build/Objects-normal/arm64/GTMAppAuth-primary.swiftconstvalues",
+    "dependencies" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/GTMAppAuth.build/Release-iphoneos/GTMAppAuth.build/Objects-normal/arm64/GTMAppAuth-primary.d",
+    "diagnostics" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/GTMAppAuth.build/Release-iphoneos/GTMAppAuth.build/Objects-normal/arm64/GTMAppAuth-primary.dia",
+    "emit-module-dependencies" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/GTMAppAuth.build/Release-iphoneos/GTMAppAuth.build/Objects-normal/arm64/GTMAppAuth-primary-emit-module.d",
+    "emit-module-diagnostics" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/GTMAppAuth.build/Release-iphoneos/GTMAppAuth.build/Objects-normal/arm64/GTMAppAuth-primary-emit-module.dia",
+    "pch" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/GTMAppAuth.build/Release-iphoneos/GTMAppAuth.build/Objects-normal/arm64/GTMAppAuth-primary-Bridging-header.pch",
+    "swift-dependencies" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/GTMAppAuth.build/Release-iphoneos/GTMAppAuth.build/Objects-normal/arm64/GTMAppAuth-primary.swiftdeps"
+  },
+  "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/GTMAppAuth.build/Release-iphoneos/GTMAppAuth.build/DerivedSources/resource_bundle_accessor.swift" : {
+    "index-unit-output-path" : "/GTMAppAuth.build/Release-iphoneos/GTMAppAuth.build/Objects-normal/arm64/resource_bundle_accessor.o",
+    "llvm-bc" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/GTMAppAuth.build/Release-iphoneos/GTMAppAuth.build/Objects-normal/arm64/resource_bundle_accessor.bc",
+    "object" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/GTMAppAuth.build/Release-iphoneos/GTMAppAuth.build/Objects-normal/arm64/resource_bundle_accessor.o"
+  },
+  "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/taggr-safety-build/SourcePackages/checkouts/GTMAppAuth/GTMAppAuth/Sources/AuthSession.swift" : {
+    "index-unit-output-path" : "/GTMAppAuth.build/Release-iphoneos/GTMAppAuth.build/Objects-normal/arm64/AuthSession.o",
+    "llvm-bc" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/GTMAppAuth.build/Release-iphoneos/GTMAppAuth.build/Objects-normal/arm64/AuthSession.bc",
+    "object" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/GTMAppAuth.build/Release-iphoneos/GTMAppAuth.build/Objects-normal/arm64/AuthSession.o"
+  },
+  "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/taggr-safety-build/SourcePackages/checkouts/GTMAppAuth/GTMAppAuth/Sources/AuthSessionDelegate.swift" : {
+    "index-unit-output-path" : "/GTMAppAuth.build/Release-iphoneos/GTMAppAuth.build/Objects-normal/arm64/AuthSessionDelegate.o",
+    "llvm-bc" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/GTMAppAuth.build/Release-iphoneos/GTMAppAuth.build/Objects-normal/arm64/AuthSessionDelegate.bc",
+    "object" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/GTMAppAuth.build/Release-iphoneos/GTMAppAuth.build/Objects-normal/arm64/AuthSessionDelegate.o"
+  },
+  "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/taggr-safety-build/SourcePackages/checkouts/GTMAppAuth/GTMAppAuth/Sources/AuthSessionStore.swift" : {
+    "index-unit-output-path" : "/GTMAppAuth.build/Release-iphoneos/GTMAppAuth.build/Objects-normal/arm64/AuthSessionStore.o",
+    "llvm-bc" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/GTMAppAuth.build/Release-iphoneos/GTMAppAuth.build/Objects-normal/arm64/AuthSessionStore.bc",
+    "object" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/GTMAppAuth.build/Release-iphoneos/GTMAppAuth.build/Objects-normal/arm64/AuthSessionStore.o"
+  },
+  "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/taggr-safety-build/SourcePackages/checkouts/GTMAppAuth/GTMAppAuth/Sources/KeychainStore/GTMOAuth2Compatibility.swift" : {
+    "index-unit-output-path" : "/GTMAppAuth.build/Release-iphoneos/GTMAppAuth.build/Objects-normal/arm64/GTMOAuth2Compatibility.o",
+    "llvm-bc" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/GTMAppAuth.build/Release-iphoneos/GTMAppAuth.build/Objects-normal/arm64/GTMOAuth2Compatibility.bc",
+    "object" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/GTMAppAuth.build/Release-iphoneos/GTMAppAuth.build/Objects-normal/arm64/GTMOAuth2Compatibility.o"
+  },
+  "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/taggr-safety-build/SourcePackages/checkouts/GTMAppAuth/GTMAppAuth/Sources/KeychainStore/KeychainAttribute.swift" : {
+    "index-unit-output-path" : "/GTMAppAuth.build/Release-iphoneos/GTMAppAuth.build/Objects-normal/arm64/KeychainAttribute.o",
+    "llvm-bc" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/GTMAppAuth.build/Release-iphoneos/GTMAppAuth.build/Objects-normal/arm64/KeychainAttribute.bc",
+    "object" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/GTMAppAuth.build/Release-iphoneos/GTMAppAuth.build/Objects-normal/arm64/KeychainAttribute.o"
+  },
+  "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/taggr-safety-build/SourcePackages/checkouts/GTMAppAuth/GTMAppAuth/Sources/KeychainStore/KeychainHelper.swift" : {
+    "index-unit-output-path" : "/GTMAppAuth.build/Release-iphoneos/GTMAppAuth.build/Objects-normal/arm64/KeychainHelper.o",
+    "llvm-bc" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/GTMAppAuth.build/Release-iphoneos/GTMAppAuth.build/Objects-normal/arm64/KeychainHelper.bc",
+    "object" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/GTMAppAuth.build/Release-iphoneos/GTMAppAuth.build/Objects-normal/arm64/KeychainHelper.o"
+  },
+  "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/taggr-safety-build/SourcePackages/checkouts/GTMAppAuth/GTMAppAuth/Sources/KeychainStore/KeychainStore.swift" : {
+    "index-unit-output-path" : "/GTMAppAuth.build/Release-iphoneos/GTMAppAuth.build/Objects-normal/arm64/KeychainStore.o",
+    "llvm-bc" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/GTMAppAuth.build/Release-iphoneos/GTMAppAuth.build/Objects-normal/arm64/KeychainStore.bc",
+    "object" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/GTMAppAuth.build/Release-iphoneos/GTMAppAuth.build/Objects-normal/arm64/KeychainStore.o"
+  }
+}

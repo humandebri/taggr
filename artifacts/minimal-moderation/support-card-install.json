@@ -1,0 +1,39 @@
+{
+  "info" : {
+    "arguments" : [
+      "devicectl",
+      "--timeout",
+      "90",
+      "device",
+      "install",
+      "app",
+      "--device",
+      "EF18B302-BBD0-5702-B540-9604CBA0E446",
+      "artifacts/minimal-moderation/build/Build/Products/Debug-iphoneos/TAGGR.app",
+      "--json-output",
+      "artifacts/minimal-moderation/support-card-install.json"
+    ],
+    "commandType" : "devicectl.device.install.app",
+    "environment" : {
+      "TERM" : "dumb"
+    },
+    "jsonVersion" : 3,
+    "outcome" : "success",
+    "version" : "518.31"
+  },
+  "result" : {
+    "deviceIdentifier" : "EF18B302-BBD0-5702-B540-9604CBA0E446",
+    "installedApplications" : [
+      {
+        "bundleID" : "network.taggr.ios",
+        "databaseSequenceNumber" : 2776,
+        "databaseUUID" : "57537F51-8069-4179-BE69-B4771E6A7896",
+        "installationURL" : "file:///private/var/containers/Bundle/Application/2B0EFEBC-E2DC-4C8A-ADAB-E9153C6149BB/TAGGR.app/",
+        "launchServicesIdentifier" : "unknown",
+        "options" : {
+
+        }
+      }
+    ]
+  }
+}

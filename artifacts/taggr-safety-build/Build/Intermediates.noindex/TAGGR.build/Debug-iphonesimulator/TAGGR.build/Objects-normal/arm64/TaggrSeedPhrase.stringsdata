@@ -1,0 +1,56 @@
+{
+  "source": "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/ios/TAGGR/TAGGR/TaggrSeedPhrase.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "Seed phrase",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 73
+        }
+      },
+      {
+        "comment": "",
+        "key": "Seed phrase",
+        "location": {
+          "startingColumn": 33,
+          "startingLine": 38
+        }
+      },
+      {
+        "comment": "",
+        "key": "Enter the same seed phrase you use on TAGGR's website. Spaces and capitalization must match. Internet Identity accounts use their original sign-in method.",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 45
+        }
+      },
+      {
+        "comment": "",
+        "key": "Signing in...",
+        "location": {
+          "startingColumn": 42,
+          "startingLine": 55
+        }
+      },
+      {
+        "comment": "",
+        "key": "Sign in",
+        "location": {
+          "startingColumn": 60,
+          "startingLine": 55
+        }
+      },
+      {
+        "comment": "",
+        "key": "Cancel",
+        "location": {
+          "startingColumn": 28,
+          "startingLine": 77
+        }
+      }
+    ]
+  },
+  "version": 1
+}

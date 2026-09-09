@@ -1,0 +1,89 @@
+{
+  "" : {
+    "diagnostics" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGRTests.build/Objects-normal/arm64/TAGGRTests-primary.dia",
+    "emit-module-dependencies" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGRTests.build/Objects-normal/arm64/TAGGRTests-primary-emit-module.d",
+    "emit-module-diagnostics" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGRTests.build/Objects-normal/arm64/TAGGRTests-primary-emit-module.dia",
+    "pch" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGRTests.build/Objects-normal/arm64/TAGGRTests-primary-Bridging-header.pch",
+    "swift-dependencies" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGRTests.build/Objects-normal/arm64/TAGGRTests-primary.swiftdeps"
+  },
+  "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/ios/TAGGR/TAGGRTests/ImageDraftsTests.swift" : {
+    "const-values" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGRTests.build/Objects-normal/arm64/ImageDraftsTests.swiftconstvalues",
+    "dependencies" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGRTests.build/Objects-normal/arm64/ImageDraftsTests.d",
+    "diagnostics" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGRTests.build/Objects-normal/arm64/ImageDraftsTests.dia",
+    "index-unit-output-path" : "/TAGGR.build/Debug-iphonesimulator/TAGGRTests.build/Objects-normal/arm64/ImageDraftsTests.o",
+    "llvm-bc" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGRTests.build/Objects-normal/arm64/ImageDraftsTests.bc",
+    "object" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGRTests.build/Objects-normal/arm64/ImageDraftsTests.o",
+    "swift-dependencies" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGRTests.build/Objects-normal/arm64/ImageDraftsTests.swiftdeps",
+    "swiftmodule" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGRTests.build/Objects-normal/arm64/ImageDraftsTests~partial.swiftmodule"
+  },
+  "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/ios/TAGGR/TAGGRTests/TaggrActionTests.swift" : {
+    "const-values" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGRTests.build/Objects-normal/arm64/TaggrActionTests.swiftconstvalues",
+    "dependencies" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGRTests.build/Objects-normal/arm64/TaggrActionTests.d",
+    "diagnostics" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGRTests.build/Objects-normal/arm64/TaggrActionTests.dia",
+    "index-unit-output-path" : "/TAGGR.build/Debug-iphonesimulator/TAGGRTests.build/Objects-normal/arm64/TaggrActionTests.o",
+    "llvm-bc" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGRTests.build/Objects-normal/arm64/TaggrActionTests.bc",
+    "object" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGRTests.build/Objects-normal/arm64/TaggrActionTests.o",
+    "swift-dependencies" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGRTests.build/Objects-normal/arm64/TaggrActionTests.swiftdeps",
+    "swiftmodule" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGRTests.build/Objects-normal/arm64/TaggrActionTests~partial.swiftmodule"
+  },
+  "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/ios/TAGGR/TAGGRTests/TaggrFeatureTests.swift" : {
+    "const-values" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGRTests.build/Objects-normal/arm64/TaggrFeatureTests.swiftconstvalues",
+    "dependencies" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGRTests.build/Objects-normal/arm64/TaggrFeatureTests.d",
+    "diagnostics" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGRTests.build/Objects-normal/arm64/TaggrFeatureTests.dia",
+    "index-unit-output-path" : "/TAGGR.build/Debug-iphonesimulator/TAGGRTests.build/Objects-normal/arm64/TaggrFeatureTests.o",
+    "llvm-bc" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGRTests.build/Objects-normal/arm64/TaggrFeatureTests.bc",
+    "object" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGRTests.build/Objects-normal/arm64/TaggrFeatureTests.o",
+    "swift-dependencies" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGRTests.build/Objects-normal/arm64/TaggrFeatureTests.swiftdeps",
+    "swiftmodule" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGRTests.build/Objects-normal/arm64/TaggrFeatureTests~partial.swiftmodule"
+  },
+  "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/ios/TAGGR/TAGGRTests/TaggrIdentityTests.swift" : {
+    "const-values" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGRTests.build/Objects-normal/arm64/TaggrIdentityTests.swiftconstvalues",
+    "dependencies" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGRTests.build/Objects-normal/arm64/TaggrIdentityTests.d",
+    "diagnostics" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGRTests.build/Objects-normal/arm64/TaggrIdentityTests.dia",
+    "index-unit-output-path" : "/TAGGR.build/Debug-iphonesimulator/TAGGRTests.build/Objects-normal/arm64/TaggrIdentityTests.o",
+    "llvm-bc" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGRTests.build/Objects-normal/arm64/TaggrIdentityTests.bc",
+    "object" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGRTests.build/Objects-normal/arm64/TaggrIdentityTests.o",
+    "swift-dependencies" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGRTests.build/Objects-normal/arm64/TaggrIdentityTests.swiftdeps",
+    "swiftmodule" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGRTests.build/Objects-normal/arm64/TaggrIdentityTests~partial.swiftmodule"
+  },
+  "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/ios/TAGGR/TAGGRTests/TaggrPostPresentationTests.swift" : {
+    "const-values" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGRTests.build/Objects-normal/arm64/TaggrPostPresentationTests.swiftconstvalues",
+    "dependencies" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGRTests.build/Objects-normal/arm64/TaggrPostPresentationTests.d",
+    "diagnostics" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGRTests.build/Objects-normal/arm64/TaggrPostPresentationTests.dia",
+    "index-unit-output-path" : "/TAGGR.build/Debug-iphonesimulator/TAGGRTests.build/Objects-normal/arm64/TaggrPostPresentationTests.o",
+    "llvm-bc" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGRTests.build/Objects-normal/arm64/TaggrPostPresentationTests.bc",
+    "object" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGRTests.build/Objects-normal/arm64/TaggrPostPresentationTests.o",
+    "swift-dependencies" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGRTests.build/Objects-normal/arm64/TaggrPostPresentationTests.swiftdeps",
+    "swiftmodule" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGRTests.build/Objects-normal/arm64/TaggrPostPresentationTests~partial.swiftmodule"
+  },
+  "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/ios/TAGGR/TAGGRTests/TaggrRealmTests.swift" : {
+    "const-values" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGRTests.build/Objects-normal/arm64/TaggrRealmTests.swiftconstvalues",
+    "dependencies" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGRTests.build/Objects-normal/arm64/TaggrRealmTests.d",
+    "diagnostics" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGRTests.build/Objects-normal/arm64/TaggrRealmTests.dia",
+    "index-unit-output-path" : "/TAGGR.build/Debug-iphonesimulator/TAGGRTests.build/Objects-normal/arm64/TaggrRealmTests.o",
+    "llvm-bc" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGRTests.build/Objects-normal/arm64/TaggrRealmTests.bc",
+    "object" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGRTests.build/Objects-normal/arm64/TaggrRealmTests.o",
+    "swift-dependencies" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGRTests.build/Objects-normal/arm64/TaggrRealmTests.swiftdeps",
+    "swiftmodule" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGRTests.build/Objects-normal/arm64/TaggrRealmTests~partial.swiftmodule"
+  },
+  "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/ios/TAGGR/TAGGRTests/TaggrStateTests.swift" : {
+    "const-values" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGRTests.build/Objects-normal/arm64/TaggrStateTests.swiftconstvalues",
+    "dependencies" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGRTests.build/Objects-normal/arm64/TaggrStateTests.d",
+    "diagnostics" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGRTests.build/Objects-normal/arm64/TaggrStateTests.dia",
+    "index-unit-output-path" : "/TAGGR.build/Debug-iphonesimulator/TAGGRTests.build/Objects-normal/arm64/TaggrStateTests.o",
+    "llvm-bc" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGRTests.build/Objects-normal/arm64/TaggrStateTests.bc",
+    "object" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGRTests.build/Objects-normal/arm64/TaggrStateTests.o",
+    "swift-dependencies" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGRTests.build/Objects-normal/arm64/TaggrStateTests.swiftdeps",
+    "swiftmodule" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGRTests.build/Objects-normal/arm64/TaggrStateTests~partial.swiftmodule"
+  },
+  "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/ios/TAGGR/TAGGRTests/TaggrTests.swift" : {
+    "const-values" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGRTests.build/Objects-normal/arm64/TaggrTests.swiftconstvalues",
+    "dependencies" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGRTests.build/Objects-normal/arm64/TaggrTests.d",
+    "diagnostics" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGRTests.build/Objects-normal/arm64/TaggrTests.dia",
+    "index-unit-output-path" : "/TAGGR.build/Debug-iphonesimulator/TAGGRTests.build/Objects-normal/arm64/TaggrTests.o",
+    "llvm-bc" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGRTests.build/Objects-normal/arm64/TaggrTests.bc",
+    "object" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGRTests.build/Objects-normal/arm64/TaggrTests.o",
+    "swift-dependencies" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGRTests.build/Objects-normal/arm64/TaggrTests.swiftdeps",
+    "swiftmodule" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGRTests.build/Objects-normal/arm64/TaggrTests~partial.swiftmodule"
+  }
+}

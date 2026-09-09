@@ -1,0 +1,44 @@
+{
+  "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/ios/TAGGR/TAGGR/Views/ImageDrafts.swift" : {
+    "const-values" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-device-install/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGR.build/Objects-normal/arm64/ImageDrafts.swiftconstvalues",
+    "dependencies" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-device-install/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGR.build/Objects-normal/arm64/ImageDrafts.d",
+    "diagnostics" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-device-install/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGR.build/Objects-normal/arm64/ImageDrafts.dia",
+    "object" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-device-install/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGR.build/Objects-normal/arm64/ImageDrafts.o",
+    "swift-dependencies" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-device-install/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGR.build/Objects-normal/arm64/ImageDrafts.swiftdeps"
+  },
+  "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/ios/TAGGR/TAGGR/Views/PostImageLoaderView.swift" : {
+    "const-values" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-device-install/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGR.build/Objects-normal/arm64/PostImageLoaderView.swiftconstvalues",
+    "dependencies" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-device-install/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGR.build/Objects-normal/arm64/PostImageLoaderView.d",
+    "diagnostics" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-device-install/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGR.build/Objects-normal/arm64/PostImageLoaderView.dia",
+    "object" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-device-install/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGR.build/Objects-normal/arm64/PostImageLoaderView.o",
+    "swift-dependencies" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-device-install/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGR.build/Objects-normal/arm64/PostImageLoaderView.swiftdeps"
+  },
+  "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/ios/TAGGR/TAGGR/Views/PostImageViews.swift" : {
+    "const-values" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-device-install/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGR.build/Objects-normal/arm64/PostImageViews.swiftconstvalues",
+    "dependencies" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-device-install/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGR.build/Objects-normal/arm64/PostImageViews.d",
+    "diagnostics" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-device-install/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGR.build/Objects-normal/arm64/PostImageViews.dia",
+    "object" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-device-install/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGR.build/Objects-normal/arm64/PostImageViews.o",
+    "swift-dependencies" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-device-install/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGR.build/Objects-normal/arm64/PostImageViews.swiftdeps"
+  },
+  "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/ios/TAGGR/TAGGR/Views/TaggrImagePagerView.swift" : {
+    "const-values" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-device-install/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGR.build/Objects-normal/arm64/TaggrImagePagerView.swiftconstvalues",
+    "dependencies" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-device-install/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGR.build/Objects-normal/arm64/TaggrImagePagerView.d",
+    "diagnostics" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-device-install/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGR.build/Objects-normal/arm64/TaggrImagePagerView.dia",
+    "object" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-device-install/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGR.build/Objects-normal/arm64/TaggrImagePagerView.o",
+    "swift-dependencies" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-device-install/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGR.build/Objects-normal/arm64/TaggrImagePagerView.swiftdeps"
+  },
+  "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/ios/TAGGR/TAGGR/Views/TaggrMarkdownText.swift" : {
+    "const-values" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-device-install/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGR.build/Objects-normal/arm64/TaggrMarkdownText.swiftconstvalues",
+    "dependencies" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-device-install/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGR.build/Objects-normal/arm64/TaggrMarkdownText.d",
+    "diagnostics" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-device-install/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGR.build/Objects-normal/arm64/TaggrMarkdownText.dia",
+    "object" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-device-install/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGR.build/Objects-normal/arm64/TaggrMarkdownText.o",
+    "swift-dependencies" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-device-install/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGR.build/Objects-normal/arm64/TaggrMarkdownText.swiftdeps"
+  },
+  "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/ios/TAGGR/TAGGR/Views/TaggrPostBodyView.swift" : {
+    "const-values" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-device-install/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGR.build/Objects-normal/arm64/TaggrPostBodyView.swiftconstvalues",
+    "dependencies" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-device-install/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGR.build/Objects-normal/arm64/TaggrPostBodyView.d",
+    "diagnostics" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-device-install/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGR.build/Objects-normal/arm64/TaggrPostBodyView.dia",
+    "object" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-device-install/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGR.build/Objects-normal/arm64/TaggrPostBodyView.o",
+    "swift-dependencies" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-device-install/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGR.build/Objects-normal/arm64/TaggrPostBodyView.swiftdeps"
+  }
+}

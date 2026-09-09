@@ -1,0 +1,4 @@
+module GoogleUtilities_UserDefaults {
+umbrella "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/icnativeclient-077/SourcePackages/checkouts/GoogleUtilities/GoogleUtilities/UserDefaults/Public"
+export *
+}

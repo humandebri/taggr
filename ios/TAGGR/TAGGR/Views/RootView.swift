@@ -4,8 +4,31 @@ import UIKit
 struct RootView: View {
     @Environment(TaggrAppCoordinator.self) private var state
     @State private var feedScrollToTopRevision = 0
+    @State private var seedPhrasePresented = false
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
+        Group {
+            if !state.acceptedSafetyTerms {
+                SafetyGateView()
+            } else {
+                tabs.id(state.safetyScope)
+            }
+        }
+        .task(id: "\(state.runtimeConfig.canisterId):\(scenePhase)") {
+            guard ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil,
+                  ProcessInfo.processInfo.environment["XCTestBundlePath"] == nil,
+                  scenePhase == .active else { return }
+            while !Task.isCancelled {
+                await state.safety.refresh(canisterID: state.runtimeConfig.canisterId)
+                do { try await Task.sleep(for: .seconds(60)) } catch { break }
+            }
+        }
+        .tint(TaggrTheme.clickable)
+        .preferredColorScheme(.dark)
+    }
+
+    private var tabs: some View {
         TabView(selection: Binding(
             get: { tab },
             set: { next in
@@ -49,7 +72,6 @@ struct RootView: View {
             return .handled
         })
         .task(id: RouteLoadKey(route: state.route, revision: state.routeLoadRevision)) {
-            guard state.routeLoadRevision > 0 else { return }
             await state.loadCurrentRoute()
         }
         .overlay(alignment: .top) {
@@ -93,7 +115,7 @@ struct RootView: View {
             .padding()
         }
         .confirmationDialog(
-            "Sign in with Internet Identity",
+            "Sign in",
             isPresented: Binding(
                 get: { state.identitySignInMethodPickerPresented },
                 set: { state.identitySignInMethodPickerPresented = $0 }
@@ -105,11 +127,21 @@ struct RootView: View {
                     state.startIdentitySignIn(method, reason: state.identitySignInReason)
                 }
             }
+            Button("Password") {
+                state.identitySignInMethodPickerPresented = false
+                state.identitySignInReason = nil
+                seedPhrasePresented = true
+            }
         } message: {
             if let reason = state.identitySignInReason {
                 Text(reason)
             } else {
                 Text("Choose a sign-in method.")
+            }
+        }
+        .sheet(isPresented: $seedPhrasePresented) {
+            SeedPhraseSignInSheet { phrase in
+                try await state.signInWithSeedPhrase(phrase)
             }
         }
         .tint(TaggrTheme.clickable)
@@ -169,6 +201,36 @@ struct RootView: View {
         case .scrollToTop:
             feedScrollToTopRevision &+= 1
         }
+    }
+}
+
+struct SafetyLinksView: View {
+    var body: some View {
+        Link("Terms of Use", destination: TaggrSafetyStore.siteURL.appendingPathComponent("terms"))
+        Link("Privacy Policy", destination: TaggrSafetyStore.siteURL.appendingPathComponent("privacy-policy"))
+    }
+}
+
+private struct SafetyGateView: View {
+    @Environment(TaggrAppCoordinator.self) private var state
+    @State private var agrees = false
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 20) {
+                Text("Terms & safety").font(.largeTitle.bold())
+                Text("Objectionable content and abusive behavior are not tolerated. Do not post pornography, exploitation, threats, hateful abuse, harassment, or illegal material. NSFW posts are unavailable in this iOS app.")
+                Text("Use Report on a post or profile to send concerns in the app. No tokens or credits are required. Block immediately hides a user's content. The operator reviews reports within 24 hours and can hide posts or a user's content in the official iOS app.")
+                SafetyLinksView()
+                Toggle("I agree to the Terms of Use and safety rules", isOn: $agrees)
+                Button("Agree and continue") { state.safety.accept(scope: state.safetyScope) }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(!agrees)
+            }
+            .padding(24)
+        }
+        .background(TaggrTheme.background)
+        .onChange(of: state.safetyScope) { _, _ in agrees = false }
     }
 }
 

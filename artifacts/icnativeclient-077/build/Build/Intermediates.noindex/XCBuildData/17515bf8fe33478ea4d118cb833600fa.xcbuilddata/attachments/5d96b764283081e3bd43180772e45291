@@ -1,0 +1,4 @@
+module GTMSessionFetcherCore {
+umbrella "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/icnativeclient-077/SourcePackages/checkouts/gtm-session-fetcher/Sources/Core/Public"
+export *
+}

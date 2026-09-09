@@ -1,0 +1,248 @@
+{
+  "source": "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/baseline/TAGGR/TAGGR/Views/YouTubeUploadView.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "Cancel this YouTube upload?",
+        "location": {
+          "startingColumn": 13,
+          "startingLine": 65
+        }
+      },
+      {
+        "comment": "",
+        "key": "YouTube Upload",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 43
+        }
+      },
+      {
+        "comment": "",
+        "key": "Close",
+        "location": {
+          "startingColumn": 28,
+          "startingLine": 47
+        }
+      },
+      {
+        "comment": "",
+        "key": "Cancel Upload",
+        "location": {
+          "startingColumn": 20,
+          "startingLine": 69
+        }
+      },
+      {
+        "comment": "",
+        "key": "Keep Uploading",
+        "location": {
+          "startingColumn": 20,
+          "startingLine": 72
+        }
+      },
+      {
+        "comment": "",
+        "key": "The video is sent directly from this device to the selected YouTube channel.",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 105
+        }
+      },
+      {
+        "comment": "",
+        "key": "Connecting...",
+        "location": {
+          "startingColumn": 59,
+          "startingLine": 93
+        }
+      },
+      {
+        "comment": "",
+        "key": "Connect YouTube",
+        "location": {
+          "startingColumn": 77,
+          "startingLine": 93
+        }
+      },
+      {
+        "comment": "",
+        "key": "Choose video",
+        "location": {
+          "startingColumn": 43,
+          "startingLine": 122
+        }
+      },
+      {
+        "comment": "",
+        "key": "Choose another video",
+        "location": {
+          "startingColumn": 60,
+          "startingLine": 122
+        }
+      },
+      {
+        "comment": "",
+        "key": "Preparing video...",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 129
+        }
+      },
+      {
+        "comment": "",
+        "key": "%lld/%lld",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 147
+        }
+      },
+      {
+        "comment": "",
+        "key": "%lld/%lld bytes",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 166
+        }
+      },
+      {
+        "comment": "",
+        "key": "Title",
+        "location": {
+          "startingColumn": 23,
+          "startingLine": 142
+        }
+      },
+      {
+        "comment": "",
+        "key": "Visibility",
+        "location": {
+          "startingColumn": 20,
+          "startingLine": 173
+        }
+      },
+      {
+        "comment": "",
+        "key": "Contains realistic altered or synthetic media",
+        "location": {
+          "startingColumn": 20,
+          "startingLine": 193
+        }
+      },
+      {
+        "comment": "",
+        "key": "Read YouTube Community Guidelines",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 200
+        }
+      },
+      {
+        "comment": "",
+        "key": "Description",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 159
+        }
+      },
+      {
+        "comment": "",
+        "key": "Is this video made for kids?",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 181
+        }
+      },
+      {
+        "comment": "",
+        "key": "Is this video made for kids?",
+        "location": {
+          "startingColumn": 24,
+          "startingLine": 183
+        }
+      },
+      {
+        "comment": "",
+        "key": "Is this video made for kids?",
+        "location": {
+          "startingColumn": 37,
+          "startingLine": 190
+        }
+      },
+      {
+        "comment": "",
+        "key": "No",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 184
+        }
+      },
+      {
+        "comment": "",
+        "key": "Yes",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 185
+        }
+      },
+      {
+        "comment": "",
+        "key": "I confirm that I own or may upload this video and that it follows YouTube's Community Guidelines.",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 197
+        }
+      },
+      {
+        "comment": "",
+        "key": "Upload to YouTube",
+        "location": {
+          "startingColumn": 19,
+          "startingLine": 224
+        }
+      },
+      {
+        "comment": "",
+        "key": "The video may remain unavailable while YouTube finishes processing it.",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 271
+        }
+      },
+      {
+        "comment": "",
+        "key": "Insert into draft",
+        "location": {
+          "startingColumn": 24,
+          "startingLine": 274
+        }
+      },
+      {
+        "comment": "",
+        "key": "Retry",
+        "location": {
+          "startingColumn": 28,
+          "startingLine": 259
+        }
+      },
+      {
+        "comment": "",
+        "key": "Cancel",
+        "location": {
+          "startingColumn": 28,
+          "startingLine": 266
+        }
+      },
+      {
+        "comment": "",
+        "key": "Cancel upload",
+        "location": {
+          "startingColumn": 27,
+          "startingLine": 252
+        }
+      }
+    ]
+  },
+  "version": 1
+}

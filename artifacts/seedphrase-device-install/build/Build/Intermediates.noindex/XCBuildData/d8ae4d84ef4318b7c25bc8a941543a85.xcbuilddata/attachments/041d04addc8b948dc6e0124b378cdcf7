@@ -1,0 +1,4 @@
+module GoogleSignIn {
+umbrella header "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/taggr-safety-build/SourcePackages/checkouts/GoogleSignIn-iOS/GoogleSignIn/Sources/Public/GoogleSignIn/GoogleSignIn.h"
+export *
+}

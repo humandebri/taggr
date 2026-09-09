@@ -3,6 +3,7 @@ import SwiftUI
 struct InboxView: View {
     @Environment(TaggrAppCoordinator.self) private var state
     @State private var showArchive = false
+    @State private var postRefreshRevision = 0
 
     var body: some View {
         ZStack {
@@ -21,7 +22,7 @@ struct InboxView: View {
                             InboxZeroView()
                         }
                         ForEach(freshEntries, id: \.id) { item in
-                            InboxNotificationCard(id: item.id, entry: item.entry, archive: false)
+                            InboxNotificationCard(id: item.id, entry: item.entry, archive: false, refreshRevision: postRefreshRevision)
                                 .environment(state)
                         }
                         if !showArchive {
@@ -36,7 +37,7 @@ struct InboxView: View {
                                 .foregroundStyle(TaggrTheme.secondaryText)
                                 .padding(.horizontal, 16)
                             ForEach(archivedEntries, id: \.id) { item in
-                                InboxNotificationCard(id: item.id, entry: item.entry, archive: true)
+                                InboxNotificationCard(id: item.id, entry: item.entry, archive: true, refreshRevision: postRefreshRevision)
                                     .environment(state)
                                     .opacity(0.65)
                             }
@@ -49,7 +50,7 @@ struct InboxView: View {
         .navigationTitle("Inbox")
         .taggrInlineNavigationChrome()
         .taggrBusyOverlay(state.isBusy)
-        .taggrRefreshable()
+        .taggrRefreshable { postRefreshRevision += 1 }
     }
 
     private var freshEntries: [(id: Int, entry: TaggrNotificationEntry)] {
@@ -133,8 +134,25 @@ private struct InboxNotificationCard: View {
     let id: Int
     let entry: TaggrNotificationEntry
     let archive: Bool
+    let refreshRevision: Int
+    @State private var associatedPost: TaggrPost?
 
     var body: some View {
+        Group {
+            if entry.notification.postId == nil || associatedPost.map({ state.canDisplayPost($0) && $0.contentRestriction(viewerID: state.currentUser?.id) == nil }) == true {
+                cardContent
+            }
+        }
+        .task(id: "\(entry.notification.postId.map(String.init) ?? "none"):\(refreshRevision)") {
+            if let id = entry.notification.postId {
+                let post = try? await state.loadNotificationPost(id)
+                guard !Task.isCancelled else { return }
+                associatedPost = post
+            }
+        }
+    }
+
+    private var cardContent: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .top, spacing: 10) {
                 Image(systemName: archive ? "archivebox" : "bell")
@@ -142,7 +160,7 @@ private struct InboxNotificationCard: View {
                     .foregroundStyle(archive ? TaggrTheme.secondaryText : TaggrTheme.clickable)
                     .frame(width: 28)
                 VStack(alignment: .leading, spacing: 8) {
-                    Text(entry.notification.message)
+                    Text(entry.notification.safetyMessage)
                         .font(.subheadline)
                         .foregroundStyle(TaggrTheme.text)
                         .fixedSize(horizontal: false, vertical: true)

@@ -1,0 +1,16 @@
+dependencies: \
+  /tmp/taggr-safety-build/SourcePackages/checkouts/libwebp-Xcode/libwebp/src/enc/picture_psnr_enc.c \
+  /tmp/taggr-safety-build/SourcePackages/checkouts/libwebp-Xcode/libwebp/src/webp/encode.h \
+  /Applications/Xcode-26.5.0.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/clang/21/include/module.modulemap \
+  /tmp/taggr-safety-build/SourcePackages/checkouts/libwebp-Xcode/libwebp/src/webp/./types.h \
+  /Applications/Xcode-26.5.0.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator.sdk/usr/include/DarwinFoundation3.modulemap \
+  /Applications/Xcode-26.5.0.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator.sdk/usr/include/DarwinFoundation2.modulemap \
+  /Applications/Xcode-26.5.0.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator.sdk/usr/include/DarwinFoundation1.modulemap \
+  /tmp/taggr-safety-build/SourcePackages/checkouts/libwebp-Xcode/libwebp/src/webp/types.h \
+  /tmp/taggr-safety-build/SourcePackages/checkouts/libwebp-Xcode/libwebp/src/dsp/dsp.h \
+  /tmp/taggr-safety-build/SourcePackages/checkouts/libwebp-Xcode/libwebp/src/dsp/cpu.h \
+  /tmp/taggr-safety-build/SourcePackages/checkouts/libwebp-Xcode/libwebp/src/enc/vp8i_enc.h \
+  /tmp/taggr-safety-build/SourcePackages/checkouts/libwebp-Xcode/libwebp/src/dec/common_dec.h \
+  /tmp/taggr-safety-build/SourcePackages/checkouts/libwebp-Xcode/libwebp/src/utils/bit_writer_utils.h \
+  /tmp/taggr-safety-build/SourcePackages/checkouts/libwebp-Xcode/libwebp/src/utils/thread_utils.h \
+  /tmp/taggr-safety-build/SourcePackages/checkouts/libwebp-Xcode/libwebp/src/utils/utils.h

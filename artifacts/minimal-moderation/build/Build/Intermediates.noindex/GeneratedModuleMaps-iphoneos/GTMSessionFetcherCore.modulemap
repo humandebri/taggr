@@ -1,0 +1,4 @@
+module GTMSessionFetcherCore {
+umbrella "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/taggr-safety-build/SourcePackages/checkouts/gtm-session-fetcher/Sources/Core/Public"
+export *
+}

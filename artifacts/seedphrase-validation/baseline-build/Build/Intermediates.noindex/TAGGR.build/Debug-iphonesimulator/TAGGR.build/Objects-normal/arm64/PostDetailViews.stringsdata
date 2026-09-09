@@ -1,0 +1,24 @@
+{
+  "source": "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/baseline/TAGGR/TAGGR/Views/PostDetailViews.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "Post not found",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 61
+        }
+      },
+      {
+        "comment": "",
+        "key": "Pull to refresh or return to the timeline.",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 64
+        }
+      }
+    ]
+  },
+  "version": 1
+}

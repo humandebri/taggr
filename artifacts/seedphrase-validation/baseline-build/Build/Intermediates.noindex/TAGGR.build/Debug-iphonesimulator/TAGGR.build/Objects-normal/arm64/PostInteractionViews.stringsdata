@@ -1,0 +1,264 @@
+{
+  "source": "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/baseline/TAGGR/TAGGR/Views/PostInteractionViews.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "Delete post",
+        "location": {
+          "startingColumn": 29,
+          "startingLine": 77
+        }
+      },
+      {
+        "comment": "",
+        "key": "Hide post actions",
+        "location": {
+          "startingColumn": 58,
+          "startingLine": 34
+        }
+      },
+      {
+        "comment": "",
+        "key": "Show post actions",
+        "location": {
+          "startingColumn": 80,
+          "startingLine": 34
+        }
+      },
+      {
+        "comment": "",
+        "key": "Delete",
+        "location": {
+          "startingColumn": 20,
+          "startingLine": 78
+        }
+      },
+      {
+        "comment": "",
+        "key": "Cancel",
+        "location": {
+          "startingColumn": 20,
+          "startingLine": 81
+        }
+      },
+      {
+        "comment": "",
+        "key": "%@ reaction, %lld",
+        "location": {
+          "startingColumn": 41,
+          "startingLine": 96
+        }
+      },
+      {
+        "comment": "",
+        "key": "Add reaction",
+        "location": {
+          "startingColumn": 37,
+          "startingLine": 115
+        }
+      },
+      {
+        "comment": "",
+        "key": "Translating post",
+        "location": {
+          "startingColumn": 45,
+          "startingLine": 131
+        }
+      },
+      {
+        "comment": "",
+        "key": "Hide translation",
+        "location": {
+          "startingColumn": 56,
+          "startingLine": 137
+        }
+      },
+      {
+        "comment": "",
+        "key": "Translate post",
+        "location": {
+          "startingColumn": 77,
+          "startingLine": 137
+        }
+      },
+      {
+        "comment": "",
+        "key": "Hide replies",
+        "location": {
+          "startingColumn": 55,
+          "startingLine": 145
+        }
+      },
+      {
+        "comment": "",
+        "key": "Show replies",
+        "location": {
+          "startingColumn": 72,
+          "startingLine": 145
+        }
+      },
+      {
+        "comment": "",
+        "key": "Clear this draft?",
+        "location": {
+          "startingColumn": 13,
+          "startingLine": 557
+        }
+      },
+      {
+        "comment": "",
+        "key": "I confirmed it was posted",
+        "location": {
+          "startingColumn": 24,
+          "startingLine": 477
+        }
+      },
+      {
+        "comment": "",
+        "key": "Edit and retry",
+        "location": {
+          "startingColumn": 24,
+          "startingLine": 480
+        }
+      },
+      {
+        "comment": "",
+        "key": "Submit",
+        "location": {
+          "startingColumn": 24,
+          "startingLine": 512
+        }
+      },
+      {
+        "comment": "",
+        "key": "Clear Draft",
+        "location": {
+          "startingColumn": 20,
+          "startingLine": 561
+        }
+      },
+      {
+        "comment": "",
+        "key": "Cancel",
+        "location": {
+          "startingColumn": 20,
+          "startingLine": 571
+        }
+      },
+      {
+        "comment": "",
+        "key": "%@ %lld",
+        "location": {
+          "startingColumn": 14,
+          "startingLine": 755
+        }
+      },
+      {
+        "comment": "",
+        "key": "%lld",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 803
+        }
+      },
+      {
+        "comment": "",
+        "key": "$",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 900
+        }
+      },
+      {
+        "comment": "",
+        "key": "A",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 990
+        }
+      },
+      {
+        "comment": "",
+        "key": "React %@",
+        "location": {
+          "startingColumn": 37,
+          "startingLine": 1081
+        }
+      },
+      {
+        "comment": "",
+        "key": "Cancel",
+        "location": {
+          "startingColumn": 24,
+          "startingLine": 1113
+        }
+      },
+      {
+        "comment": "",
+        "key": "Repost",
+        "location": {
+          "startingColumn": 24,
+          "startingLine": 1116
+        }
+      },
+      {
+        "comment": "",
+        "key": "I confirmed it was reposted",
+        "location": {
+          "startingColumn": 28,
+          "startingLine": 1142
+        }
+      },
+      {
+        "comment": "",
+        "key": "Edit and retry",
+        "location": {
+          "startingColumn": 28,
+          "startingLine": 1143
+        }
+      },
+      {
+        "comment": "",
+        "key": "Report received",
+        "location": {
+          "startingColumn": 27,
+          "startingLine": 1263
+        }
+      },
+      {
+        "comment": "",
+        "key": "Report not sent",
+        "location": {
+          "startingColumn": 47,
+          "startingLine": 1263
+        }
+      },
+      {
+        "comment": "",
+        "key": "Cancel",
+        "location": {
+          "startingColumn": 24,
+          "startingLine": 1238
+        }
+      },
+      {
+        "comment": "",
+        "key": "Report",
+        "location": {
+          "startingColumn": 24,
+          "startingLine": 1241
+        }
+      },
+      {
+        "comment": "",
+        "key": "OK",
+        "location": {
+          "startingColumn": 20,
+          "startingLine": 1264
+        }
+      }
+    ]
+  },
+  "version": 1
+}

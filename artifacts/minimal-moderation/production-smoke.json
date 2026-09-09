@@ -1,0 +1,228 @@
+{
+  "time": "2026-09-09T03:14:57.292255+00:00",
+  "report": {
+    "id": "ae5a9b2a-e655-4ae3-80bb-d0318b23f054",
+    "canisterID": "6qfxa-ryaaa-aaaai-qbhsq-cai",
+    "userID": 9007199254740991,
+    "postID": 9007199254740991,
+    "reason": "Deployment smoke test only: nonexistent sentinel target; no user complaint."
+  },
+  "events": [
+    {
+      "name": "initial",
+      "result": {
+        "status": 200,
+        "body": {
+          "canisterID": "6qfxa-ryaaa-aaaai-qbhsq-cai",
+          "version": 0,
+          "postIDs": [],
+          "userIDs": []
+        },
+        "cacheControl": "no-store"
+      }
+    },
+    {
+      "name": "report",
+      "result": {
+        "status": 201,
+        "body": {
+          "id": "ae5a9b2a-e655-4ae3-80bb-d0318b23f054",
+          "status": "received"
+        },
+        "cacheControl": "no-store"
+      }
+    },
+    {
+      "name": "retry",
+      "result": {
+        "status": 201,
+        "body": {
+          "id": "ae5a9b2a-e655-4ae3-80bb-d0318b23f054",
+          "status": "received"
+        },
+        "cacheControl": "no-store"
+      }
+    },
+    {
+      "name": "private-show",
+      "result": [
+        {
+          "results": [
+            {
+              "id": "ae5a9b2a-e655-4ae3-80bb-d0318b23f054",
+              "canister_id": "6qfxa-ryaaa-aaaai-qbhsq-cai",
+              "user_id": 9007199254740991,
+              "post_id": 9007199254740991,
+              "reason": "Deployment smoke test only: nonexistent sentinel target; no user complaint.",
+              "received_at": 1788923698550,
+              "closed_at": null
+            }
+          ],
+          "success": true,
+          "meta": {
+            "served_by": "v3-prod",
+            "served_by_region": "APAC",
+            "served_by_colo": "NRT",
+            "served_by_primary": true,
+            "timings": {
+              "sql_duration_ms": 0.1468
+            },
+            "duration": 0.1468,
+            "changes": 0,
+            "last_row_id": 1,
+            "changed_db": false,
+            "size_after": 45056,
+            "rows_read": 1,
+            "rows_written": 0,
+            "total_attempts": 1
+          }
+        }
+      ]
+    },
+    {
+      "name": "hide",
+      "result": [
+        {
+          "results": [
+            {
+              "id": 1,
+              "canister_id": "6qfxa-ryaaa-aaaai-qbhsq-cai",
+              "kind": "post",
+              "target_id": 9007199254740991,
+              "active": 1,
+              "reason": "Deployment smoke: nonexistent sentinel target",
+              "created_at": 1788923701310
+            }
+          ],
+          "success": true,
+          "meta": {
+            "served_by": "v3-prod",
+            "served_by_region": "APAC",
+            "served_by_colo": "NRT",
+            "served_by_primary": true,
+            "timings": {
+              "sql_duration_ms": 0.3694
+            },
+            "duration": 0.3694,
+            "changes": 1,
+            "last_row_id": 1,
+            "changed_db": true,
+            "size_after": 45056,
+            "rows_read": 2,
+            "rows_written": 3,
+            "total_attempts": 1
+          }
+        }
+      ]
+    },
+    {
+      "name": "hidden-list",
+      "result": {
+        "status": 200,
+        "body": {
+          "canisterID": "6qfxa-ryaaa-aaaai-qbhsq-cai",
+          "version": 1,
+          "postIDs": [
+            9007199254740991
+          ],
+          "userIDs": []
+        },
+        "cacheControl": "no-store"
+      }
+    },
+    {
+      "name": "restore",
+      "result": [
+        {
+          "results": [
+            {
+              "id": 2,
+              "canister_id": "6qfxa-ryaaa-aaaai-qbhsq-cai",
+              "kind": "post",
+              "target_id": 9007199254740991,
+              "active": 0,
+              "reason": "Deployment smoke completed; restore sentinel",
+              "created_at": 1788923703156
+            }
+          ],
+          "success": true,
+          "meta": {
+            "served_by": "v3-prod",
+            "served_by_region": "APAC",
+            "served_by_colo": "NRT",
+            "served_by_primary": true,
+            "timings": {
+              "sql_duration_ms": 0.191
+            },
+            "duration": 0.191,
+            "changes": 1,
+            "last_row_id": 2,
+            "changed_db": true,
+            "size_after": 45056,
+            "rows_read": 3,
+            "rows_written": 3,
+            "total_attempts": 1
+          }
+        }
+      ]
+    },
+    {
+      "name": "close-report",
+      "result": [
+        {
+          "results": [
+            {
+              "id": "ae5a9b2a-e655-4ae3-80bb-d0318b23f054",
+              "closed_at": 1788923704618
+            }
+          ],
+          "success": true,
+          "meta": {
+            "served_by": "v3-prod",
+            "served_by_region": "APAC",
+            "served_by_colo": "NRT",
+            "served_by_primary": true,
+            "timings": {
+              "sql_duration_ms": 0.1663
+            },
+            "duration": 0.1663,
+            "changes": 1,
+            "last_row_id": 2,
+            "changed_db": true,
+            "size_after": 45056,
+            "rows_read": 2,
+            "rows_written": 2,
+            "total_attempts": 1
+          }
+        }
+      ]
+    },
+    {
+      "name": "restored-list",
+      "result": {
+        "status": 200,
+        "body": {
+          "canisterID": "6qfxa-ryaaa-aaaai-qbhsq-cai",
+          "version": 2,
+          "postIDs": [],
+          "userIDs": []
+        },
+        "cacheControl": "no-store"
+      }
+    },
+    {
+      "name": "report-get-rejected",
+      "result": {
+        "status": 405,
+        "body": {
+          "error": "Method not allowed"
+        },
+        "cacheControl": "no-store"
+      }
+    },
+    {
+      "name": "passed",
+      "result": true
+    }
+  ]
+}

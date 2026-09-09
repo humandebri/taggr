@@ -22,14 +22,20 @@ test("serves every public policy route", async () => {
         assert.match(response.headers.get("content-type"), /^text\/html/);
         assert.match(response.headers.get("cache-control"), /no-transform/);
         assert.equal(response.headers.get("x-frame-options"), "DENY");
-        assert.match(response.headers.get("content-security-policy"), /frame-ancestors 'none'/);
+        assert.match(
+            response.headers.get("content-security-policy"),
+            /frame-ancestors 'none'/,
+        );
         assert.match(await response.text(), new RegExp(heading));
     }
 });
 
 test("homepage is a public app-information page", async () => {
     const body = await (await request("/about")).text();
-    assert.match(body, /Every page on this website is publicly accessible/);
+    assert.match(
+        body,
+        /All app-information and legal pages are publicly accessible/,
+    );
     assert.match(body, /What the TAGGR iOS app does/);
     assert.match(body, /Read the TAGGR Privacy Policy/);
     assert.doesNotMatch(body, /Open TAGGR/);

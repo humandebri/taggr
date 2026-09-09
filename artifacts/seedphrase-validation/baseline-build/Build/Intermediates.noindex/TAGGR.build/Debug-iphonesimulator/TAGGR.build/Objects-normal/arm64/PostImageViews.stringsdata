@@ -1,0 +1,32 @@
+{
+  "source": "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/baseline/TAGGR/TAGGR/Views/PostImageViews.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "Open image %lld of %lld",
+        "location": {
+          "startingColumn": 29,
+          "startingLine": 289
+        }
+      },
+      {
+        "comment": "",
+        "key": "+%lld",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 299
+        }
+      },
+      {
+        "comment": "",
+        "key": "%lld / %lld",
+        "location": {
+          "startingColumn": 14,
+          "startingLine": 312
+        }
+      }
+    ]
+  },
+  "version": 1
+}

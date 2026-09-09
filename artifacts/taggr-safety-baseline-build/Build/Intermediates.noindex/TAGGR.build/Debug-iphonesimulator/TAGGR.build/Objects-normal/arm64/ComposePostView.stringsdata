@@ -1,0 +1,120 @@
+{
+  "source": "/tmp/taggr-safety-baseline.ezhNRz/ios/TAGGR/TAGGR/Views/ComposePostView.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "Discard this draft?",
+        "location": {
+          "startingColumn": 13,
+          "startingLine": 173
+        }
+      },
+      {
+        "comment": "",
+        "key": "I confirmed it was posted",
+        "location": {
+          "startingColumn": 40,
+          "startingLine": 99
+        }
+      },
+      {
+        "comment": "",
+        "key": "Edit and retry",
+        "location": {
+          "startingColumn": 40,
+          "startingLine": 102
+        }
+      },
+      {
+        "comment": "",
+        "key": "Discard Draft",
+        "location": {
+          "startingColumn": 20,
+          "startingLine": 177
+        }
+      },
+      {
+        "comment": "",
+        "key": "Cancel",
+        "location": {
+          "startingColumn": 20,
+          "startingLine": 187
+        }
+      },
+      {
+        "comment": "",
+        "key": "Close",
+        "location": {
+          "startingColumn": 20,
+          "startingLine": 515
+        }
+      },
+      {
+        "comment": "",
+        "key": "Discard Draft",
+        "location": {
+          "startingColumn": 24,
+          "startingLine": 530
+        }
+      },
+      {
+        "comment": "",
+        "key": "Attached image. Drag to change its position.",
+        "location": {
+          "startingColumn": 29,
+          "startingLine": 771
+        }
+      },
+      {
+        "comment": "",
+        "key": "Attached image",
+        "location": {
+          "startingColumn": 23,
+          "startingLine": 740
+        }
+      },
+      {
+        "comment": "",
+        "key": "Remove image",
+        "location": {
+          "startingColumn": 20,
+          "startingLine": 745
+        }
+      },
+      {
+        "comment": "",
+        "key": "Cost unavailable",
+        "location": {
+          "startingColumn": 19,
+          "startingLine": 882
+        }
+      },
+      {
+        "comment": "",
+        "key": "Cost %@ credits",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 883
+        }
+      },
+      {
+        "comment": "",
+        "key": "Calculating cost",
+        "location": {
+          "startingColumn": 68,
+          "startingLine": 883
+        }
+      },
+      {
+        "comment": "",
+        "key": "Create storage",
+        "location": {
+          "startingColumn": 27,
+          "startingLine": 927
+        }
+      }
+    ]
+  },
+  "version": 1
+}

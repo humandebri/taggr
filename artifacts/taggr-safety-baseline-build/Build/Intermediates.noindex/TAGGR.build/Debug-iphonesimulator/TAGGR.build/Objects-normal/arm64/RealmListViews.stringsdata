@@ -1,0 +1,64 @@
+{
+  "source": "/tmp/taggr-safety-baseline.ezhNRz/ios/TAGGR/TAGGR/Views/RealmListViews.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "No realms",
+        "location": {
+          "startingColumn": 48,
+          "startingLine": 60
+        }
+      },
+      {
+        "comment": "",
+        "key": "No joined realms",
+        "location": {
+          "startingColumn": 62,
+          "startingLine": 60
+        }
+      },
+      {
+        "comment": "",
+        "key": "REALM",
+        "location": {
+          "startingColumn": 35,
+          "startingLine": 14
+        }
+      },
+      {
+        "comment": "",
+        "key": "Open realm %@",
+        "location": {
+          "startingColumn": 53,
+          "startingLine": 46
+        }
+      },
+      {
+        "comment": "",
+        "key": "# %@",
+        "location": {
+          "startingColumn": 42,
+          "startingLine": 41
+        }
+      },
+      {
+        "comment": "",
+        "key": "Show joined realms",
+        "location": {
+          "startingColumn": 50,
+          "startingLine": 81
+        }
+      },
+      {
+        "comment": "",
+        "key": "Browse all realms",
+        "location": {
+          "startingColumn": 73,
+          "startingLine": 81
+        }
+      }
+    ]
+  },
+  "version": 1
+}

@@ -1,0 +1,23 @@
+{
+  "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/ios/TAGGR/TAGGR/TAGGRApp.swift" : {
+    "const-values" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/taggr-safety-build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGR.build/Objects-normal/arm64/TAGGRApp.swiftconstvalues",
+    "dependencies" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/taggr-safety-build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGR.build/Objects-normal/arm64/TAGGRApp.d",
+    "diagnostics" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/taggr-safety-build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGR.build/Objects-normal/arm64/TAGGRApp.dia",
+    "object" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/taggr-safety-build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGR.build/Objects-normal/arm64/TAGGRApp.o",
+    "swift-dependencies" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/taggr-safety-build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGR.build/Objects-normal/arm64/TAGGRApp.swiftdeps"
+  },
+  "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/ios/TAGGR/TAGGR/Views/FeedViews.swift" : {
+    "const-values" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/taggr-safety-build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGR.build/Objects-normal/arm64/FeedViews.swiftconstvalues",
+    "dependencies" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/taggr-safety-build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGR.build/Objects-normal/arm64/FeedViews.d",
+    "diagnostics" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/taggr-safety-build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGR.build/Objects-normal/arm64/FeedViews.dia",
+    "object" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/taggr-safety-build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGR.build/Objects-normal/arm64/FeedViews.o",
+    "swift-dependencies" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/taggr-safety-build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGR.build/Objects-normal/arm64/FeedViews.swiftdeps"
+  },
+  "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/ios/TAGGR/TAGGR/Views/PostInteractionViews.swift" : {
+    "const-values" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/taggr-safety-build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGR.build/Objects-normal/arm64/PostInteractionViews.swiftconstvalues",
+    "dependencies" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/taggr-safety-build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGR.build/Objects-normal/arm64/PostInteractionViews.d",
+    "diagnostics" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/taggr-safety-build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGR.build/Objects-normal/arm64/PostInteractionViews.dia",
+    "object" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/taggr-safety-build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGR.build/Objects-normal/arm64/PostInteractionViews.o",
+    "swift-dependencies" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/taggr-safety-build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGR.build/Objects-normal/arm64/PostInteractionViews.swiftdeps"
+  }
+}

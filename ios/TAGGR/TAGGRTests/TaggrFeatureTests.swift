@@ -114,26 +114,6 @@ extension TaggrTests {
         XCTAssertEqual(TaggrTokenAmount.format(123, decimals: nil), "123")
     }
 
-    @MainActor
-    func testReportSendsUserIdAndReason() async throws {
-        var calls: [(method: String, arg: Data)] = []
-        let api = makeStubbedAPI { request in
-            if let call = self.requestMethodAndArg(from: request) {
-                calls.append(call)
-            }
-            let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
-            return (response, Self.queryReply(Data("null".utf8)))
-        }
-        let state = TaggrAppCoordinator(api: api)
-        state.authSession = makeAuthSession(privateKey: Curve25519.Signing.PrivateKey())
-
-        await state.report(userId: 7, reason: "misbehavior")
-
-        XCTAssertNil(state.errorMessage)
-        XCTAssertEqual(calls.map(\.method), ["report"])
-        XCTAssertEqual(calls.first?.arg, try TaggrCandid.jsonArguments([7, "misbehavior"]))
-    }
-
     func testUserDecodesEngagementState() throws {
         let data = Data(
             #"""

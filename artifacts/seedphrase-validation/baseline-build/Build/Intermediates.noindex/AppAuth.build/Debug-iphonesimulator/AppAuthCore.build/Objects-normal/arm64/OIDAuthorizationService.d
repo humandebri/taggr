@@ -1,0 +1,27 @@
+dependencies: \
+  /Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/taggr-safety-build/SourcePackages/checkouts/AppAuth-iOS/Sources/AppAuthCore/OIDAuthorizationService.m \
+  /Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/baseline-build/Build/Intermediates.noindex/AppAuth.build/Debug-iphonesimulator/AppAuthCore.build/DerivedSources/resource_bundle_accessor.h \
+  /Applications/Xcode-26.5.0.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator.sdk/System/Library/Frameworks/Foundation.framework/Modules/module.modulemap \
+  /Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/taggr-safety-build/SourcePackages/checkouts/AppAuth-iOS/Sources/AppAuthCore/OIDAuthorizationService.h \
+  /Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/taggr-safety-build/SourcePackages/checkouts/AppAuth-iOS/Sources/AppAuthCore/OIDAuthorizationRequest.h \
+  /Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/taggr-safety-build/SourcePackages/checkouts/AppAuth-iOS/Sources/AppAuthCore/OIDExternalUserAgentRequest.h \
+  /Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/taggr-safety-build/SourcePackages/checkouts/AppAuth-iOS/Sources/AppAuthCore/OIDResponseTypes.h \
+  /Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/taggr-safety-build/SourcePackages/checkouts/AppAuth-iOS/Sources/AppAuthCore/OIDScopes.h \
+  /Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/taggr-safety-build/SourcePackages/checkouts/AppAuth-iOS/Sources/AppAuthCore/OIDAuthorizationResponse.h \
+  /Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/taggr-safety-build/SourcePackages/checkouts/AppAuth-iOS/Sources/AppAuthCore/OIDDefines.h \
+  /Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/taggr-safety-build/SourcePackages/checkouts/AppAuth-iOS/Sources/AppAuthCore/OIDEndSessionRequest.h \
+  /Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/taggr-safety-build/SourcePackages/checkouts/AppAuth-iOS/Sources/AppAuthCore/OIDEndSessionResponse.h \
+  /Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/taggr-safety-build/SourcePackages/checkouts/AppAuth-iOS/Sources/AppAuthCore/OIDErrorUtilities.h \
+  /Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/taggr-safety-build/SourcePackages/checkouts/AppAuth-iOS/Sources/AppAuthCore/OIDError.h \
+  /Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/taggr-safety-build/SourcePackages/checkouts/AppAuth-iOS/Sources/AppAuthCore/OIDExternalUserAgent.h \
+  /Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/taggr-safety-build/SourcePackages/checkouts/AppAuth-iOS/Sources/AppAuthCore/OIDExternalUserAgentSession.h \
+  /Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/taggr-safety-build/SourcePackages/checkouts/AppAuth-iOS/Sources/AppAuthCore/OIDIDToken.h \
+  /Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/taggr-safety-build/SourcePackages/checkouts/AppAuth-iOS/Sources/AppAuthCore/OIDRegistrationRequest.h \
+  /Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/taggr-safety-build/SourcePackages/checkouts/AppAuth-iOS/Sources/AppAuthCore/OIDRegistrationResponse.h \
+  /Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/taggr-safety-build/SourcePackages/checkouts/AppAuth-iOS/Sources/AppAuthCore/OIDServiceConfiguration.h \
+  /Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/taggr-safety-build/SourcePackages/checkouts/AppAuth-iOS/Sources/AppAuthCore/OIDServiceDiscovery.h \
+  /Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/taggr-safety-build/SourcePackages/checkouts/AppAuth-iOS/Sources/AppAuthCore/OIDTokenRequest.h \
+  /Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/taggr-safety-build/SourcePackages/checkouts/AppAuth-iOS/Sources/AppAuthCore/OIDGrantTypes.h \
+  /Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/taggr-safety-build/SourcePackages/checkouts/AppAuth-iOS/Sources/AppAuthCore/OIDTokenResponse.h \
+  /Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/taggr-safety-build/SourcePackages/checkouts/AppAuth-iOS/Sources/AppAuthCore/OIDURLQueryComponent.h \
+  /Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/taggr-safety-build/SourcePackages/checkouts/AppAuth-iOS/Sources/AppAuthCore/OIDURLSessionProvider.h

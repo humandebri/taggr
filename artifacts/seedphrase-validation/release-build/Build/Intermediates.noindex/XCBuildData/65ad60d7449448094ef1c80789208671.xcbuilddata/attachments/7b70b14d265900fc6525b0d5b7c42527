@@ -1,0 +1,251 @@
+{
+  "" : {
+    "const-values" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/TAGGR-primary.swiftconstvalues",
+    "dependencies" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/TAGGR-primary.d",
+    "diagnostics" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/TAGGR-primary.dia",
+    "emit-module-dependencies" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/TAGGR-primary-emit-module.d",
+    "emit-module-diagnostics" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/TAGGR-primary-emit-module.dia",
+    "pch" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/TAGGR-primary-Bridging-header.pch",
+    "swift-dependencies" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/TAGGR-primary.swiftdeps"
+  },
+  "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/BuildToolPluginIntermediates/TAGGR.output/TAGGR/ICNativeClientBindgenPlugin/Generated/ICNativeClientCandidBindings.swift" : {
+    "index-unit-output-path" : "/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/ICNativeClientCandidBindings.o",
+    "llvm-bc" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/ICNativeClientCandidBindings.bc",
+    "object" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/ICNativeClientCandidBindings.o"
+  },
+  "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/TAGGR.build/Release-iphoneos/TAGGR.build/DerivedSources/GeneratedAssetSymbols.swift" : {
+    "index-unit-output-path" : "/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/GeneratedAssetSymbols.o",
+    "llvm-bc" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/GeneratedAssetSymbols.bc",
+    "object" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/GeneratedAssetSymbols.o"
+  },
+  "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/ios/TAGGR/TAGGR/AppActions.swift" : {
+    "index-unit-output-path" : "/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/AppActions.o",
+    "llvm-bc" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/AppActions.bc",
+    "object" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/AppActions.o"
+  },
+  "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/ios/TAGGR/TAGGR/AppState.swift" : {
+    "index-unit-output-path" : "/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/AppState.o",
+    "llvm-bc" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/AppState.bc",
+    "object" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/AppState.o"
+  },
+  "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/ios/TAGGR/TAGGR/AppStores.swift" : {
+    "index-unit-output-path" : "/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/AppStores.o",
+    "llvm-bc" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/AppStores.bc",
+    "object" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/AppStores.o"
+  },
+  "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/ios/TAGGR/TAGGR/PostDraftStore.swift" : {
+    "index-unit-output-path" : "/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/PostDraftStore.o",
+    "llvm-bc" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/PostDraftStore.bc",
+    "object" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/PostDraftStore.o"
+  },
+  "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/ios/TAGGR/TAGGR/TAGGRApp.swift" : {
+    "index-unit-output-path" : "/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/TAGGRApp.o",
+    "llvm-bc" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/TAGGRApp.bc",
+    "object" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/TAGGRApp.o"
+  },
+  "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/ios/TAGGR/TAGGR/TaggrAPI/TaggrAPI.swift" : {
+    "index-unit-output-path" : "/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/TaggrAPI.o",
+    "llvm-bc" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/TaggrAPI.bc",
+    "object" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/TaggrAPI.o"
+  },
+  "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/ios/TAGGR/TAGGR/TaggrAPI/TaggrCandidAdapter.swift" : {
+    "index-unit-output-path" : "/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/TaggrCandidAdapter.o",
+    "llvm-bc" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/TaggrCandidAdapter.bc",
+    "object" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/TaggrCandidAdapter.o"
+  },
+  "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/ios/TAGGR/TAGGR/TaggrAPI/TaggrCandidSupport.swift" : {
+    "index-unit-output-path" : "/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/TaggrCandidSupport.o",
+    "llvm-bc" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/TaggrCandidSupport.bc",
+    "object" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/TaggrCandidSupport.o"
+  },
+  "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/ios/TAGGR/TAGGR/TaggrModels/TaggrAccountImage.swift" : {
+    "index-unit-output-path" : "/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/TaggrAccountImage.o",
+    "llvm-bc" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/TaggrAccountImage.bc",
+    "object" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/TaggrAccountImage.o"
+  },
+  "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/ios/TAGGR/TAGGR/TaggrModels/TaggrEditPatch.swift" : {
+    "index-unit-output-path" : "/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/TaggrEditPatch.o",
+    "llvm-bc" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/TaggrEditPatch.bc",
+    "object" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/TaggrEditPatch.o"
+  },
+  "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/ios/TAGGR/TAGGR/TaggrModels/TaggrModels.swift" : {
+    "index-unit-output-path" : "/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/TaggrModels.o",
+    "llvm-bc" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/TaggrModels.bc",
+    "object" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/TaggrModels.o"
+  },
+  "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/ios/TAGGR/TAGGR/TaggrModels/TaggrPostContentRestriction.swift" : {
+    "index-unit-output-path" : "/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/TaggrPostContentRestriction.o",
+    "llvm-bc" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/TaggrPostContentRestriction.bc",
+    "object" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/TaggrPostContentRestriction.o"
+  },
+  "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/ios/TAGGR/TAGGR/TaggrModels/TaggrRealm.swift" : {
+    "index-unit-output-path" : "/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/TaggrRealm.o",
+    "llvm-bc" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/TaggrRealm.bc",
+    "object" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/TaggrRealm.o"
+  },
+  "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/ios/TAGGR/TAGGR/TaggrModels/TaggrRelativeTime.swift" : {
+    "index-unit-output-path" : "/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/TaggrRelativeTime.o",
+    "llvm-bc" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/TaggrRelativeTime.bc",
+    "object" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/TaggrRelativeTime.o"
+  },
+  "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/ios/TAGGR/TAGGR/TaggrNavigation/TaggrNavigation.swift" : {
+    "index-unit-output-path" : "/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/TaggrNavigation.o",
+    "llvm-bc" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/TaggrNavigation.bc",
+    "object" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/TaggrNavigation.o"
+  },
+  "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/ios/TAGGR/TAGGR/TaggrRuntimeConfig.swift" : {
+    "index-unit-output-path" : "/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/TaggrRuntimeConfig.o",
+    "llvm-bc" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/TaggrRuntimeConfig.bc",
+    "object" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/TaggrRuntimeConfig.o"
+  },
+  "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/ios/TAGGR/TAGGR/TaggrSafetyStore.swift" : {
+    "index-unit-output-path" : "/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/TaggrSafetyStore.o",
+    "llvm-bc" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/TaggrSafetyStore.bc",
+    "object" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/TaggrSafetyStore.o"
+  },
+  "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/ios/TAGGR/TAGGR/TaggrSeedPhrase.swift" : {
+    "index-unit-output-path" : "/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/TaggrSeedPhrase.o",
+    "llvm-bc" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/TaggrSeedPhrase.bc",
+    "object" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/TaggrSeedPhrase.o"
+  },
+  "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/ios/TAGGR/TAGGR/Views/AccountImagePagerView.swift" : {
+    "index-unit-output-path" : "/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/AccountImagePagerView.o",
+    "llvm-bc" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/AccountImagePagerView.bc",
+    "object" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/AccountImagePagerView.o"
+  },
+  "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/ios/TAGGR/TAGGR/Views/AuthSettingsViews.swift" : {
+    "index-unit-output-path" : "/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/AuthSettingsViews.o",
+    "llvm-bc" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/AuthSettingsViews.bc",
+    "object" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/AuthSettingsViews.o"
+  },
+  "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/ios/TAGGR/TAGGR/Views/ComposePostAttachmentBar.swift" : {
+    "index-unit-output-path" : "/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/ComposePostAttachmentBar.o",
+    "llvm-bc" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/ComposePostAttachmentBar.bc",
+    "object" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/ComposePostAttachmentBar.o"
+  },
+  "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/ios/TAGGR/TAGGR/Views/ComposePostView.swift" : {
+    "index-unit-output-path" : "/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/ComposePostView.o",
+    "llvm-bc" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/ComposePostView.bc",
+    "object" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/ComposePostView.o"
+  },
+  "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/ios/TAGGR/TAGGR/Views/FeedViews.swift" : {
+    "index-unit-output-path" : "/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/FeedViews.o",
+    "llvm-bc" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/FeedViews.bc",
+    "object" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/FeedViews.o"
+  },
+  "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/ios/TAGGR/TAGGR/Views/ImageDrafts.swift" : {
+    "index-unit-output-path" : "/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/ImageDrafts.o",
+    "llvm-bc" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/ImageDrafts.bc",
+    "object" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/ImageDrafts.o"
+  },
+  "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/ios/TAGGR/TAGGR/Views/InboxView.swift" : {
+    "index-unit-output-path" : "/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/InboxView.o",
+    "llvm-bc" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/InboxView.bc",
+    "object" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/InboxView.o"
+  },
+  "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/ios/TAGGR/TAGGR/Views/PostComposerMode.swift" : {
+    "index-unit-output-path" : "/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/PostComposerMode.o",
+    "llvm-bc" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/PostComposerMode.bc",
+    "object" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/PostComposerMode.o"
+  },
+  "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/ios/TAGGR/TAGGR/Views/PostDetailViews.swift" : {
+    "index-unit-output-path" : "/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/PostDetailViews.o",
+    "llvm-bc" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/PostDetailViews.bc",
+    "object" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/PostDetailViews.o"
+  },
+  "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/ios/TAGGR/TAGGR/Views/PostImageLoaderView.swift" : {
+    "index-unit-output-path" : "/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/PostImageLoaderView.o",
+    "llvm-bc" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/PostImageLoaderView.bc",
+    "object" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/PostImageLoaderView.o"
+  },
+  "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/ios/TAGGR/TAGGR/Views/PostImageViews.swift" : {
+    "index-unit-output-path" : "/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/PostImageViews.o",
+    "llvm-bc" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/PostImageViews.bc",
+    "object" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/PostImageViews.o"
+  },
+  "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/ios/TAGGR/TAGGR/Views/PostInteractionViews.swift" : {
+    "index-unit-output-path" : "/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/PostInteractionViews.o",
+    "llvm-bc" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/PostInteractionViews.bc",
+    "object" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/PostInteractionViews.o"
+  },
+  "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/ios/TAGGR/TAGGR/Views/PostReactionDetailsView.swift" : {
+    "index-unit-output-path" : "/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/PostReactionDetailsView.o",
+    "llvm-bc" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/PostReactionDetailsView.bc",
+    "object" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/PostReactionDetailsView.o"
+  },
+  "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/ios/TAGGR/TAGGR/Views/ProfileViews.swift" : {
+    "index-unit-output-path" : "/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/ProfileViews.o",
+    "llvm-bc" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/ProfileViews.bc",
+    "object" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/ProfileViews.o"
+  },
+  "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/ios/TAGGR/TAGGR/Views/RealmListViews.swift" : {
+    "index-unit-output-path" : "/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/RealmListViews.o",
+    "llvm-bc" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/RealmListViews.bc",
+    "object" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/RealmListViews.o"
+  },
+  "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/ios/TAGGR/TAGGR/Views/RealmViews.swift" : {
+    "index-unit-output-path" : "/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/RealmViews.o",
+    "llvm-bc" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/RealmViews.bc",
+    "object" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/RealmViews.o"
+  },
+  "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/ios/TAGGR/TAGGR/Views/RootView.swift" : {
+    "index-unit-output-path" : "/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/RootView.o",
+    "llvm-bc" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/RootView.bc",
+    "object" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/RootView.o"
+  },
+  "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/ios/TAGGR/TAGGR/Views/SharedViews.swift" : {
+    "index-unit-output-path" : "/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/SharedViews.o",
+    "llvm-bc" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/SharedViews.bc",
+    "object" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/SharedViews.o"
+  },
+  "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/ios/TAGGR/TAGGR/Views/TaggrImagePagerView.swift" : {
+    "index-unit-output-path" : "/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/TaggrImagePagerView.o",
+    "llvm-bc" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/TaggrImagePagerView.bc",
+    "object" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/TaggrImagePagerView.o"
+  },
+  "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/ios/TAGGR/TAGGR/Views/TaggrMarkdownText.swift" : {
+    "index-unit-output-path" : "/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/TaggrMarkdownText.o",
+    "llvm-bc" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/TaggrMarkdownText.bc",
+    "object" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/TaggrMarkdownText.o"
+  },
+  "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/ios/TAGGR/TAGGR/Views/TaggrPostBodyView.swift" : {
+    "index-unit-output-path" : "/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/TaggrPostBodyView.o",
+    "llvm-bc" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/TaggrPostBodyView.bc",
+    "object" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/TaggrPostBodyView.o"
+  },
+  "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/ios/TAGGR/TAGGR/Views/TaggrRefreshable.swift" : {
+    "index-unit-output-path" : "/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/TaggrRefreshable.o",
+    "llvm-bc" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/TaggrRefreshable.bc",
+    "object" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/TaggrRefreshable.o"
+  },
+  "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/ios/TAGGR/TAGGR/Views/TaggrTheme.swift" : {
+    "index-unit-output-path" : "/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/TaggrTheme.o",
+    "llvm-bc" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/TaggrTheme.bc",
+    "object" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/TaggrTheme.o"
+  },
+  "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/ios/TAGGR/TAGGR/Views/UserAttributeBadgesView.swift" : {
+    "index-unit-output-path" : "/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/UserAttributeBadgesView.o",
+    "llvm-bc" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/UserAttributeBadgesView.bc",
+    "object" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/UserAttributeBadgesView.o"
+  },
+  "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/ios/TAGGR/TAGGR/Views/UserImageLibraryView.swift" : {
+    "index-unit-output-path" : "/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/UserImageLibraryView.o",
+    "llvm-bc" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/UserImageLibraryView.bc",
+    "object" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/UserImageLibraryView.o"
+  },
+  "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/ios/TAGGR/TAGGR/Views/YouTubeEmbedView.swift" : {
+    "index-unit-output-path" : "/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/YouTubeEmbedView.o",
+    "llvm-bc" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/YouTubeEmbedView.bc",
+    "object" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/YouTubeEmbedView.o"
+  },
+  "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/ios/TAGGR/TAGGR/Views/YouTubeUploadView.swift" : {
+    "index-unit-output-path" : "/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/YouTubeUploadView.o",
+    "llvm-bc" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/YouTubeUploadView.bc",
+    "object" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/YouTubeUploadView.o"
+  },
+  "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/ios/TAGGR/TAGGR/YouTubeUpload.swift" : {
+    "index-unit-output-path" : "/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/YouTubeUpload.o",
+    "llvm-bc" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/YouTubeUpload.bc",
+    "object" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/TAGGR.build/Release-iphoneos/TAGGR.build/Objects-normal/arm64/YouTubeUpload.o"
+  }
+}

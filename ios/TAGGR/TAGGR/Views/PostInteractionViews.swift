@@ -248,13 +248,13 @@ struct PostEngagementBar: View {
             state.errorMessage = "Create a TAGGR user before reacting."
             state.route = .settings
         } else {
-            state.startIdentitySignIn(reason: "Sign in with Internet Identity before reacting.")
+            state.startIdentitySignIn(reason: "Sign in before reacting.")
         }
     }
 
     func explainReactionRequirement() {
         if state.authSession == nil {
-            state.errorMessage = "Sign in with Internet Identity before reacting."
+            state.errorMessage = "Sign in before reacting."
         } else if state.currentUser == nil {
             state.errorMessage = "Create a TAGGR user before reacting."
             state.route = .settings
@@ -306,6 +306,7 @@ struct PostInlineActionPanel: View {
                     }
                     .buttonStyle(.plain)
 
+                    PostExpandedActionButton(title: "Report", kind: .report, destructive: true, action: report)
                     if signedIn {
                         PostExpandedActionButton(title: watching ? "Unwatch" : "Watch", kind: watching ? .unwatch : .watch, selected: watching, action: toggleWatch)
                         PostExpandedActionButton(title: "Repost", kind: .repost, action: repost)
@@ -320,7 +321,6 @@ struct PostInlineActionPanel: View {
                         if canDelete {
                             PostExpandedActionButton(title: "Delete", kind: .delete, destructive: true, action: delete)
                         }
-                        PostExpandedActionButton(title: "Report", kind: .report, destructive: true, action: report)
                         if canReply {
                             PostExpandedActionButton(
                                 title: "Clear Draft",
@@ -1223,55 +1223,73 @@ struct RepostSheet: View {
 }
 
 struct ReportPostSheet: View {
-    @Environment(TaggrAppCoordinator.self) private var state
     let post: TaggrPost
     @Binding var isPresented: Bool
+
+    var body: some View {
+        ContentReportSheet(userID: post.user, postID: post.id, isPresented: $isPresented)
+    }
+}
+
+struct ContentReportSheet: View {
+    @Environment(TaggrAppCoordinator.self) private var state
+    let userID: Int
+    let postID: Int?
+    @Binding var isPresented: Bool
     @State private var reason = ""
+    @State private var requestID = UUID()
     @State private var isSubmitting = false
+    @State private var received = false
+    @State private var resultMessage: String?
 
     var body: some View {
         VStack(spacing: 14) {
             HStack {
-                Button("Cancel") { isPresented = false }
-                    .foregroundStyle(TaggrTheme.secondaryText)
+                Button("Cancel") { isPresented = false }.disabled(isSubmitting)
                 Spacer()
-                Button("Report") { submit() }
-                    .font(.subheadline.weight(.bold))
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 16)
-                    .frame(height: 36)
-                    .background(canSubmit ? .red : TaggrTheme.panelRaised)
-                    .clipShape(Capsule())
-                    .disabled(!canSubmit || isSubmitting || state.isBusy)
+                Button("Send report") { submit() }
+                    .disabled(!canSubmit || isSubmitting)
+                    .accessibilityIdentifier("sendContentReport")
             }
+            Text("Send a report to the iOS operator. No tokens or credits are required. Reports are reviewed manually; they do not automatically hide content.")
+                .font(.footnote)
             TextEditor(text: $reason)
+                .accessibilityIdentifier("contentReportReason")
+                .disabled(isSubmitting)
                 .scrollContentBackground(.hidden)
                 .foregroundStyle(TaggrTheme.text)
                 .frame(minHeight: 160)
                 .padding(8)
                 .background(TaggrTheme.panelRaised)
                 .clipShape(RoundedRectangle(cornerRadius: 8))
+            if isSubmitting { ProgressView("Sending…") }
             Spacer()
         }
         .padding(16)
         .background(TaggrTheme.background)
-        .presentationDetents([.medium])
+        .presentationDetents([.medium, .large])
+        .interactiveDismissDisabled(isSubmitting)
+        .onChange(of: reason) { _, _ in requestID = UUID() }
+        .alert(received ? "Report received" : "Report not sent", isPresented: Binding(get: { resultMessage != nil }, set: { if !$0 { resultMessage = nil } })) {
+            Button("OK") { if received { isPresented = false } }
+        } message: { Text(resultMessage ?? "") }
     }
 
-    var canSubmit: Bool {
-        !reason.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    private var canSubmit: Bool {
+        !reason.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && reason.unicodeScalars.count <= 2000
     }
 
-    func submit() {
-        let trimmed = reason.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty, !isSubmitting else { return }
+    private func submit() {
+        guard canSubmit, !isSubmitting else { return }
         isSubmitting = true
+        let report = TaggrContentReport(id: requestID.uuidString, canisterID: state.runtimeConfig.canisterId, userID: userID, postID: postID, reason: reason)
         Task {
-            await state.report(userId: post.user, reason: trimmed)
-            isSubmitting = false
-            if state.errorMessage == nil {
-                isPresented = false
-            }
+            defer { isSubmitting = false }
+            do {
+                try await state.safety.sendReport(report)
+                received = true
+                resultMessage = "The operator received your report."
+            } catch { resultMessage = error.localizedDescription }
         }
     }
 }

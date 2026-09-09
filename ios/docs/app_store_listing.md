@@ -84,5 +84,6 @@ App Store Connect.
 ## Review Notes Linkage
 
 Use `ios/docs/app_store_review.md` for App Review notes. Before final submission,
-add one production invite code with enough credits for reviewer account creation
-and report/block testing.
+provide the dedicated review account username and seed phrase privately in App
+Store Connect, and verify it has enough credits for review. Reuse that account
+for subsequent submissions; do not commit its credentials.

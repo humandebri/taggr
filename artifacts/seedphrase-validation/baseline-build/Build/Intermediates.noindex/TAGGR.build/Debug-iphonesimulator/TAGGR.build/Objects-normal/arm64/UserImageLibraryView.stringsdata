@@ -1,0 +1,24 @@
+{
+  "source": "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/baseline/TAGGR/TAGGR/Views/UserImageLibraryView.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "Images attached to posts will appear here.",
+        "location": {
+          "startingColumn": 47,
+          "startingLine": 30
+        }
+      },
+      {
+        "comment": "",
+        "key": "No posted images",
+        "location": {
+          "startingColumn": 29,
+          "startingLine": 28
+        }
+      }
+    ]
+  },
+  "version": 1
+}

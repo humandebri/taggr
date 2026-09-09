@@ -1,0 +1,34 @@
+dependencies: \
+  /tmp/taggr-safety-build/SourcePackages/checkouts/ICNativeClient/Vendor/blst/src/server.c \
+  /tmp/taggr-safety-build/SourcePackages/checkouts/ICNativeClient/Vendor/blst/src/keygen.c \
+  /tmp/taggr-safety-build/SourcePackages/checkouts/ICNativeClient/Vendor/blst/src/consts.h \
+  /tmp/taggr-safety-build/SourcePackages/checkouts/ICNativeClient/Vendor/blst/src/vect.h \
+  /Applications/Xcode-26.5.0.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/clang/21/include/module.modulemap \
+  /Applications/Xcode-26.5.0.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator.sdk/usr/include/DarwinFoundation3.modulemap \
+  /tmp/taggr-safety-build/SourcePackages/checkouts/ICNativeClient/Vendor/blst/src/bytes.h \
+  /tmp/taggr-safety-build/SourcePackages/checkouts/ICNativeClient/Vendor/blst/src/sha256.h \
+  /tmp/taggr-safety-build/SourcePackages/checkouts/ICNativeClient/Vendor/blst/src/hash_to_field.c \
+  /tmp/taggr-safety-build/SourcePackages/checkouts/ICNativeClient/Vendor/blst/src/e1.c \
+  /tmp/taggr-safety-build/SourcePackages/checkouts/ICNativeClient/Vendor/blst/src/point.h \
+  /tmp/taggr-safety-build/SourcePackages/checkouts/ICNativeClient/Vendor/blst/src/fields.h \
+  /tmp/taggr-safety-build/SourcePackages/checkouts/ICNativeClient/Vendor/blst/src/errors.h \
+  /tmp/taggr-safety-build/SourcePackages/checkouts/ICNativeClient/Vendor/blst/src/ec_ops.h \
+  /tmp/taggr-safety-build/SourcePackages/checkouts/ICNativeClient/Vendor/blst/src/ec_mult.h \
+  /tmp/taggr-safety-build/SourcePackages/checkouts/ICNativeClient/Vendor/blst/src/map_to_g1.c \
+  /tmp/taggr-safety-build/SourcePackages/checkouts/ICNativeClient/Vendor/blst/src/e2.c \
+  /tmp/taggr-safety-build/SourcePackages/checkouts/ICNativeClient/Vendor/blst/src/map_to_g2.c \
+  /tmp/taggr-safety-build/SourcePackages/checkouts/ICNativeClient/Vendor/blst/src/fp12_tower.c \
+  /tmp/taggr-safety-build/SourcePackages/checkouts/ICNativeClient/Vendor/blst/src/pairing.c \
+  /tmp/taggr-safety-build/SourcePackages/checkouts/ICNativeClient/Vendor/blst/src/aggregate.c \
+  /tmp/taggr-safety-build/SourcePackages/checkouts/ICNativeClient/Vendor/blst/src/exp.c \
+  /tmp/taggr-safety-build/SourcePackages/checkouts/ICNativeClient/Vendor/blst/src/sqrt.c \
+  /tmp/taggr-safety-build/SourcePackages/checkouts/ICNativeClient/Vendor/blst/src/sqrt-addchain.h \
+  /tmp/taggr-safety-build/SourcePackages/checkouts/ICNativeClient/Vendor/blst/src/recip.c \
+  /tmp/taggr-safety-build/SourcePackages/checkouts/ICNativeClient/Vendor/blst/src/recip-addchain.h \
+  /tmp/taggr-safety-build/SourcePackages/checkouts/ICNativeClient/Vendor/blst/src/bulk_addition.c \
+  /tmp/taggr-safety-build/SourcePackages/checkouts/ICNativeClient/Vendor/blst/src/multi_scalar.c \
+  /tmp/taggr-safety-build/SourcePackages/checkouts/ICNativeClient/Vendor/blst/src/consts.c \
+  /tmp/taggr-safety-build/SourcePackages/checkouts/ICNativeClient/Vendor/blst/src/vect.c \
+  /tmp/taggr-safety-build/SourcePackages/checkouts/ICNativeClient/Vendor/blst/src/exports.c \
+  /tmp/taggr-safety-build/SourcePackages/checkouts/ICNativeClient/Vendor/blst/src/rb_tree.c \
+  /tmp/taggr-safety-build/SourcePackages/checkouts/ICNativeClient/Vendor/blst/src/cpuid.c

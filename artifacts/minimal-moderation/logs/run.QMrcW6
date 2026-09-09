@@ -1,0 +1,219 @@
+Command line invocation:
+    /Applications/Xcode-26.5.0.app/Contents/Developer/usr/bin/xcodebuild -workspace artifacts/seedphrase-validation/TAGGR.xcworkspace -scheme TAGGR -configuration Debug -destination platform=iOS,id=00008120-00046DC63C44A01E -derivedDataPath artifacts/minimal-moderation/build -clonedSourcePackagesDirPath artifacts/taggr-safety-build/SourcePackages -disableAutomaticPackageResolution CODE_SIGN_STYLE=Manual "CODE_SIGN_IDENTITY=Apple Development: Created via API (SHLM3M9VHP)" PROVISIONING_PROFILE_SPECIFIER=cadae8da-208f-4f91-8a49-42bde98f4bc4 DEVELOPMENT_TEAM=AKN976G7AK SWIFT_STRICT_CONCURRENCY=complete build
+
+Build settings from command line:
+    CODE_SIGN_IDENTITY = Apple Development: Created via API (SHLM3M9VHP)
+    CODE_SIGN_STYLE = Manual
+    DEVELOPMENT_TEAM = AKN976G7AK
+    PROVISIONING_PROFILE_SPECIFIER = cadae8da-208f-4f91-8a49-42bde98f4bc4
+    SWIFT_STRICT_CONCURRENCY = complete
+
+Resolve Package Graph
+
+
+Resolved source packages:
+  libwebp: https://github.com/SDWebImage/libwebp-Xcode.git @ 1.6.0
+  GTMSessionFetcher: https://github.com/google/gtm-session-fetcher.git @ 3.5.0
+  AppAuth: https://github.com/openid/AppAuth-iOS.git @ 2.1.0
+  GoogleSignIn: https://github.com/google/GoogleSignIn-iOS.git @ 9.0.0
+  AppCheck: https://github.com/google/app-check.git @ 11.3.1
+  ICNativeClient: /Volumes/KINGSTON/ICP/ICNativeClient
+  GTMAppAuth: https://github.com/google/GTMAppAuth.git @ 5.0.0
+  Promises: https://github.com/google/promises.git @ 2.4.1
+  InteropForGoogle: https://github.com/google/interop-ios-for-google-sdks.git @ 101.0.0
+  GoogleUtilities: https://github.com/google/GoogleUtilities.git @ 8.1.3
+
+2026-09-09 12:34:40.354 xcodebuild[26811:111435911] [MT] IDERunDestination: Supported platforms for the buildables in the current scheme is empty.
+note: Using codesigning identity override: Apple Development: Created via API (SHLM3M9VHP)
+ComputePackagePrebuildTargetDependencyGraph
+
+Prepare packages
+
+Compile plug-in “ICNativeClientBindgenPlugin” in package “icnativeclient”
+[debug]: Compiling plugin to executable at /Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/minimal-moderation/build/Build/Products/PluginExecutables/ICNativeClientBindgenPlugin
+[debug]: Using compiler /Applications/Xcode-26.5.0.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc
+[debug]: Plugin compilation output directory '/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/minimal-moderation/build/Build/Products/PluginExecutables'
+[debug]: Computed hash of plugin compilation inputs: ae00a92fd456b596e27e346d33200b14efc7f7519686399c6caba385675fbec4
+
+
+Apply build tool plug-in “ICNativeClientBindgenPlugin” to target “TAGGR” in project “TAGGR”
+
+/usr/bin/sandbox-exec -p "(version 1)
+(deny default)
+(import \"system.sb\")
+(allow file-read*)
+(allow process*)
+(allow mach-lookup (global-name \"com.apple.lsd.mapdb\"))
+(allow mach-lookup (global-name \"com.apple.mobileassetd.v2\"))
+(allow file-write*
+    (subpath \"/private/tmp\")
+    (subpath \"/private/var/tmp\")
+    (subpath \"/private/var/folders/c0/wmdw9g8d70xdy1xmlw3qmdfm0000gn/T\")
+    (subpath \"/private/var/folders/c0/wmdw9g8d70xdy1xmlw3qmdfm0000gn/C\")
+)
+(deny file-write*
+    (subpath \"/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/ios/TAGGR\")
+)
+(allow file-write*
+    (subpath \"/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/minimal-moderation/build/Build/Intermediates.noindex/BuildToolPluginIntermediates/TAGGR.output/TAGGR/ICNativeClientBindgenPlugin\")
+    (subpath \"/Volumes/KINGSTON/.TemporaryItems/folders.501/TemporaryItems\")
+)
+" /Volumes/KINGSTON/ICP/ICNativeClient/Artifacts/ICNativeClientBindgen.artifactbundle/ic-candid-swift-bindgen-0.1.3-macos-arm64/bin/ic-candid-swift-bindgen --manifest /Volumes/KINGSTON/Offloaded/Desktop/TAGGR/ios/TAGGR/Candid/bindings.toml --output /Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/minimal-moderation/build/Build/Intermediates.noindex/BuildToolPluginIntermediates/TAGGR.output/TAGGR/ICNativeClientBindgenPlugin/Generated/ICNativeClientCandidBindings.swift --project-root /Volumes/KINGSTON/Offloaded/Desktop/TAGGR/ios/TAGGR
+
+Process build tool plug-in results
+
+CreateBuildRequest
+
+SendProjectDescription
+
+CreateBuildOperation
+
+ComputeTargetDependencyGraph
+note: Building targets in dependency order
+note: Target dependency graph (37 targets)
+    Target 'TAGGR' in project 'TAGGR'
+        ➜ Explicit dependency on target 'ICNativeClientBindgenPlugin' in project 'ICNativeClient'
+        ➜ Explicit dependency on target 'ICNativeClient' in project 'ICNativeClient'
+        ➜ Explicit dependency on target 'libwebp' in project 'libwebp'
+        ➜ Explicit dependency on target 'GoogleSignIn' in project 'GoogleSignIn'
+    Target 'GoogleSignIn' in project 'GoogleSignIn'
+        ➜ Explicit dependency on target 'GoogleSignIn' in project 'GoogleSignIn'
+        ➜ Explicit dependency on target 'GoogleSignIn_GoogleSignIn' in project 'GoogleSignIn'
+        ➜ Explicit dependency on target 'AppAuth' in project 'AppAuth'
+        ➜ Explicit dependency on target 'AppAuthCore' in project 'AppAuth'
+        ➜ Explicit dependency on target 'AppCheckCore' in project 'AppCheck'
+        ➜ Explicit dependency on target 'GTMAppAuth' in project 'GTMAppAuth'
+        ➜ Explicit dependency on target 'GTMSessionFetcherCore' in project 'GTMSessionFetcher'
+    Target 'GoogleSignIn' in project 'GoogleSignIn'
+        ➜ Explicit dependency on target 'GoogleSignIn_GoogleSignIn' in project 'GoogleSignIn'
+        ➜ Explicit dependency on target 'AppAuth' in project 'AppAuth'
+        ➜ Explicit dependency on target 'AppAuthCore' in project 'AppAuth'
+        ➜ Explicit dependency on target 'AppCheckCore' in project 'AppCheck'
+        ➜ Explicit dependency on target 'GTMAppAuth' in project 'GTMAppAuth'
+        ➜ Explicit dependency on target 'GTMSessionFetcherCore' in project 'GTMSessionFetcher'
+    Target 'GTMAppAuth' in project 'GTMAppAuth'
+        ➜ Explicit dependency on target 'GTMAppAuth' in project 'GTMAppAuth'
+        ➜ Explicit dependency on target 'GTMAppAuth_GTMAppAuth' in project 'GTMAppAuth'
+        ➜ Explicit dependency on target 'GTMSessionFetcherCore' in project 'GTMSessionFetcher'
+        ➜ Explicit dependency on target 'AppAuthCore' in project 'AppAuth'
+    Target 'GTMAppAuth' in project 'GTMAppAuth'
+        ➜ Explicit dependency on target 'GTMAppAuth_GTMAppAuth' in project 'GTMAppAuth'
+        ➜ Explicit dependency on target 'GTMSessionFetcherCore' in project 'GTMSessionFetcher'
+        ➜ Explicit dependency on target 'AppAuthCore' in project 'AppAuth'
+    Target 'GTMSessionFetcherCore' in project 'GTMSessionFetcher'
+        ➜ Explicit dependency on target 'GTMSessionFetcherCore' in project 'GTMSessionFetcher'
+        ➜ Explicit dependency on target 'GTMSessionFetcher_GTMSessionFetcherCore' in project 'GTMSessionFetcher'
+    Target 'GTMSessionFetcherCore' in project 'GTMSessionFetcher'
+        ➜ Explicit dependency on target 'GTMSessionFetcher_GTMSessionFetcherCore' in project 'GTMSessionFetcher'
+    Target 'GTMSessionFetcher_GTMSessionFetcherCore' in project 'GTMSessionFetcher' (no dependencies)
+    Target 'GTMAppAuth_GTMAppAuth' in project 'GTMAppAuth' (no dependencies)
+    Target 'AppCheckCore' in project 'AppCheck'
+        ➜ Explicit dependency on target 'AppCheckCore' in project 'AppCheck'
+        ➜ Explicit dependency on target 'FBLPromises' in project 'Promises'
+        ➜ Explicit dependency on target 'GULEnvironment' in project 'GoogleUtilities'
+        ➜ Explicit dependency on target 'GULUserDefaults' in project 'GoogleUtilities'
+    Target 'AppCheckCore' in project 'AppCheck'
+        ➜ Explicit dependency on target 'FBLPromises' in project 'Promises'
+        ➜ Explicit dependency on target 'GULEnvironment' in project 'GoogleUtilities'
+        ➜ Explicit dependency on target 'GULUserDefaults' in project 'GoogleUtilities'
+    Target 'GULUserDefaults' in project 'GoogleUtilities'
+        ➜ Explicit dependency on target 'GoogleUtilities-UserDefaults' in project 'GoogleUtilities'
+        ➜ Explicit dependency on target 'GoogleUtilities_GoogleUtilities-UserDefaults' in project 'GoogleUtilities'
+        ➜ Explicit dependency on target 'third-party-IsAppEncrypted' in project 'GoogleUtilities'
+        ➜ Explicit dependency on target 'GoogleUtilities-Environment' in project 'GoogleUtilities'
+        ➜ Explicit dependency on target 'GoogleUtilities-Logger' in project 'GoogleUtilities'
+    Target 'GoogleUtilities-UserDefaults' in project 'GoogleUtilities'
+        ➜ Explicit dependency on target 'GoogleUtilities_GoogleUtilities-UserDefaults' in project 'GoogleUtilities'
+        ➜ Explicit dependency on target 'third-party-IsAppEncrypted' in project 'GoogleUtilities'
+        ➜ Explicit dependency on target 'GoogleUtilities-Environment' in project 'GoogleUtilities'
+        ➜ Explicit dependency on target 'GoogleUtilities-Logger' in project 'GoogleUtilities'
+    Target 'GoogleUtilities-Logger' in project 'GoogleUtilities'
+        ➜ Explicit dependency on target 'GoogleUtilities_GoogleUtilities-Logger' in project 'GoogleUtilities'
+        ➜ Explicit dependency on target 'third-party-IsAppEncrypted' in project 'GoogleUtilities'
+        ➜ Explicit dependency on target 'GoogleUtilities-Environment' in project 'GoogleUtilities'
+    Target 'GoogleUtilities_GoogleUtilities-Logger' in project 'GoogleUtilities' (no dependencies)
+    Target 'GoogleUtilities_GoogleUtilities-UserDefaults' in project 'GoogleUtilities' (no dependencies)
+    Target 'GULEnvironment' in project 'GoogleUtilities'
+        ➜ Explicit dependency on target 'GoogleUtilities-Environment' in project 'GoogleUtilities'
+        ➜ Explicit dependency on target 'GoogleUtilities_GoogleUtilities-Environment' in project 'GoogleUtilities'
+        ➜ Explicit dependency on target 'third-party-IsAppEncrypted' in project 'GoogleUtilities'
+    Target 'GoogleUtilities-Environment' in project 'GoogleUtilities'
+        ➜ Explicit dependency on target 'GoogleUtilities_GoogleUtilities-Environment' in project 'GoogleUtilities'
+        ➜ Explicit dependency on target 'third-party-IsAppEncrypted' in project 'GoogleUtilities'
+    Target 'third-party-IsAppEncrypted' in project 'GoogleUtilities' (no dependencies)
+    Target 'GoogleUtilities_GoogleUtilities-Environment' in project 'GoogleUtilities' (no dependencies)
+    Target 'FBLPromises' in project 'Promises'
+        ➜ Explicit dependency on target 'FBLPromises' in project 'Promises'
+        ➜ Explicit dependency on target 'Promises_FBLPromises' in project 'Promises'
+    Target 'FBLPromises' in project 'Promises'
+        ➜ Explicit dependency on target 'Promises_FBLPromises' in project 'Promises'
+    Target 'Promises_FBLPromises' in project 'Promises' (no dependencies)
+    Target 'AppAuthCore' in project 'AppAuth'
+        ➜ Explicit dependency on target 'AppAuthCore' in project 'AppAuth'
+        ➜ Explicit dependency on target 'AppAuth_AppAuthCore' in project 'AppAuth'
+    Target 'AppAuth' in project 'AppAuth'
+        ➜ Explicit dependency on target 'AppAuth' in project 'AppAuth'
+        ➜ Explicit dependency on target 'AppAuth_AppAuth' in project 'AppAuth'
+        ➜ Explicit dependency on target 'AppAuthCore' in project 'AppAuth'
+    Target 'AppAuth' in project 'AppAuth'
+        ➜ Explicit dependency on target 'AppAuth_AppAuth' in project 'AppAuth'
+        ➜ Explicit dependency on target 'AppAuthCore' in project 'AppAuth'
+    Target 'AppAuthCore' in project 'AppAuth'
+        ➜ Explicit dependency on target 'AppAuth_AppAuthCore' in project 'AppAuth'
+    Target 'AppAuth_AppAuthCore' in project 'AppAuth' (no dependencies)
+    Target 'AppAuth_AppAuth' in project 'AppAuth' (no dependencies)
+    Target 'GoogleSignIn_GoogleSignIn' in project 'GoogleSignIn' (no dependencies)
+    Target 'libwebp' in project 'libwebp'
+        ➜ Explicit dependency on target 'libwebp' in project 'libwebp'
+    Target 'libwebp' in project 'libwebp' (no dependencies)
+    Target 'ICNativeClient' in project 'ICNativeClient'
+        ➜ Explicit dependency on target 'ICNativeClient' in project 'ICNativeClient'
+        ➜ Explicit dependency on target 'CBlst' in project 'ICNativeClient'
+    Target 'ICNativeClient' in project 'ICNativeClient'
+        ➜ Explicit dependency on target 'CBlst' in project 'ICNativeClient'
+    Target 'CBlst' in project 'ICNativeClient' (no dependencies)
+    Target 'ICNativeClientBindgenPlugin' in project 'ICNativeClient'
+        ➜ Explicit dependency on target 'ICNativeClientBindgenPlugin' in project 'ICNativeClient'
+    Target 'ICNativeClientBindgenPlugin' in project 'ICNativeClient' (no dependencies)
+
+GatherProvisioningInputs
+
+CreateBuildDescription
+
+ExecuteExternalTool /Applications/Xcode-26.5.0.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc --version
+
+ExecuteExternalTool /Applications/Xcode-26.5.0.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang -v -E -dM -arch arm64 -isysroot /Applications/Xcode-26.5.0.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS26.5.sdk -x assembler-with-cpp -c /dev/null
+
+ExecuteExternalTool /Applications/Xcode-26.5.0.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang -v -E -dM -arch arm64 -isysroot /Applications/Xcode-26.5.0.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS26.5.sdk -x c -c /dev/null
+
+ExecuteExternalTool /Applications/Xcode-26.5.0.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang -v -E -dM -arch arm64 -isysroot /Applications/Xcode-26.5.0.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS26.5.sdk -x objective-c -c /dev/null
+
+ExecuteExternalTool /Applications/Xcode-26.5.0.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang -v -E -dM -isysroot /Applications/Xcode-26.5.0.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk -x c -c /dev/null
+
+ExecuteExternalTool /Applications/Xcode-26.5.0.app/Contents/Developer/usr/bin/actool --print-asset-tag-combinations --output-format xml1 /Volumes/KINGSTON/Offloaded/Desktop/TAGGR/ios/TAGGR/TAGGR/Assets.xcassets
+
+ExecuteExternalTool /Applications/Xcode-26.5.0.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang -v -E -dM -isysroot /Applications/Xcode-26.5.0.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS26.5.sdk -x c -c /dev/null
+
+ExecuteExternalTool /Applications/Xcode-26.5.0.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/ld -version_details
+
+ExecuteExternalTool /Applications/Xcode-26.5.0.app/Contents/Developer/usr/bin/actool --version --output-format xml1
+
+Build description signature: b919363ba942367ce8e610ded72ad776
+Build description path: /Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/minimal-moderation/build/Build/Intermediates.noindex/XCBuildData/b919363ba942367ce8e610ded72ad776.xcbuilddata
+/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/taggr-safety-build/SourcePackages/checkouts/GoogleUtilities/Package.swift: error: GoogleUtilities_GoogleUtilities-Logger does not support provisioning profiles. GoogleUtilities_GoogleUtilities-Logger does not support provisioning profiles, but provisioning profile cadae8da-208f-4f91-8a49-42bde98f4bc4 has been manually specified. Set the provisioning profile value to "Automatic" in the build settings editor. (in target 'GoogleUtilities_GoogleUtilities-Logger' from project 'GoogleUtilities')
+/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/taggr-safety-build/SourcePackages/checkouts/AppAuth-iOS/Package.swift: error: AppAuth_AppAuth does not support provisioning profiles. AppAuth_AppAuth does not support provisioning profiles, but provisioning profile cadae8da-208f-4f91-8a49-42bde98f4bc4 has been manually specified. Set the provisioning profile value to "Automatic" in the build settings editor. (in target 'AppAuth_AppAuth' from project 'AppAuth')
+/Volumes/KINGSTON/ICP/ICNativeClient/Package.swift: error: Bundle identifier is missing. ICNativeClientBindgenPlugin doesn't have a bundle identifier. Add a value for PRODUCT_BUNDLE_IDENTIFIER in the build settings editor. (in target 'ICNativeClientBindgenPlugin' from project 'ICNativeClient')
+/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/taggr-safety-build/SourcePackages/checkouts/GoogleSignIn-iOS/Package.swift: error: GoogleSignIn_GoogleSignIn does not support provisioning profiles. GoogleSignIn_GoogleSignIn does not support provisioning profiles, but provisioning profile cadae8da-208f-4f91-8a49-42bde98f4bc4 has been manually specified. Set the provisioning profile value to "Automatic" in the build settings editor. (in target 'GoogleSignIn_GoogleSignIn' from project 'GoogleSignIn')
+/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/taggr-safety-build/SourcePackages/checkouts/promises/Package.swift: error: Promises_FBLPromises does not support provisioning profiles. Promises_FBLPromises does not support provisioning profiles, but provisioning profile cadae8da-208f-4f91-8a49-42bde98f4bc4 has been manually specified. Set the provisioning profile value to "Automatic" in the build settings editor. (in target 'Promises_FBLPromises' from project 'Promises')
+/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/taggr-safety-build/SourcePackages/checkouts/GoogleUtilities/Package.swift: error: GoogleUtilities_GoogleUtilities-UserDefaults does not support provisioning profiles. GoogleUtilities_GoogleUtilities-UserDefaults does not support provisioning profiles, but provisioning profile cadae8da-208f-4f91-8a49-42bde98f4bc4 has been manually specified. Set the provisioning profile value to "Automatic" in the build settings editor. (in target 'GoogleUtilities_GoogleUtilities-UserDefaults' from project 'GoogleUtilities')
+/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/taggr-safety-build/SourcePackages/checkouts/gtm-session-fetcher/Package.swift: error: GTMSessionFetcher_GTMSessionFetcherCore does not support provisioning profiles. GTMSessionFetcher_GTMSessionFetcherCore does not support provisioning profiles, but provisioning profile cadae8da-208f-4f91-8a49-42bde98f4bc4 has been manually specified. Set the provisioning profile value to "Automatic" in the build settings editor. (in target 'GTMSessionFetcher_GTMSessionFetcherCore' from project 'GTMSessionFetcher')
+/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/taggr-safety-build/SourcePackages/checkouts/AppAuth-iOS/Package.swift: error: AppAuth_AppAuthCore does not support provisioning profiles. AppAuth_AppAuthCore does not support provisioning profiles, but provisioning profile cadae8da-208f-4f91-8a49-42bde98f4bc4 has been manually specified. Set the provisioning profile value to "Automatic" in the build settings editor. (in target 'AppAuth_AppAuthCore' from project 'AppAuth')
+/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/ios/TAGGR/TAGGR.xcodeproj: error: Provisioning profile "iOS Team Provisioning Profile: network.taggr.ios" is Xcode managed, but signing settings require a manually managed profile. (in target 'TAGGR' from project 'TAGGR')
+/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/taggr-safety-build/SourcePackages/checkouts/GTMAppAuth/Package.swift: error: GTMAppAuth_GTMAppAuth does not support provisioning profiles. GTMAppAuth_GTMAppAuth does not support provisioning profiles, but provisioning profile cadae8da-208f-4f91-8a49-42bde98f4bc4 has been manually specified. Set the provisioning profile value to "Automatic" in the build settings editor. (in target 'GTMAppAuth_GTMAppAuth' from project 'GTMAppAuth')
+/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/taggr-safety-build/SourcePackages/checkouts/GoogleUtilities/Package.swift: error: GoogleUtilities_GoogleUtilities-Environment does not support provisioning profiles. GoogleUtilities_GoogleUtilities-Environment does not support provisioning profiles, but provisioning profile cadae8da-208f-4f91-8a49-42bde98f4bc4 has been manually specified. Set the provisioning profile value to "Automatic" in the build settings editor. (in target 'GoogleUtilities_GoogleUtilities-Environment' from project 'GoogleUtilities')
+** BUILD FAILED **
+
+
+The following build commands failed:
+	Building workspace TAGGR with scheme TAGGR and configuration Debug
+(1 failure)

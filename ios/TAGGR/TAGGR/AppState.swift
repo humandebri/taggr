@@ -66,6 +66,7 @@ final class TaggrAppCoordinator {
     let contentStore = ContentStore()
     let walletStorageStore = WalletStorageStore()
     let sessionStore: SessionStore
+    let safety: TaggrSafetyStore
 
     var route: TaggrRoute {
         get { navigationStore.route }
@@ -251,6 +252,7 @@ final class TaggrAppCoordinator {
     var postSubmissionNoticeDismissTask: Task<Void, Never>?
 
     init(
+        safety: TaggrSafetyStore = TaggrSafetyStore(),
         api: TaggrAPI? = nil,
         identityStore: ICIdentityStore? = nil,
         identityAuthenticator: ICInternetIdentityAuthenticator? = nil,
@@ -278,6 +280,7 @@ final class TaggrAppCoordinator {
         }
     ) {
         self.sessionStore = SessionStore(config: buildConfig)
+        self.safety = safety
         self.apiFactory = apiFactory
         self.identityStoreFactory = identityStoreFactory
         self.identityAuthenticatorFactory = identityAuthenticatorFactory
@@ -290,6 +293,13 @@ final class TaggrAppCoordinator {
         self.postDraftStore = postDraftStore
         self.realmPostingPreferences = realmPostingPreferences
         self.youtubeUpload = youtubeUpload ?? YouTubeUploadCoordinator()
+        self.youtubeUpload.safetyCheck = { [weak self] target, text in
+            guard let self, target.namespace.canisterID == self.runtimeConfig.canisterId,
+                  target.namespace.userID == self.currentUser?.id else { throw TaggrSafetyError.unavailable }
+            try await self.requireSafePublishing(text: text)
+            guard target.namespace.canisterID == self.runtimeConfig.canisterId,
+                  target.namespace.userID == self.currentUser?.id else { throw TaggrSafetyError.unavailable }
+        }
     }
 
     var realmPostingScope: RealmPostingScope? {
@@ -327,7 +337,7 @@ final class TaggrAppCoordinator {
     }
 
     func bootstrap() async {
-        await youtubeUpload.bootstrap()
+        youtubeUpload.auth.bootstrap()
         var loadError: Error?
         authSession = nil
         for signInMethod in runtimeConfig.availableIdentitySignInMethods {
@@ -349,6 +359,7 @@ final class TaggrAppCoordinator {
         }
         await reloadCache()
         await refreshCurrentUser()
+        await youtubeUpload.bootstrap()
         if navigationStore.lastHomeFeedMode == .personal, authSession == nil {
             route = .feed(.hot)
         } else if !navigationStore.hasStoredHomeFeedMode, authSession != nil {

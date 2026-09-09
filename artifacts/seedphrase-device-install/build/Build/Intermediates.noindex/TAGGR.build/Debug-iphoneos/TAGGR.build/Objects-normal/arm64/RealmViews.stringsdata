@@ -1,0 +1,304 @@
+{
+  "source": "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/ios/TAGGR/TAGGR/Views/RealmViews.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "Join %@?",
+        "location": {
+          "startingColumn": 13,
+          "startingLine": 65
+        }
+      },
+      {
+        "comment": "",
+        "key": "Leave %@?",
+        "location": {
+          "startingColumn": 13,
+          "startingLine": 81
+        }
+      },
+      {
+        "comment": "",
+        "key": "Posts",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 24
+        }
+      },
+      {
+        "comment": "",
+        "key": "No posts",
+        "location": {
+          "startingColumn": 34,
+          "startingLine": 29
+        }
+      },
+      {
+        "comment": "",
+        "key": "Realm not found.",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 46
+        }
+      },
+      {
+        "comment": "",
+        "key": "Realms",
+        "location": {
+          "startingColumn": 28,
+          "startingLine": 16
+        }
+      },
+      {
+        "comment": "",
+        "key": "Agree and Join",
+        "location": {
+          "startingColumn": 20,
+          "startingLine": 69
+        }
+      },
+      {
+        "comment": "",
+        "key": "Cancel",
+        "location": {
+          "startingColumn": 20,
+          "startingLine": 72
+        }
+      },
+      {
+        "comment": "",
+        "key": "By joining, you agree to the Realm description and rules. Rule violations may remove a post and charge up to %lld credits and reward points.",
+        "location": {
+          "startingColumn": 21,
+          "startingLine": 76
+        }
+      },
+      {
+        "comment": "",
+        "key": "Leave Realm",
+        "location": {
+          "startingColumn": 20,
+          "startingLine": 85
+        }
+      },
+      {
+        "comment": "",
+        "key": "Cancel",
+        "location": {
+          "startingColumn": 20,
+          "startingLine": 88
+        }
+      },
+      {
+        "comment": "",
+        "key": "You can continue reading this Realm and join it again later.",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 90
+        }
+      },
+      {
+        "comment": "",
+        "key": "Share Realm",
+        "location": {
+          "startingColumn": 23,
+          "startingLine": 122
+        }
+      },
+      {
+        "comment": "",
+        "key": "Sign in to Join",
+        "location": {
+          "startingColumn": 27,
+          "startingLine": 128
+        }
+      },
+      {
+        "comment": "",
+        "key": "Leave Realm",
+        "location": {
+          "startingColumn": 27,
+          "startingLine": 134
+        }
+      },
+      {
+        "comment": "",
+        "key": "Join Realm",
+        "location": {
+          "startingColumn": 27,
+          "startingLine": 140
+        }
+      },
+      {
+        "comment": "",
+        "key": "Manage Realm",
+        "location": {
+          "startingColumn": 27,
+          "startingLine": 148
+        }
+      },
+      {
+        "comment": "",
+        "key": "Realm actions",
+        "location": {
+          "startingColumn": 37,
+          "startingLine": 154
+        }
+      },
+      {
+        "comment": "",
+        "key": "About",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 214
+        }
+      },
+      {
+        "comment": "",
+        "key": "Controllers",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 228
+        }
+      },
+      {
+        "comment": "",
+        "key": "No controllers",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 232
+        }
+      },
+      {
+        "comment": "",
+        "key": "@%lld",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 273
+        }
+      },
+      {
+        "comment": "",
+        "key": "@%@",
+        "location": {
+          "startingColumn": 20,
+          "startingLine": 267
+        }
+      },
+      {
+        "comment": "",
+        "key": "Manage %@",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 367
+        }
+      },
+      {
+        "comment": "",
+        "key": "Identity",
+        "location": {
+          "startingColumn": 25,
+          "startingLine": 314
+        }
+      },
+      {
+        "comment": "",
+        "key": "Moderation",
+        "location": {
+          "startingColumn": 25,
+          "startingLine": 337
+        }
+      },
+      {
+        "comment": "",
+        "key": "Label color (#RRGGBB)",
+        "location": {
+          "startingColumn": 31,
+          "startingLine": 324
+        }
+      },
+      {
+        "comment": "",
+        "key": "Description",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 316
+        }
+      },
+      {
+        "comment": "",
+        "key": "%@ / 2,000",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 320
+        }
+      },
+      {
+        "comment": "",
+        "key": "Replace Logo",
+        "location": {
+          "startingColumn": 35,
+          "startingLine": 332
+        }
+      },
+      {
+        "comment": "",
+        "key": "Maximum clean-up penalty: %@ credits",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 351
+        }
+      },
+      {
+        "comment": "",
+        "key": "Adult content",
+        "location": {
+          "startingColumn": 28,
+          "startingLine": 338
+        }
+      },
+      {
+        "comment": "",
+        "key": "Allow comments from everyone",
+        "location": {
+          "startingColumn": 25,
+          "startingLine": 340
+        }
+      },
+      {
+        "comment": "",
+        "key": "Clean-up penalty",
+        "location": {
+          "startingColumn": 31,
+          "startingLine": 346
+        }
+      },
+      {
+        "comment": "",
+        "key": "Maximum downvotes",
+        "location": {
+          "startingColumn": 31,
+          "startingLine": 348
+        }
+      },
+      {
+        "comment": "",
+        "key": "Cancel",
+        "location": {
+          "startingColumn": 28,
+          "startingLine": 371
+        }
+      },
+      {
+        "comment": "",
+        "key": "Save",
+        "location": {
+          "startingColumn": 28,
+          "startingLine": 377
+        }
+      }
+    ]
+  },
+  "version": 1
+}

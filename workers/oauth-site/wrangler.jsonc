@@ -5,6 +5,41 @@
     "main": "src/index.mjs",
     "compatibility_date": "2026-07-09",
     "workers_dev": true,
+    "d1_databases": [
+        {
+            "binding": "MODERATION_DB",
+            "database_name": "taggr-ios-moderation",
+            "database_id": "352d9c96-1ed6-4542-b736-a86f097b6b26",
+            "migrations_dir": "migrations",
+        },
+    ],
+    "ratelimits": [
+        {
+            "name": "REPORT_LIMITER",
+            "namespace_id": "2026090901",
+            "simple": { "limit": 10, "period": 60 },
+        },
+    ],
+    "env": {
+        "local": {
+            "routes": [],
+            "workers_dev": false,
+            "d1_databases": [
+                {
+                    "binding": "MODERATION_DB",
+                    "database_name": "taggr-ios-moderation-local",
+                    "migrations_dir": "migrations",
+                },
+            ],
+            "ratelimits": [
+                {
+                    "name": "REPORT_LIMITER",
+                    "namespace_id": "2026090902",
+                    "simple": { "limit": 10, "period": 60 },
+                },
+            ],
+        },
+    },
     "routes": [
         {
             "pattern": "taggr.kasane.network",

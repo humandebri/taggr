@@ -1,0 +1,40 @@
+{
+  "source": "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/ios/TAGGR/TAGGR/Views/TaggrImagePagerView.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "Pinch to zoom. Drag to pan when enlarged.",
+        "location": {
+          "startingColumn": 32,
+          "startingLine": 150
+        }
+      },
+      {
+        "comment": "",
+        "key": "Close image viewer",
+        "location": {
+          "startingColumn": 33,
+          "startingLine": 288
+        }
+      },
+      {
+        "comment": "",
+        "key": "Close image",
+        "location": {
+          "startingColumn": 24,
+          "startingLine": 254
+        }
+      },
+      {
+        "comment": "",
+        "key": "Close image viewer",
+        "location": {
+          "startingColumn": 41,
+          "startingLine": 273
+        }
+      }
+    ]
+  },
+  "version": 1
+}

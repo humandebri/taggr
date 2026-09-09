@@ -1,0 +1,89 @@
+{
+    "": {
+        "diagnostics": "/tmp/taggr-safety-build/Build/Intermediates.noindex/GTMAppAuth.build/Debug-iphonesimulator/GTMAppAuth.build/Objects-normal/x86_64/GTMAppAuth-primary.dia",
+        "emit-module-dependencies": "/tmp/taggr-safety-build/Build/Intermediates.noindex/GTMAppAuth.build/Debug-iphonesimulator/GTMAppAuth.build/Objects-normal/x86_64/GTMAppAuth-primary-emit-module.d",
+        "emit-module-diagnostics": "/tmp/taggr-safety-build/Build/Intermediates.noindex/GTMAppAuth.build/Debug-iphonesimulator/GTMAppAuth.build/Objects-normal/x86_64/GTMAppAuth-primary-emit-module.dia",
+        "pch": "/tmp/taggr-safety-build/Build/Intermediates.noindex/GTMAppAuth.build/Debug-iphonesimulator/GTMAppAuth.build/Objects-normal/x86_64/GTMAppAuth-primary-Bridging-header.pch",
+        "swift-dependencies": "/tmp/taggr-safety-build/Build/Intermediates.noindex/GTMAppAuth.build/Debug-iphonesimulator/GTMAppAuth.build/Objects-normal/x86_64/GTMAppAuth-primary.swiftdeps"
+    },
+    "/tmp/taggr-safety-build/Build/Intermediates.noindex/GTMAppAuth.build/Debug-iphonesimulator/GTMAppAuth.build/DerivedSources/resource_bundle_accessor.swift": {
+        "const-values": "/tmp/taggr-safety-build/Build/Intermediates.noindex/GTMAppAuth.build/Debug-iphonesimulator/GTMAppAuth.build/Objects-normal/x86_64/resource_bundle_accessor.swiftconstvalues",
+        "dependencies": "/tmp/taggr-safety-build/Build/Intermediates.noindex/GTMAppAuth.build/Debug-iphonesimulator/GTMAppAuth.build/Objects-normal/x86_64/resource_bundle_accessor.d",
+        "diagnostics": "/tmp/taggr-safety-build/Build/Intermediates.noindex/GTMAppAuth.build/Debug-iphonesimulator/GTMAppAuth.build/Objects-normal/x86_64/resource_bundle_accessor.dia",
+        "index-unit-output-path": "/GTMAppAuth.build/Debug-iphonesimulator/GTMAppAuth.build/Objects-normal/x86_64/resource_bundle_accessor.o",
+        "llvm-bc": "/tmp/taggr-safety-build/Build/Intermediates.noindex/GTMAppAuth.build/Debug-iphonesimulator/GTMAppAuth.build/Objects-normal/x86_64/resource_bundle_accessor.bc",
+        "object": "/tmp/taggr-safety-build/Build/Intermediates.noindex/GTMAppAuth.build/Debug-iphonesimulator/GTMAppAuth.build/Objects-normal/x86_64/resource_bundle_accessor.o",
+        "swift-dependencies": "/tmp/taggr-safety-build/Build/Intermediates.noindex/GTMAppAuth.build/Debug-iphonesimulator/GTMAppAuth.build/Objects-normal/x86_64/resource_bundle_accessor.swiftdeps",
+        "swiftmodule": "/tmp/taggr-safety-build/Build/Intermediates.noindex/GTMAppAuth.build/Debug-iphonesimulator/GTMAppAuth.build/Objects-normal/x86_64/resource_bundle_accessor~partial.swiftmodule"
+    },
+    "/tmp/taggr-safety-build/SourcePackages/checkouts/GTMAppAuth/GTMAppAuth/Sources/AuthSession.swift": {
+        "const-values": "/tmp/taggr-safety-build/Build/Intermediates.noindex/GTMAppAuth.build/Debug-iphonesimulator/GTMAppAuth.build/Objects-normal/x86_64/AuthSession.swiftconstvalues",
+        "dependencies": "/tmp/taggr-safety-build/Build/Intermediates.noindex/GTMAppAuth.build/Debug-iphonesimulator/GTMAppAuth.build/Objects-normal/x86_64/AuthSession.d",
+        "diagnostics": "/tmp/taggr-safety-build/Build/Intermediates.noindex/GTMAppAuth.build/Debug-iphonesimulator/GTMAppAuth.build/Objects-normal/x86_64/AuthSession.dia",
+        "index-unit-output-path": "/GTMAppAuth.build/Debug-iphonesimulator/GTMAppAuth.build/Objects-normal/x86_64/AuthSession.o",
+        "llvm-bc": "/tmp/taggr-safety-build/Build/Intermediates.noindex/GTMAppAuth.build/Debug-iphonesimulator/GTMAppAuth.build/Objects-normal/x86_64/AuthSession.bc",
+        "object": "/tmp/taggr-safety-build/Build/Intermediates.noindex/GTMAppAuth.build/Debug-iphonesimulator/GTMAppAuth.build/Objects-normal/x86_64/AuthSession.o",
+        "swift-dependencies": "/tmp/taggr-safety-build/Build/Intermediates.noindex/GTMAppAuth.build/Debug-iphonesimulator/GTMAppAuth.build/Objects-normal/x86_64/AuthSession.swiftdeps",
+        "swiftmodule": "/tmp/taggr-safety-build/Build/Intermediates.noindex/GTMAppAuth.build/Debug-iphonesimulator/GTMAppAuth.build/Objects-normal/x86_64/AuthSession~partial.swiftmodule"
+    },
+    "/tmp/taggr-safety-build/SourcePackages/checkouts/GTMAppAuth/GTMAppAuth/Sources/AuthSessionDelegate.swift": {
+        "const-values": "/tmp/taggr-safety-build/Build/Intermediates.noindex/GTMAppAuth.build/Debug-iphonesimulator/GTMAppAuth.build/Objects-normal/x86_64/AuthSessionDelegate.swiftconstvalues",
+        "dependencies": "/tmp/taggr-safety-build/Build/Intermediates.noindex/GTMAppAuth.build/Debug-iphonesimulator/GTMAppAuth.build/Objects-normal/x86_64/AuthSessionDelegate.d",
+        "diagnostics": "/tmp/taggr-safety-build/Build/Intermediates.noindex/GTMAppAuth.build/Debug-iphonesimulator/GTMAppAuth.build/Objects-normal/x86_64/AuthSessionDelegate.dia",
+        "index-unit-output-path": "/GTMAppAuth.build/Debug-iphonesimulator/GTMAppAuth.build/Objects-normal/x86_64/AuthSessionDelegate.o",
+        "llvm-bc": "/tmp/taggr-safety-build/Build/Intermediates.noindex/GTMAppAuth.build/Debug-iphonesimulator/GTMAppAuth.build/Objects-normal/x86_64/AuthSessionDelegate.bc",
+        "object": "/tmp/taggr-safety-build/Build/Intermediates.noindex/GTMAppAuth.build/Debug-iphonesimulator/GTMAppAuth.build/Objects-normal/x86_64/AuthSessionDelegate.o",
+        "swift-dependencies": "/tmp/taggr-safety-build/Build/Intermediates.noindex/GTMAppAuth.build/Debug-iphonesimulator/GTMAppAuth.build/Objects-normal/x86_64/AuthSessionDelegate.swiftdeps",
+        "swiftmodule": "/tmp/taggr-safety-build/Build/Intermediates.noindex/GTMAppAuth.build/Debug-iphonesimulator/GTMAppAuth.build/Objects-normal/x86_64/AuthSessionDelegate~partial.swiftmodule"
+    },
+    "/tmp/taggr-safety-build/SourcePackages/checkouts/GTMAppAuth/GTMAppAuth/Sources/AuthSessionStore.swift": {
+        "const-values": "/tmp/taggr-safety-build/Build/Intermediates.noindex/GTMAppAuth.build/Debug-iphonesimulator/GTMAppAuth.build/Objects-normal/x86_64/AuthSessionStore.swiftconstvalues",
+        "dependencies": "/tmp/taggr-safety-build/Build/Intermediates.noindex/GTMAppAuth.build/Debug-iphonesimulator/GTMAppAuth.build/Objects-normal/x86_64/AuthSessionStore.d",
+        "diagnostics": "/tmp/taggr-safety-build/Build/Intermediates.noindex/GTMAppAuth.build/Debug-iphonesimulator/GTMAppAuth.build/Objects-normal/x86_64/AuthSessionStore.dia",
+        "index-unit-output-path": "/GTMAppAuth.build/Debug-iphonesimulator/GTMAppAuth.build/Objects-normal/x86_64/AuthSessionStore.o",
+        "llvm-bc": "/tmp/taggr-safety-build/Build/Intermediates.noindex/GTMAppAuth.build/Debug-iphonesimulator/GTMAppAuth.build/Objects-normal/x86_64/AuthSessionStore.bc",
+        "object": "/tmp/taggr-safety-build/Build/Intermediates.noindex/GTMAppAuth.build/Debug-iphonesimulator/GTMAppAuth.build/Objects-normal/x86_64/AuthSessionStore.o",
+        "swift-dependencies": "/tmp/taggr-safety-build/Build/Intermediates.noindex/GTMAppAuth.build/Debug-iphonesimulator/GTMAppAuth.build/Objects-normal/x86_64/AuthSessionStore.swiftdeps",
+        "swiftmodule": "/tmp/taggr-safety-build/Build/Intermediates.noindex/GTMAppAuth.build/Debug-iphonesimulator/GTMAppAuth.build/Objects-normal/x86_64/AuthSessionStore~partial.swiftmodule"
+    },
+    "/tmp/taggr-safety-build/SourcePackages/checkouts/GTMAppAuth/GTMAppAuth/Sources/KeychainStore/GTMOAuth2Compatibility.swift": {
+        "const-values": "/tmp/taggr-safety-build/Build/Intermediates.noindex/GTMAppAuth.build/Debug-iphonesimulator/GTMAppAuth.build/Objects-normal/x86_64/GTMOAuth2Compatibility.swiftconstvalues",
+        "dependencies": "/tmp/taggr-safety-build/Build/Intermediates.noindex/GTMAppAuth.build/Debug-iphonesimulator/GTMAppAuth.build/Objects-normal/x86_64/GTMOAuth2Compatibility.d",
+        "diagnostics": "/tmp/taggr-safety-build/Build/Intermediates.noindex/GTMAppAuth.build/Debug-iphonesimulator/GTMAppAuth.build/Objects-normal/x86_64/GTMOAuth2Compatibility.dia",
+        "index-unit-output-path": "/GTMAppAuth.build/Debug-iphonesimulator/GTMAppAuth.build/Objects-normal/x86_64/GTMOAuth2Compatibility.o",
+        "llvm-bc": "/tmp/taggr-safety-build/Build/Intermediates.noindex/GTMAppAuth.build/Debug-iphonesimulator/GTMAppAuth.build/Objects-normal/x86_64/GTMOAuth2Compatibility.bc",
+        "object": "/tmp/taggr-safety-build/Build/Intermediates.noindex/GTMAppAuth.build/Debug-iphonesimulator/GTMAppAuth.build/Objects-normal/x86_64/GTMOAuth2Compatibility.o",
+        "swift-dependencies": "/tmp/taggr-safety-build/Build/Intermediates.noindex/GTMAppAuth.build/Debug-iphonesimulator/GTMAppAuth.build/Objects-normal/x86_64/GTMOAuth2Compatibility.swiftdeps",
+        "swiftmodule": "/tmp/taggr-safety-build/Build/Intermediates.noindex/GTMAppAuth.build/Debug-iphonesimulator/GTMAppAuth.build/Objects-normal/x86_64/GTMOAuth2Compatibility~partial.swiftmodule"
+    },
+    "/tmp/taggr-safety-build/SourcePackages/checkouts/GTMAppAuth/GTMAppAuth/Sources/KeychainStore/KeychainAttribute.swift": {
+        "const-values": "/tmp/taggr-safety-build/Build/Intermediates.noindex/GTMAppAuth.build/Debug-iphonesimulator/GTMAppAuth.build/Objects-normal/x86_64/KeychainAttribute.swiftconstvalues",
+        "dependencies": "/tmp/taggr-safety-build/Build/Intermediates.noindex/GTMAppAuth.build/Debug-iphonesimulator/GTMAppAuth.build/Objects-normal/x86_64/KeychainAttribute.d",
+        "diagnostics": "/tmp/taggr-safety-build/Build/Intermediates.noindex/GTMAppAuth.build/Debug-iphonesimulator/GTMAppAuth.build/Objects-normal/x86_64/KeychainAttribute.dia",
+        "index-unit-output-path": "/GTMAppAuth.build/Debug-iphonesimulator/GTMAppAuth.build/Objects-normal/x86_64/KeychainAttribute.o",
+        "llvm-bc": "/tmp/taggr-safety-build/Build/Intermediates.noindex/GTMAppAuth.build/Debug-iphonesimulator/GTMAppAuth.build/Objects-normal/x86_64/KeychainAttribute.bc",
+        "object": "/tmp/taggr-safety-build/Build/Intermediates.noindex/GTMAppAuth.build/Debug-iphonesimulator/GTMAppAuth.build/Objects-normal/x86_64/KeychainAttribute.o",
+        "swift-dependencies": "/tmp/taggr-safety-build/Build/Intermediates.noindex/GTMAppAuth.build/Debug-iphonesimulator/GTMAppAuth.build/Objects-normal/x86_64/KeychainAttribute.swiftdeps",
+        "swiftmodule": "/tmp/taggr-safety-build/Build/Intermediates.noindex/GTMAppAuth.build/Debug-iphonesimulator/GTMAppAuth.build/Objects-normal/x86_64/KeychainAttribute~partial.swiftmodule"
+    },
+    "/tmp/taggr-safety-build/SourcePackages/checkouts/GTMAppAuth/GTMAppAuth/Sources/KeychainStore/KeychainHelper.swift": {
+        "const-values": "/tmp/taggr-safety-build/Build/Intermediates.noindex/GTMAppAuth.build/Debug-iphonesimulator/GTMAppAuth.build/Objects-normal/x86_64/KeychainHelper.swiftconstvalues",
+        "dependencies": "/tmp/taggr-safety-build/Build/Intermediates.noindex/GTMAppAuth.build/Debug-iphonesimulator/GTMAppAuth.build/Objects-normal/x86_64/KeychainHelper.d",
+        "diagnostics": "/tmp/taggr-safety-build/Build/Intermediates.noindex/GTMAppAuth.build/Debug-iphonesimulator/GTMAppAuth.build/Objects-normal/x86_64/KeychainHelper.dia",
+        "index-unit-output-path": "/GTMAppAuth.build/Debug-iphonesimulator/GTMAppAuth.build/Objects-normal/x86_64/KeychainHelper.o",
+        "llvm-bc": "/tmp/taggr-safety-build/Build/Intermediates.noindex/GTMAppAuth.build/Debug-iphonesimulator/GTMAppAuth.build/Objects-normal/x86_64/KeychainHelper.bc",
+        "object": "/tmp/taggr-safety-build/Build/Intermediates.noindex/GTMAppAuth.build/Debug-iphonesimulator/GTMAppAuth.build/Objects-normal/x86_64/KeychainHelper.o",
+        "swift-dependencies": "/tmp/taggr-safety-build/Build/Intermediates.noindex/GTMAppAuth.build/Debug-iphonesimulator/GTMAppAuth.build/Objects-normal/x86_64/KeychainHelper.swiftdeps",
+        "swiftmodule": "/tmp/taggr-safety-build/Build/Intermediates.noindex/GTMAppAuth.build/Debug-iphonesimulator/GTMAppAuth.build/Objects-normal/x86_64/KeychainHelper~partial.swiftmodule"
+    },
+    "/tmp/taggr-safety-build/SourcePackages/checkouts/GTMAppAuth/GTMAppAuth/Sources/KeychainStore/KeychainStore.swift": {
+        "const-values": "/tmp/taggr-safety-build/Build/Intermediates.noindex/GTMAppAuth.build/Debug-iphonesimulator/GTMAppAuth.build/Objects-normal/x86_64/KeychainStore.swiftconstvalues",
+        "dependencies": "/tmp/taggr-safety-build/Build/Intermediates.noindex/GTMAppAuth.build/Debug-iphonesimulator/GTMAppAuth.build/Objects-normal/x86_64/KeychainStore.d",
+        "diagnostics": "/tmp/taggr-safety-build/Build/Intermediates.noindex/GTMAppAuth.build/Debug-iphonesimulator/GTMAppAuth.build/Objects-normal/x86_64/KeychainStore.dia",
+        "index-unit-output-path": "/GTMAppAuth.build/Debug-iphonesimulator/GTMAppAuth.build/Objects-normal/x86_64/KeychainStore.o",
+        "llvm-bc": "/tmp/taggr-safety-build/Build/Intermediates.noindex/GTMAppAuth.build/Debug-iphonesimulator/GTMAppAuth.build/Objects-normal/x86_64/KeychainStore.bc",
+        "object": "/tmp/taggr-safety-build/Build/Intermediates.noindex/GTMAppAuth.build/Debug-iphonesimulator/GTMAppAuth.build/Objects-normal/x86_64/KeychainStore.o",
+        "swift-dependencies": "/tmp/taggr-safety-build/Build/Intermediates.noindex/GTMAppAuth.build/Debug-iphonesimulator/GTMAppAuth.build/Objects-normal/x86_64/KeychainStore.swiftdeps",
+        "swiftmodule": "/tmp/taggr-safety-build/Build/Intermediates.noindex/GTMAppAuth.build/Debug-iphonesimulator/GTMAppAuth.build/Objects-normal/x86_64/KeychainStore~partial.swiftmodule"
+    }
+}

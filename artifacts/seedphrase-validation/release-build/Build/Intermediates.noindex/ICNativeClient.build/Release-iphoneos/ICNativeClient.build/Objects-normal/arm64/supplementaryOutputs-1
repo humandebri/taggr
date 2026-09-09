@@ -1,0 +1,12 @@
+{
+  "/Volumes/KINGSTON/ICP/ICNativeClient/Sources/ICNativeClient/CBOR.swift" : {
+    "abi-baseline-json" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/ICNativeClient.build/Release-iphoneos/ICNativeClient.build/Objects-normal/arm64/ICNativeClient.abi.json",
+    "const-values" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/ICNativeClient.build/Release-iphoneos/ICNativeClient.build/Objects-normal/arm64/ICNativeClient-primary.swiftconstvalues",
+    "dependencies" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/ICNativeClient.build/Release-iphoneos/ICNativeClient.build/Objects-normal/arm64/ICNativeClient-primary.d",
+    "diagnostics" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/ICNativeClient.build/Release-iphoneos/ICNativeClient.build/Objects-normal/arm64/ICNativeClient-primary.dia",
+    "objc-header" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/ICNativeClient.build/Release-iphoneos/ICNativeClient.build/Objects-normal/arm64/ICNativeClient-Swift.h",
+    "swiftdoc" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/ICNativeClient.build/Release-iphoneos/ICNativeClient.build/Objects-normal/arm64/ICNativeClient.swiftdoc",
+    "swiftmodule" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/ICNativeClient.build/Release-iphoneos/ICNativeClient.build/Objects-normal/arm64/ICNativeClient.swiftmodule",
+    "swiftsourceinfo" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/ICNativeClient.build/Release-iphoneos/ICNativeClient.build/Objects-normal/arm64/ICNativeClient.swiftsourceinfo"
+  }
+}

@@ -1,0 +1,21 @@
+dependencies: \
+  /tmp/taggr-safety-build/SourcePackages/checkouts/AppAuth-iOS/Sources/AppAuthCore/OIDAuthState.m \
+  /tmp/taggr-safety-build/Build/Intermediates.noindex/AppAuth.build/Debug-iphonesimulator/AppAuthCore.build/DerivedSources/resource_bundle_accessor.h \
+  /Applications/Xcode-26.5.0.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator.sdk/System/Library/Frameworks/Foundation.framework/Modules/module.modulemap \
+  /tmp/taggr-safety-build/SourcePackages/checkouts/AppAuth-iOS/Sources/AppAuthCore/OIDAuthState.h \
+  /tmp/taggr-safety-build/SourcePackages/checkouts/AppAuth-iOS/Sources/AppAuthCore/OIDAuthStateChangeDelegate.h \
+  /tmp/taggr-safety-build/SourcePackages/checkouts/AppAuth-iOS/Sources/AppAuthCore/OIDAuthStateErrorDelegate.h \
+  /tmp/taggr-safety-build/SourcePackages/checkouts/AppAuth-iOS/Sources/AppAuthCore/OIDAuthorizationRequest.h \
+  /tmp/taggr-safety-build/SourcePackages/checkouts/AppAuth-iOS/Sources/AppAuthCore/OIDExternalUserAgentRequest.h \
+  /tmp/taggr-safety-build/SourcePackages/checkouts/AppAuth-iOS/Sources/AppAuthCore/OIDResponseTypes.h \
+  /tmp/taggr-safety-build/SourcePackages/checkouts/AppAuth-iOS/Sources/AppAuthCore/OIDScopes.h \
+  /tmp/taggr-safety-build/SourcePackages/checkouts/AppAuth-iOS/Sources/AppAuthCore/OIDAuthorizationResponse.h \
+  /tmp/taggr-safety-build/SourcePackages/checkouts/AppAuth-iOS/Sources/AppAuthCore/OIDAuthorizationService.h \
+  /tmp/taggr-safety-build/SourcePackages/checkouts/AppAuth-iOS/Sources/AppAuthCore/OIDDefines.h \
+  /tmp/taggr-safety-build/SourcePackages/checkouts/AppAuth-iOS/Sources/AppAuthCore/OIDError.h \
+  /tmp/taggr-safety-build/SourcePackages/checkouts/AppAuth-iOS/Sources/AppAuthCore/OIDErrorUtilities.h \
+  /tmp/taggr-safety-build/SourcePackages/checkouts/AppAuth-iOS/Sources/AppAuthCore/OIDRegistrationResponse.h \
+  /tmp/taggr-safety-build/SourcePackages/checkouts/AppAuth-iOS/Sources/AppAuthCore/OIDTokenRequest.h \
+  /tmp/taggr-safety-build/SourcePackages/checkouts/AppAuth-iOS/Sources/AppAuthCore/OIDGrantTypes.h \
+  /tmp/taggr-safety-build/SourcePackages/checkouts/AppAuth-iOS/Sources/AppAuthCore/OIDTokenResponse.h \
+  /tmp/taggr-safety-build/SourcePackages/checkouts/AppAuth-iOS/Sources/AppAuthCore/OIDTokenUtilities.h

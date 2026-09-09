@@ -109,11 +109,15 @@ extension TaggrAppCoordinator {
         context: TaggrPostSubmissionContext
     ) async -> TaggrPostSubmissionResult {
         do {
+            try await requireSafePublishing(text: text, realm: realm, parentID: parent)
+            guard context.runtimeGeneration == runtimeGeneration, context.userID == currentUser?.id else { throw TaggrSafetyError.unavailable }
             let body = text.trimmingCharacters(in: .whitespacesAndNewlines)
             let refs = try await uploadBlobs(
                 referencedNewBlobs(in: body, draftImages: images, existingBlobIDs: []),
                 context: context
             )
+            try await requireSafePublishing(text: text, realm: realm, parentID: parent)
+            guard context.runtimeGeneration == runtimeGeneration, context.userID == currentUser?.id else { throw TaggrSafetyError.unavailable }
             do {
                 _ = try await context.api.addPost(
                     text: body,
@@ -469,12 +473,16 @@ extension TaggrAppCoordinator {
         context: TaggrPostSubmissionContext
     ) async -> TaggrPostSubmissionResult {
         do {
+            try await requireSafePublishing(text: text, realm: realm ?? post.realm)
+            guard context.runtimeGeneration == runtimeGeneration, context.userID == currentUser?.id, !post.isNSFW else { throw TaggrSafetyError.unavailable }
             let body = text.trimmingCharacters(in: .whitespacesAndNewlines)
             let refs = try await uploadBlobs(
                 referencedNewBlobs(in: body, draftImages: images, existingBlobIDs: Self.blobIDs(in: post.files)),
                 context: context
             )
             let patch = TaggrEditPatch.fullReplacement(from: body, to: post.body)
+            try await requireSafePublishing(text: text, realm: realm ?? post.realm)
+            guard context.runtimeGeneration == runtimeGeneration, context.userID == currentUser?.id else { throw TaggrSafetyError.unavailable }
             do {
                 _ = try await context.api.editPost(
                     id: post.id,
@@ -532,6 +540,13 @@ extension TaggrAppCoordinator {
         context: TaggrPostSubmissionContext
     ) async -> TaggrPostSubmissionResult {
         do {
+            try await requireSafePublishing(text: text, realm: realm)
+            guard context.runtimeGeneration == runtimeGeneration,
+                  context.userID == currentUser?.id else { throw TaggrSafetyError.unavailable }
+        } catch {
+            return TaggrPostSubmissionResult(outcome: .retryableFailure, errorMessage: error.localizedDescription)
+        }
+        do {
             _ = try await context.api.repost(
                 postId: postId,
                 text: text.trimmingCharacters(in: .whitespacesAndNewlines),
@@ -564,12 +579,6 @@ extension TaggrAppCoordinator {
             feed = previousFeed
             focusedPost = previousFocusedPost
             repliesByPostID = previousReplies
-        }
-    }
-
-    func report(userId: Int, reason: String) async {
-        await runBusy {
-            _ = try await api.updateJSON("report", args: [userId, reason], identity: authSession)
         }
     }
 
@@ -660,11 +669,13 @@ extension TaggrAppCoordinator {
     }
 
     func toggleBlock(userId: Int) async {
-        await runBusy {
-            _ = try await api.updateJSON("toggle_blacklist", args: [userId], identity: authSession)
-            await updateCurrentUserIfPossible()
-            if case .profile(let handle) = route {
-                profile = try await api.query("user", args: [api.domain, [handle]], as: TaggrUser.self)
+        let blocked = !isUserBlocked(userId)
+        safety.setBlocked(blocked, userID: userId, scope: safetyScope)
+        // Persist the local choice first; IC failures must not expose blocked content.
+        if authSession != nil, (currentUser?.blacklist.contains(userId) == true) != blocked {
+            await runBusy {
+                _ = try await api.updateJSON("toggle_blacklist", args: [userId], identity: authSession)
+                await updateCurrentUserIfPossible()
             }
         }
     }
@@ -1005,20 +1016,26 @@ extension TaggrAppCoordinator {
     }
 
     func completeIdentity(_ session: ICAuthSession) async {
-        let completed = await runBusy {
-            // This signed canister query is the practical verifier before the II delegation is saved.
-            currentUser = try await api.signedQuery("user", args: [api.domain, []], identity: session, as: Optional<TaggrUser>.self) ?? nil
-            if let currentUser {
-                cacheAuthorName(currentUser.name, userID: currentUser.id)
-            }
-            try identityStore.save(session)
-            authSession = session
-            await reloadCache()
-            await loadCurrentRoute()
+        await runBusy {
+            let user = try await api.signedQuery("user", args: [api.domain, []], identity: session, as: Optional<TaggrUser>.self) ?? nil
+            try await finishIdentity(session, user: user, api: api, store: identityStore)
         }
-        if completed {
-            await refreshWallet()
+    }
+
+    func finishIdentity(_ session: ICAuthSession, user: TaggrUser?, api: TaggrAPI, store: ICIdentityStore) async throws {
+        try store.save(session)
+        self.api = api
+        identityStore = store
+        currentUser = user
+        authSession = session
+        errorMessage = nil
+        clearAuthorNameCache()
+        if let user {
+            cacheAuthorName(user.name, userID: user.id)
         }
+        await reloadCache()
+        await loadCurrentRoute()
+        await refreshWallet()
     }
 
     func signOut() {
@@ -1214,7 +1231,7 @@ extension TaggrAppCoordinator {
             return
         }
         let loadedUser = try await activeAPI.signedQuery("user", args: [activeAPI.domain, []], identity: authSession, as: Optional<TaggrUser>.self) ?? nil
-        guard isCurrentRuntimeGeneration(generation) else { return }
+        guard isCurrentRuntimeGeneration(generation), self.authSession?.principal == authSession.principal else { return }
         currentUser = loadedUser
         storageCreationState = Self.storageCreationState(from: loadedUser?.settings)
         if let loadedUser {

@@ -1,0 +1,192 @@
+{
+  "source": "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/ios/TAGGR/TAGGR/Views/RootView.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "Sign in",
+        "location": {
+          "startingColumn": 13,
+          "startingLine": 142
+        }
+      },
+      {
+        "comment": "",
+        "key": "Feed",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 60
+        }
+      },
+      {
+        "comment": "",
+        "key": "Realms",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 70
+        }
+      },
+      {
+        "comment": "",
+        "key": "Inbox",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 80
+        }
+      },
+      {
+        "comment": "",
+        "key": "Account",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 87
+        }
+      },
+      {
+        "comment": "",
+        "key": "Dismiss",
+        "location": {
+          "startingColumn": 36,
+          "startingLine": 127
+        }
+      },
+      {
+        "comment": "",
+        "key": "Seed phrase",
+        "location": {
+          "startingColumn": 20,
+          "startingLine": 149
+        }
+      },
+      {
+        "comment": "",
+        "key": "Choose a sign-in method.",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 163
+        }
+      },
+      {
+        "comment": "",
+        "key": "Terms of Use",
+        "location": {
+          "startingColumn": 14,
+          "startingLine": 233
+        }
+      },
+      {
+        "comment": "",
+        "key": "Privacy Policy",
+        "location": {
+          "startingColumn": 14,
+          "startingLine": 234
+        }
+      },
+      {
+        "comment": "",
+        "key": "Objectionable content and abusive behavior are not tolerated. Do not post pornography, exploitation, threats, hateful abuse, harassment, or illegal material. NSFW posts are unavailable in this iOS app.",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 249
+        }
+      },
+      {
+        "comment": "",
+        "key": "Report posts or users without a token or credit requirement. Blocking immediately hides their content and notifies the iOS operator. The operator reviews reports and acts on violations within 24 hours, removing content and suspending responsible users in the official iOS app. These actions do not delete data or accounts from the decentralized TAGGR network.",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 250
+        }
+      },
+      {
+        "comment": "",
+        "key": "Account suspended",
+        "location": {
+          "startingColumn": 75,
+          "startingLine": 246
+        }
+      },
+      {
+        "comment": "",
+        "key": "Safety check unavailable",
+        "location": {
+          "startingColumn": 97,
+          "startingLine": 246
+        }
+      },
+      {
+        "comment": "",
+        "key": "Terms & safety",
+        "location": {
+          "startingColumn": 127,
+          "startingLine": 246
+        }
+      },
+      {
+        "comment": "",
+        "key": "I agree to the Terms of Use and safety rules",
+        "location": {
+          "startingColumn": 28,
+          "startingLine": 252
+        }
+      },
+      {
+        "comment": "",
+        "key": "Agree and continue",
+        "location": {
+          "startingColumn": 28,
+          "startingLine": 253
+        }
+      },
+      {
+        "comment": "",
+        "key": "Your access to the official TAGGR iOS app is suspended. To appeal, open Account → Terms & safety → Contact / appeal a restriction. Your on-chain account is not deleted.",
+        "location": {
+          "startingColumn": 50,
+          "startingLine": 257
+        }
+      },
+      {
+        "comment": "",
+        "key": "Your agreement is saved. Posts are temporarily unavailable while we cannot verify the safety policy. Account and settings remain available.",
+        "location": {
+          "startingColumn": 227,
+          "startingLine": 257
+        }
+      },
+      {
+        "comment": "",
+        "key": "Go to Account",
+        "location": {
+          "startingColumn": 28,
+          "startingLine": 259
+        }
+      },
+      {
+        "comment": "",
+        "key": "Retry safety check",
+        "location": {
+          "startingColumn": 28,
+          "startingLine": 262
+        }
+      },
+      {
+        "comment": "",
+        "key": "Checking…",
+        "location": {
+          "startingColumn": 38,
+          "startingLine": 274
+        }
+      },
+      {
+        "comment": "",
+        "key": "Sign out",
+        "location": {
+          "startingColumn": 54,
+          "startingLine": 283
+        }
+      }
+    ]
+  },
+  "version": 1
+}

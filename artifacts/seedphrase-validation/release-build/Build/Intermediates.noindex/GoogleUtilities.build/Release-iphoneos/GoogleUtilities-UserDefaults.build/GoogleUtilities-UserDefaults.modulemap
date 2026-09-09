@@ -1,0 +1,4 @@
+module GoogleUtilities_UserDefaults {
+umbrella "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/taggr-safety-build/SourcePackages/checkouts/GoogleUtilities/GoogleUtilities/UserDefaults/Public"
+export *
+}

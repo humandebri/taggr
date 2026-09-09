@@ -1,0 +1,58 @@
+{
+  "info" : {
+    "arguments" : [
+      "devicectl",
+      "--timeout",
+      "30",
+      "device",
+      "process",
+      "launch",
+      "--device",
+      "EF18B302-BBD0-5702-B540-9604CBA0E446",
+      "network.taggr.ios",
+      "--json-output",
+      "artifacts/minimal-moderation/device-launch.json"
+    ],
+    "commandType" : "devicectl.device.process.launch",
+    "environment" : {
+      "TERM" : "dumb"
+    },
+    "jsonVersion" : 3,
+    "outcome" : "success",
+    "version" : "518.31"
+  },
+  "result" : {
+    "deviceIdentifier" : "EF18B302-BBD0-5702-B540-9604CBA0E446",
+    "launchOptions" : {
+      "activatedWhenStarted" : true,
+      "arguments" : [
+
+      ],
+      "environmentVariables" : {
+        "TERM" : "dumb"
+      },
+      "platformSpecificOptions" : {
+
+      },
+      "startStopped" : false,
+      "terminateExistingInstances" : false,
+      "user" : {
+        "active" : true
+      }
+    },
+    "process" : {
+      "auditToken" : [
+        4294967295,
+        501,
+        501,
+        501,
+        501,
+        37041,
+        0,
+        102704
+      ],
+      "executable" : "file:///private/var/containers/Bundle/Application/56C50E8E-EE10-42D6-80FC-1D589D16BE07/TAGGR.app/TAGGR",
+      "processIdentifier" : 37041
+    }
+  }
+}

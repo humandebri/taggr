@@ -1,5 +1,7 @@
+import { moderationFetch } from "./moderation.mjs";
+
 const SOURCE_URL = "https://github.com/TaggrNetwork/Taggr";
-const POLICY_EFFECTIVE_DATE = "September 7, 2026";
+const POLICY_EFFECTIVE_DATE = "September 9, 2026";
 
 const styles = `
 :root {
@@ -120,7 +122,7 @@ const home = layout({
       <div class="eyebrow">Official TAGGR iOS app information</div>
       <h1>TAGGR is a decentralized social network and publishing app.</h1>
       <p class="lead">TAGGR runs on the Internet Computer. Its iOS app lets people read and publish posts, join topic-based communities, manage their public profile and wallet, and optionally upload a video they select to their own YouTube channel.</p>
-      <p>This public website explains the TAGGR app, its optional Google and YouTube integration, and its data practices. Every page on this website is publicly accessible.</p>
+      <p>This public website explains the TAGGR app, its optional Google and YouTube integration, and its data practices. All app-information and legal pages are publicly accessible.</p>
       <div class="actions"><a class="button primary" href="/privacy-policy">Read the TAGGR Privacy Policy</a><a class="button" href="/terms">Read the Terms of Use</a></div>
       <h2>What the TAGGR iOS app does</h2>
       <ul>
@@ -203,8 +205,12 @@ const privacy = layout({
       <h2>Children</h2>
       <p>TAGGR is not directed to children under the age required to consent to online services in their jurisdiction.</p>
 
+      <h2>iOS reports and moderation</h2>
+      <p>Report on a post or profile sends the target canister, post or user ID, your reason, and a random request ID to the operator's Cloudflare Worker. Reports are stored in D1 for manual review; no token or credit balance is required. Reports do not automatically hide content. Do not include passwords, private keys, or other sensitive information.</p>
+      <p>The operator can hide individual posts or a user's content in the official iOS app. The public list contains only target IDs and a version, not report text or decision reasons. Closed reports are deleted after 90 days during the operator's review process. Display decisions and their reasons are retained for review and reversal.</p>
+      <p>Terms acceptance, personal blocks, and the last fetched display-stop list are stored on your device. Signed-in block choices are synchronized with TAGGR when possible. The app fetches the display-stop list without sending your identity credentials. IP addresses are used transiently by Cloudflare's rate limiter to limit report abuse; they are not stored in the report database.</p>
       <h2>Changes and contact</h2>
-      <p>This policy may be updated when TAGGR’s data practices change. The effective date above identifies the current version. Privacy questions, support requests, and public issue reports can be submitted through the <a href="${SOURCE_URL}/issues">TAGGR open-source project issue tracker</a>.</p>
+      <p>This policy may be updated when TAGGR’s data practices change. The effective date above identifies the current version. Contact the iOS operator through <a href="https://6qfxa-ryaaa-aaaai-qbhsq-cai.icp0.io/#/user/FF">@FF on TAGGR</a>. Profile posts and replies are public. Send private safety reports using Report in the iOS app.</p>
     `,
 });
 
@@ -234,6 +240,12 @@ const terms = layout({
       <h2>No warranty</h2>
       <p>TAGGR is provided on an “as is” and “as available” basis to the extent permitted by law. No guarantee is made that the service will be uninterrupted, error-free, or suitable for a particular purpose. Nothing on TAGGR constitutes financial, legal, or investment advice.</p>
 
+      <h2>iOS end-user agreement and safety</h2>
+      <p>You must explicitly accept this agreement before using user-generated content in the iOS app. There is zero tolerance for objectionable content or abusive users, including sexual exploitation, pornography, threats, targeted harassment, hateful abuse, and illegal material. Do not upload or link to such content.</p>
+      <p>The iOS app does not display posts marked NSFW and retains existing content filtering. Report on a post or profile submits a concern within the app without tokens or credits. The app confirms receipt only after storage succeeds. Block immediately hides that user's content from your iOS experience.</p>
+      <p>The operator reviews reports within 24 hours and can hide a post or a user's content in the official iOS app. This does not delete content from Internet Computer, disable the underlying account, or restrict other clients. Reports are not automatically treated as proof of a violation. Unmarked objectionable content may escape filtering; please report it.</p>
+      <p>If the display-stop list cannot be updated, the app continues using the last fetched list. Newly issued or lifted restrictions take effect after a successful update; service failure does not prevent normal app use.</p>
+      <p>For support or appeals, contact <a href="https://6qfxa-ryaaa-aaaai-qbhsq-cai.icp0.io/#/user/FF">@FF on TAGGR</a>. Profile posts and replies are public. Send private safety reports using Report in the iOS app.</p>
       <h2>Changes and support</h2>
       <p>These terms may be updated as the service changes. The effective date above identifies the current version. Questions and public issue reports can be submitted through the <a href="${SOURCE_URL}/issues">TAGGR open-source project issue tracker</a>.</p>
     `,
@@ -262,7 +274,9 @@ const securityHeaders = {
 };
 
 export default {
-    async fetch(request) {
+    async fetch(request, env = {}) {
+        const result = await moderationFetch(request, env);
+        if (result) return result;
         const url = new URL(request.url);
         const method = request.method.toUpperCase();
         if (method !== "GET" && method !== "HEAD") {

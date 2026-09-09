@@ -1,0 +1,16 @@
+{
+  "source": "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/baseline/TAGGR/TAGGR/Views/YouTubeEmbedView.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "YouTube video",
+        "location": {
+          "startingColumn": 33,
+          "startingLine": 15
+        }
+      }
+    ]
+  },
+  "version": 1
+}

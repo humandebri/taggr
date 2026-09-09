@@ -1,0 +1,44 @@
+{
+  "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/ios/TAGGR/TAGGR/Views/AccountImagePagerView.swift" : {
+    "const-values" : "/tmp/taggr-safety-build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGR.build/Objects-normal/x86_64/AccountImagePagerView.swiftconstvalues",
+    "dependencies" : "/tmp/taggr-safety-build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGR.build/Objects-normal/x86_64/AccountImagePagerView.d",
+    "diagnostics" : "/tmp/taggr-safety-build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGR.build/Objects-normal/x86_64/AccountImagePagerView.dia",
+    "object" : "/tmp/taggr-safety-build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGR.build/Objects-normal/x86_64/AccountImagePagerView.o",
+    "swift-dependencies" : "/tmp/taggr-safety-build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGR.build/Objects-normal/x86_64/AccountImagePagerView.swiftdeps"
+  },
+  "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/ios/TAGGR/TAGGR/Views/PostDetailViews.swift" : {
+    "const-values" : "/tmp/taggr-safety-build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGR.build/Objects-normal/x86_64/PostDetailViews.swiftconstvalues",
+    "dependencies" : "/tmp/taggr-safety-build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGR.build/Objects-normal/x86_64/PostDetailViews.d",
+    "diagnostics" : "/tmp/taggr-safety-build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGR.build/Objects-normal/x86_64/PostDetailViews.dia",
+    "object" : "/tmp/taggr-safety-build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGR.build/Objects-normal/x86_64/PostDetailViews.o",
+    "swift-dependencies" : "/tmp/taggr-safety-build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGR.build/Objects-normal/x86_64/PostDetailViews.swiftdeps"
+  },
+  "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/ios/TAGGR/TAGGR/Views/RealmViews.swift" : {
+    "const-values" : "/tmp/taggr-safety-build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGR.build/Objects-normal/x86_64/RealmViews.swiftconstvalues",
+    "dependencies" : "/tmp/taggr-safety-build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGR.build/Objects-normal/x86_64/RealmViews.d",
+    "diagnostics" : "/tmp/taggr-safety-build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGR.build/Objects-normal/x86_64/RealmViews.dia",
+    "object" : "/tmp/taggr-safety-build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGR.build/Objects-normal/x86_64/RealmViews.o",
+    "swift-dependencies" : "/tmp/taggr-safety-build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGR.build/Objects-normal/x86_64/RealmViews.swiftdeps"
+  },
+  "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/ios/TAGGR/TAGGR/Views/SharedViews.swift" : {
+    "const-values" : "/tmp/taggr-safety-build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGR.build/Objects-normal/x86_64/SharedViews.swiftconstvalues",
+    "dependencies" : "/tmp/taggr-safety-build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGR.build/Objects-normal/x86_64/SharedViews.d",
+    "diagnostics" : "/tmp/taggr-safety-build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGR.build/Objects-normal/x86_64/SharedViews.dia",
+    "object" : "/tmp/taggr-safety-build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGR.build/Objects-normal/x86_64/SharedViews.o",
+    "swift-dependencies" : "/tmp/taggr-safety-build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGR.build/Objects-normal/x86_64/SharedViews.swiftdeps"
+  },
+  "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/ios/TAGGR/TAGGR/Views/TaggrRefreshable.swift" : {
+    "const-values" : "/tmp/taggr-safety-build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGR.build/Objects-normal/x86_64/TaggrRefreshable.swiftconstvalues",
+    "dependencies" : "/tmp/taggr-safety-build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGR.build/Objects-normal/x86_64/TaggrRefreshable.d",
+    "diagnostics" : "/tmp/taggr-safety-build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGR.build/Objects-normal/x86_64/TaggrRefreshable.dia",
+    "object" : "/tmp/taggr-safety-build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGR.build/Objects-normal/x86_64/TaggrRefreshable.o",
+    "swift-dependencies" : "/tmp/taggr-safety-build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGR.build/Objects-normal/x86_64/TaggrRefreshable.swiftdeps"
+  },
+  "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/ios/TAGGR/TAGGR/Views/UserImageLibraryView.swift" : {
+    "const-values" : "/tmp/taggr-safety-build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGR.build/Objects-normal/x86_64/UserImageLibraryView.swiftconstvalues",
+    "dependencies" : "/tmp/taggr-safety-build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGR.build/Objects-normal/x86_64/UserImageLibraryView.d",
+    "diagnostics" : "/tmp/taggr-safety-build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGR.build/Objects-normal/x86_64/UserImageLibraryView.dia",
+    "object" : "/tmp/taggr-safety-build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGR.build/Objects-normal/x86_64/UserImageLibraryView.o",
+    "swift-dependencies" : "/tmp/taggr-safety-build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGR.build/Objects-normal/x86_64/UserImageLibraryView.swiftdeps"
+  }
+}

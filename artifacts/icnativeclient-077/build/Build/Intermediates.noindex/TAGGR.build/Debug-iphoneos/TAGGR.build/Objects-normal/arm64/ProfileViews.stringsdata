@@ -1,0 +1,144 @@
+{
+  "source": "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/ios/TAGGR/TAGGR/Views/ProfileViews.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "No profile",
+        "location": {
+          "startingColumn": 34,
+          "startingLine": 40
+        }
+      },
+      {
+        "comment": "",
+        "key": "This user's content is unavailable.",
+        "location": {
+          "startingColumn": 38,
+          "startingLine": 22
+        }
+      },
+      {
+        "comment": "",
+        "key": "This account is deactivated.",
+        "location": {
+          "startingColumn": 38,
+          "startingLine": 27
+        }
+      },
+      {
+        "comment": "",
+        "key": "Unblock",
+        "location": {
+          "startingColumn": 42,
+          "startingLine": 86
+        }
+      },
+      {
+        "comment": "",
+        "key": "Block",
+        "location": {
+          "startingColumn": 54,
+          "startingLine": 86
+        }
+      },
+      {
+        "comment": "",
+        "key": "Cancel",
+        "location": {
+          "startingColumn": 20,
+          "startingLine": 90
+        }
+      },
+      {
+        "comment": "",
+        "key": "Unblock",
+        "location": {
+          "startingColumn": 39,
+          "startingLine": 140
+        }
+      },
+      {
+        "comment": "",
+        "key": "Block",
+        "location": {
+          "startingColumn": 51,
+          "startingLine": 140
+        }
+      },
+      {
+        "comment": "",
+        "key": "Report",
+        "location": {
+          "startingColumn": 23,
+          "startingLine": 147
+        }
+      },
+      {
+        "comment": "",
+        "key": "More actions",
+        "location": {
+          "startingColumn": 19,
+          "startingLine": 150
+        }
+      },
+      {
+        "comment": "",
+        "key": "Photos",
+        "location": {
+          "startingColumn": 19,
+          "startingLine": 177
+        }
+      },
+      {
+        "comment": "",
+        "key": "Links",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 192
+        }
+      },
+      {
+        "comment": "",
+        "key": "Principal",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 204
+        }
+      },
+      {
+        "comment": "",
+        "key": "No posts",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 257
+        }
+      },
+      {
+        "comment": "",
+        "key": "Journal",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 243
+        }
+      },
+      {
+        "comment": "",
+        "key": "#%@",
+        "location": {
+          "startingColumn": 38,
+          "startingLine": 420
+        }
+      },
+      {
+        "comment": "",
+        "key": "Done",
+        "location": {
+          "startingColumn": 28,
+          "startingLine": 438
+        }
+      }
+    ]
+  },
+  "version": 1
+}

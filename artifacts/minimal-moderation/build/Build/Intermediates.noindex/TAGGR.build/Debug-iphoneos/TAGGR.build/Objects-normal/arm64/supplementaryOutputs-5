@@ -1,0 +1,23 @@
+{
+  "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/ios/TAGGR/TAGGR/Views/PostImageLoaderView.swift" : {
+    "const-values" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/minimal-moderation/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphoneos/TAGGR.build/Objects-normal/arm64/PostImageLoaderView.swiftconstvalues",
+    "dependencies" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/minimal-moderation/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphoneos/TAGGR.build/Objects-normal/arm64/PostImageLoaderView.d",
+    "diagnostics" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/minimal-moderation/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphoneos/TAGGR.build/Objects-normal/arm64/PostImageLoaderView.dia",
+    "object" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/minimal-moderation/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphoneos/TAGGR.build/Objects-normal/arm64/PostImageLoaderView.o",
+    "swift-dependencies" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/minimal-moderation/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphoneos/TAGGR.build/Objects-normal/arm64/PostImageLoaderView.swiftdeps"
+  },
+  "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/ios/TAGGR/TAGGR/Views/TaggrImagePagerView.swift" : {
+    "const-values" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/minimal-moderation/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphoneos/TAGGR.build/Objects-normal/arm64/TaggrImagePagerView.swiftconstvalues",
+    "dependencies" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/minimal-moderation/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphoneos/TAGGR.build/Objects-normal/arm64/TaggrImagePagerView.d",
+    "diagnostics" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/minimal-moderation/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphoneos/TAGGR.build/Objects-normal/arm64/TaggrImagePagerView.dia",
+    "object" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/minimal-moderation/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphoneos/TAGGR.build/Objects-normal/arm64/TaggrImagePagerView.o",
+    "swift-dependencies" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/minimal-moderation/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphoneos/TAGGR.build/Objects-normal/arm64/TaggrImagePagerView.swiftdeps"
+  },
+  "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/ios/TAGGR/TAGGR/Views/UserImageLibraryView.swift" : {
+    "const-values" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/minimal-moderation/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphoneos/TAGGR.build/Objects-normal/arm64/UserImageLibraryView.swiftconstvalues",
+    "dependencies" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/minimal-moderation/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphoneos/TAGGR.build/Objects-normal/arm64/UserImageLibraryView.d",
+    "diagnostics" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/minimal-moderation/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphoneos/TAGGR.build/Objects-normal/arm64/UserImageLibraryView.dia",
+    "object" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/minimal-moderation/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphoneos/TAGGR.build/Objects-normal/arm64/UserImageLibraryView.o",
+    "swift-dependencies" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/minimal-moderation/build/Build/Intermediates.noindex/TAGGR.build/Debug-iphoneos/TAGGR.build/Objects-normal/arm64/UserImageLibraryView.swiftdeps"
+  }
+}

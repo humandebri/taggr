@@ -1,0 +1,16 @@
+2026-09-09 11:52:23.914 xcodebuild[56672:111139634] [MT] IDERunDestination: Supported platforms for the buildables in the current scheme is empty.
+Writing result bundle at path:
+	/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/minimal-moderation/ios-ui.xcresult
+
+2026-09-09 11:52:23.920 xcodebuild[56672:111139634] [MT] IDERunDestination: Supported platforms for the buildables in the current scheme is empty.
+2026-09-09 11:52:26.022 xcodebuild[56672:111139634] [MT] IDERunDestination: Supported platforms for the buildables in the current scheme is empty.
+2026-09-09 11:52:26.663 xcodebuild[56672:111139634] [MT] IDERunDestination: Supported platforms for the buildables in the current scheme is empty.
+2026-09-09 11:54:44.251 xcodebuild[56672:111139634] [MT] IDETestOperationsObserverDebug: 138.181 elapsed -- Testing started completed.
+2026-09-09 11:54:44.252 xcodebuild[56672:111139634] [MT] IDETestOperationsObserverDebug: 0.000 sec, +0.000 sec -- start
+2026-09-09 11:54:44.252 xcodebuild[56672:111139634] [MT] IDETestOperationsObserverDebug: 138.181 sec, +138.181 sec -- end
+Failing tests:
+	TaggrTests.testModerationReportInteractiveUI()
+
+** TEST EXECUTE FAILED **
+
+Testing started

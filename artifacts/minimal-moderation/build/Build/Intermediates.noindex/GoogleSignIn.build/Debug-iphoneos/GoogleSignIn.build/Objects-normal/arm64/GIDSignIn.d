@@ -1,0 +1,31 @@
+dependencies: \
+  /Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/taggr-safety-build/SourcePackages/checkouts/GoogleSignIn-iOS/GoogleSignIn/Sources/GIDSignIn.m \
+  /Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/minimal-moderation/build/Build/Intermediates.noindex/GoogleSignIn.build/Debug-iphoneos/GoogleSignIn.build/DerivedSources/resource_bundle_accessor.h \
+  /Applications/Xcode-26.5.0.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS.sdk/System/Library/Frameworks/Foundation.framework/Modules/module.modulemap \
+  /Applications/Xcode-26.5.0.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS.sdk/usr/include/DarwinFoundation1.modulemap \
+  /Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/taggr-safety-build/SourcePackages/checkouts/GoogleSignIn-iOS/GoogleSignIn/Sources/Public/GoogleSignIn/GIDSignIn.h \
+  /Applications/Xcode-26.5.0.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS.sdk/System/Library/Frameworks/UIKit.framework/Modules/module.modulemap \
+  /Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/taggr-safety-build/SourcePackages/checkouts/GoogleSignIn-iOS/GoogleSignIn/Sources/GIDSignIn_Private.h \
+  /Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/taggr-safety-build/SourcePackages/checkouts/GoogleSignIn-iOS/GoogleSignIn/Sources/Public/GoogleSignIn/GIDConfiguration.h \
+  /Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/taggr-safety-build/SourcePackages/checkouts/GoogleSignIn-iOS/GoogleSignIn/Sources/Public/GoogleSignIn/GIDGoogleUser.h \
+  /Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/minimal-moderation/build/Build/Intermediates.noindex/GeneratedModuleMaps-iphoneos/GTMSessionFetcherCore.modulemap \
+  /Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/taggr-safety-build/SourcePackages/checkouts/GoogleSignIn-iOS/GoogleSignIn/Sources/Public/GoogleSignIn/GIDProfileData.h \
+  /Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/taggr-safety-build/SourcePackages/checkouts/GoogleSignIn-iOS/GoogleSignIn/Sources/Public/GoogleSignIn/GIDSignInResult.h \
+  /Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/taggr-safety-build/SourcePackages/checkouts/GoogleSignIn-iOS/GoogleSignIn/Sources/GIDAuthStateMigration/GIDAuthStateMigration.h \
+  /Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/taggr-safety-build/SourcePackages/checkouts/GoogleSignIn-iOS/GoogleSignIn/Sources/GIDEMMSupport.h \
+  /Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/minimal-moderation/build/Build/Intermediates.noindex/GeneratedModuleMaps-iphoneos/GTMAppAuth.modulemap \
+  /Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/taggr-safety-build/SourcePackages/checkouts/GoogleSignIn-iOS/GoogleSignIn/Sources/GIDSignInInternalOptions.h \
+  /Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/taggr-safety-build/SourcePackages/checkouts/GoogleSignIn-iOS/GoogleSignIn/Sources/GIDSignInPreferences.h \
+  /Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/taggr-safety-build/SourcePackages/checkouts/GoogleSignIn-iOS/GoogleSignIn/Sources/GIDCallbackQueue.h \
+  /Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/taggr-safety-build/SourcePackages/checkouts/GoogleSignIn-iOS/GoogleSignIn/Sources/GIDScopes.h \
+  /Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/taggr-safety-build/SourcePackages/checkouts/GoogleSignIn-iOS/GoogleSignIn/Sources/GIDSignInCallbackSchemes.h \
+  /Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/minimal-moderation/build/Build/Intermediates.noindex/GeneratedModuleMaps-iphoneos/AppCheckCore.modulemap \
+  /Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/taggr-safety-build/SourcePackages/checkouts/GoogleSignIn-iOS/GoogleSignIn/Sources/GIDAppCheck/Implementations/GIDAppCheck.h \
+  /Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/taggr-safety-build/SourcePackages/checkouts/GoogleSignIn-iOS/GoogleSignIn/Sources/GIDAppCheck/UI/GIDActivityIndicatorViewController.h \
+  /Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/taggr-safety-build/SourcePackages/checkouts/GoogleSignIn-iOS/GoogleSignIn/Sources/GIDEMMErrorHandler.h \
+  /Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/taggr-safety-build/SourcePackages/checkouts/GoogleSignIn-iOS/GoogleSignIn/Sources/GIDTimedLoader/GIDTimedLoader.h \
+  /Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/taggr-safety-build/SourcePackages/checkouts/GoogleSignIn-iOS/GoogleSignIn/Sources/GIDGoogleUser_Private.h \
+  /Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/minimal-moderation/build/Build/Intermediates.noindex/GeneratedModuleMaps-iphoneos/AppAuth.modulemap \
+  /Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/minimal-moderation/build/Build/Intermediates.noindex/GeneratedModuleMaps-iphoneos/AppAuthCore.modulemap \
+  /Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/taggr-safety-build/SourcePackages/checkouts/GoogleSignIn-iOS/GoogleSignIn/Sources/GIDProfileData_Private.h \
+  /Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/taggr-safety-build/SourcePackages/checkouts/GoogleSignIn-iOS/GoogleSignIn/Sources/GIDSignInResult_Private.h

@@ -1,0 +1,168 @@
+{
+  "source": "/tmp/taggr-safety-baseline.ezhNRz/ios/TAGGR/TAGGR/Views/FeedViews.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "Create TAGGR user",
+        "location": {
+          "startingColumn": 72,
+          "startingLine": 74
+        }
+      },
+      {
+        "comment": "",
+        "key": "Post",
+        "location": {
+          "startingColumn": 94,
+          "startingLine": 74
+        }
+      },
+      {
+        "comment": "",
+        "key": "Feed",
+        "location": {
+          "startingColumn": 24,
+          "startingLine": 225
+        }
+      },
+      {
+        "comment": "",
+        "key": "Back to feed",
+        "location": {
+          "startingColumn": 41,
+          "startingLine": 232
+        }
+      },
+      {
+        "comment": "",
+        "key": "No posts",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 301
+        }
+      },
+      {
+        "comment": "",
+        "key": "Pull to refresh or switch channels.",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 304
+        }
+      },
+      {
+        "comment": "",
+        "key": "Translated",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 357
+        }
+      },
+      {
+        "comment": "",
+        "key": "Open realm %@",
+        "location": {
+          "startingColumn": 45,
+          "startingLine": 415
+        }
+      },
+      {
+        "comment": "",
+        "key": "Show full post",
+        "location": {
+          "startingColumn": 35,
+          "startingLine": 433
+        }
+      },
+      {
+        "comment": "",
+        "key": "#%@",
+        "location": {
+          "startingColumn": 14,
+          "startingLine": 687
+        }
+      },
+      {
+        "comment": "",
+        "key": "Poll",
+        "location": {
+          "startingColumn": 23,
+          "startingLine": 763
+        }
+      },
+      {
+        "comment": "",
+        "key": "1 vote",
+        "location": {
+          "startingColumn": 40,
+          "startingLine": 767
+        }
+      },
+      {
+        "comment": "",
+        "key": "%lld votes",
+        "location": {
+          "startingColumn": 51,
+          "startingLine": 767
+        }
+      },
+      {
+        "comment": "",
+        "key": "Vote",
+        "location": {
+          "startingColumn": 28,
+          "startingLine": 785
+        }
+      },
+      {
+        "comment": "",
+        "key": "Vote anonymously",
+        "location": {
+          "startingColumn": 28,
+          "startingLine": 789
+        }
+      },
+      {
+        "comment": "",
+        "key": "%lld%%",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 845
+        }
+      },
+      {
+        "comment": "",
+        "key": "Repost",
+        "location": {
+          "startingColumn": 31,
+          "startingLine": 886
+        }
+      },
+      {
+        "comment": "",
+        "key": "Proposal",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 930
+        }
+      },
+      {
+        "comment": "",
+        "key": "#%lld",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 933
+        }
+      },
+      {
+        "comment": "",
+        "key": "Loading replies",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 1034
+        }
+      }
+    ]
+  },
+  "version": 1
+}

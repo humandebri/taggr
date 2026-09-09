@@ -108,7 +108,7 @@ struct SettingsView: View {
                                 state.presentIdentitySignInMethodPicker()
                             } label: {
                                 Label(
-                                    state.isAuthenticatingIdentity ? "Signing in..." : "Sign in with Internet Identity",
+                                    state.isAuthenticatingIdentity ? "Signing in..." : "Sign in",
                                     systemImage: "infinity"
                                 )
                             }
@@ -165,6 +165,10 @@ struct SettingsView: View {
                                     .foregroundStyle(.red)
                             }
                         }
+                    }
+                    SettingsPanel(title: "Privacy & support") {
+                        Link("Privacy Policy", destination: TaggrSafetyStore.siteURL.appendingPathComponent("privacy-policy"))
+                        Link("Contact @FF on TAGGR", destination: TaggrSafetyStore.contactURL)
                     }
                 }
                 .padding(16)

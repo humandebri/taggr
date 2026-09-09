@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>logFormatVersion</key>
+	<integer>12</integer>
+	<key>logs</key>
+	<dict>
+		<key>938D43A5-3D58-4FC1-8D09-1F710BC4B10E</key>
+		<dict>
+			<key>className</key>
+			<string>IDECommandLineBuildLog</string>
+			<key>documentTypeString</key>
+			<string>&lt;nil&gt;</string>
+			<key>domainType</key>
+			<string>Xcode.IDEActivityLogDomainType.BuildLog</string>
+			<key>fileName</key>
+			<string>938D43A5-3D58-4FC1-8D09-1F710BC4B10E.xcactivitylog</string>
+			<key>hasPrimaryLog</key>
+			<true/>
+			<key>primaryObservable</key>
+			<dict>
+				<key>highLevelStatus</key>
+				<string>W</string>
+				<key>totalNumberOfAnalyzerIssues</key>
+				<integer>0</integer>
+				<key>totalNumberOfErrors</key>
+				<integer>0</integer>
+				<key>totalNumberOfTestFailures</key>
+				<integer>0</integer>
+				<key>totalNumberOfWarnings</key>
+				<integer>10</integer>
+			</dict>
+			<key>schemeIdentifier-containerName</key>
+			<string>TAGGR project</string>
+			<key>schemeIdentifier-schemeName</key>
+			<string>TAGGR</string>
+			<key>schemeIdentifier-sharedScheme</key>
+			<integer>1</integer>
+			<key>signature</key>
+			<string>Testing workspace Baseline with scheme TAGGR</string>
+			<key>timeStartedRecording</key>
+			<real>810606308.51950204</real>
+			<key>timeStoppedRecording</key>
+			<real>810606349.27112901</real>
+			<key>title</key>
+			<string>Testing workspace Baseline with scheme TAGGR</string>
+			<key>uniqueIdentifier</key>
+			<string>938D43A5-3D58-4FC1-8D09-1F710BC4B10E</string>
+		</dict>
+	</dict>
+</dict>
+</plist>

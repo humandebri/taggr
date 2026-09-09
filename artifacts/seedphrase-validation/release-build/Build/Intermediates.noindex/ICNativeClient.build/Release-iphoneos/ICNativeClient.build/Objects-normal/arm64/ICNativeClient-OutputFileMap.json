@@ -1,0 +1,71 @@
+{
+  "" : {
+    "const-values" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/ICNativeClient.build/Release-iphoneos/ICNativeClient.build/Objects-normal/arm64/ICNativeClient-primary.swiftconstvalues",
+    "dependencies" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/ICNativeClient.build/Release-iphoneos/ICNativeClient.build/Objects-normal/arm64/ICNativeClient-primary.d",
+    "diagnostics" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/ICNativeClient.build/Release-iphoneos/ICNativeClient.build/Objects-normal/arm64/ICNativeClient-primary.dia",
+    "emit-module-dependencies" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/ICNativeClient.build/Release-iphoneos/ICNativeClient.build/Objects-normal/arm64/ICNativeClient-primary-emit-module.d",
+    "emit-module-diagnostics" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/ICNativeClient.build/Release-iphoneos/ICNativeClient.build/Objects-normal/arm64/ICNativeClient-primary-emit-module.dia",
+    "pch" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/ICNativeClient.build/Release-iphoneos/ICNativeClient.build/Objects-normal/arm64/ICNativeClient-primary-Bridging-header.pch",
+    "swift-dependencies" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/ICNativeClient.build/Release-iphoneos/ICNativeClient.build/Objects-normal/arm64/ICNativeClient-primary.swiftdeps"
+  },
+  "/Volumes/KINGSTON/ICP/ICNativeClient/Sources/ICNativeClient/CBOR.swift" : {
+    "index-unit-output-path" : "/ICNativeClient.build/Release-iphoneos/ICNativeClient.build/Objects-normal/arm64/CBOR.o",
+    "llvm-bc" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/ICNativeClient.build/Release-iphoneos/ICNativeClient.build/Objects-normal/arm64/CBOR.bc",
+    "object" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/ICNativeClient.build/Release-iphoneos/ICNativeClient.build/Objects-normal/arm64/CBOR.o"
+  },
+  "/Volumes/KINGSTON/ICP/ICNativeClient/Sources/ICNativeClient/Candid.swift" : {
+    "index-unit-output-path" : "/ICNativeClient.build/Release-iphoneos/ICNativeClient.build/Objects-normal/arm64/Candid.o",
+    "llvm-bc" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/ICNativeClient.build/Release-iphoneos/ICNativeClient.build/Objects-normal/arm64/Candid.bc",
+    "object" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/ICNativeClient.build/Release-iphoneos/ICNativeClient.build/Objects-normal/arm64/Candid.o"
+  },
+  "/Volumes/KINGSTON/ICP/ICNativeClient/Sources/ICNativeClient/CandidCodec.swift" : {
+    "index-unit-output-path" : "/ICNativeClient.build/Release-iphoneos/ICNativeClient.build/Objects-normal/arm64/CandidCodec.o",
+    "llvm-bc" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/ICNativeClient.build/Release-iphoneos/ICNativeClient.build/Objects-normal/arm64/CandidCodec.bc",
+    "object" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/ICNativeClient.build/Release-iphoneos/ICNativeClient.build/Objects-normal/arm64/CandidCodec.o"
+  },
+  "/Volumes/KINGSTON/ICP/ICNativeClient/Sources/ICNativeClient/CandidSubtype.swift" : {
+    "index-unit-output-path" : "/ICNativeClient.build/Release-iphoneos/ICNativeClient.build/Objects-normal/arm64/CandidSubtype.o",
+    "llvm-bc" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/ICNativeClient.build/Release-iphoneos/ICNativeClient.build/Objects-normal/arm64/CandidSubtype.bc",
+    "object" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/ICNativeClient.build/Release-iphoneos/ICNativeClient.build/Objects-normal/arm64/CandidSubtype.o"
+  },
+  "/Volumes/KINGSTON/ICP/ICNativeClient/Sources/ICNativeClient/Certificate.swift" : {
+    "index-unit-output-path" : "/ICNativeClient.build/Release-iphoneos/ICNativeClient.build/Objects-normal/arm64/Certificate.o",
+    "llvm-bc" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/ICNativeClient.build/Release-iphoneos/ICNativeClient.build/Objects-normal/arm64/Certificate.bc",
+    "object" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/ICNativeClient.build/Release-iphoneos/ICNativeClient.build/Objects-normal/arm64/Certificate.o"
+  },
+  "/Volumes/KINGSTON/ICP/ICNativeClient/Sources/ICNativeClient/Configuration.swift" : {
+    "index-unit-output-path" : "/ICNativeClient.build/Release-iphoneos/ICNativeClient.build/Objects-normal/arm64/Configuration.o",
+    "llvm-bc" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/ICNativeClient.build/Release-iphoneos/ICNativeClient.build/Objects-normal/arm64/Configuration.bc",
+    "object" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/ICNativeClient.build/Release-iphoneos/ICNativeClient.build/Objects-normal/arm64/Configuration.o"
+  },
+  "/Volumes/KINGSTON/ICP/ICNativeClient/Sources/ICNativeClient/Errors.swift" : {
+    "index-unit-output-path" : "/ICNativeClient.build/Release-iphoneos/ICNativeClient.build/Objects-normal/arm64/Errors.o",
+    "llvm-bc" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/ICNativeClient.build/Release-iphoneos/ICNativeClient.build/Objects-normal/arm64/Errors.bc",
+    "object" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/ICNativeClient.build/Release-iphoneos/ICNativeClient.build/Objects-normal/arm64/Errors.o"
+  },
+  "/Volumes/KINGSTON/ICP/ICNativeClient/Sources/ICNativeClient/ICClient.swift" : {
+    "index-unit-output-path" : "/ICNativeClient.build/Release-iphoneos/ICNativeClient.build/Objects-normal/arm64/ICClient.o",
+    "llvm-bc" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/ICNativeClient.build/Release-iphoneos/ICNativeClient.build/Objects-normal/arm64/ICClient.bc",
+    "object" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/ICNativeClient.build/Release-iphoneos/ICNativeClient.build/Objects-normal/arm64/ICClient.o"
+  },
+  "/Volumes/KINGSTON/ICP/ICNativeClient/Sources/ICNativeClient/ICRC167.swift" : {
+    "index-unit-output-path" : "/ICNativeClient.build/Release-iphoneos/ICNativeClient.build/Objects-normal/arm64/ICRC167.o",
+    "llvm-bc" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/ICNativeClient.build/Release-iphoneos/ICNativeClient.build/Objects-normal/arm64/ICRC167.bc",
+    "object" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/ICNativeClient.build/Release-iphoneos/ICNativeClient.build/Objects-normal/arm64/ICRC167.o"
+  },
+  "/Volumes/KINGSTON/ICP/ICNativeClient/Sources/ICNativeClient/Identity.swift" : {
+    "index-unit-output-path" : "/ICNativeClient.build/Release-iphoneos/ICNativeClient.build/Objects-normal/arm64/Identity.o",
+    "llvm-bc" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/ICNativeClient.build/Release-iphoneos/ICNativeClient.build/Objects-normal/arm64/Identity.bc",
+    "object" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/ICNativeClient.build/Release-iphoneos/ICNativeClient.build/Objects-normal/arm64/Identity.o"
+  },
+  "/Volumes/KINGSTON/ICP/ICNativeClient/Sources/ICNativeClient/InternetIdentityAuthenticator.swift" : {
+    "index-unit-output-path" : "/ICNativeClient.build/Release-iphoneos/ICNativeClient.build/Objects-normal/arm64/InternetIdentityAuthenticator.o",
+    "llvm-bc" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/ICNativeClient.build/Release-iphoneos/ICNativeClient.build/Objects-normal/arm64/InternetIdentityAuthenticator.bc",
+    "object" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/ICNativeClient.build/Release-iphoneos/ICNativeClient.build/Objects-normal/arm64/InternetIdentityAuthenticator.o"
+  },
+  "/Volumes/KINGSTON/ICP/ICNativeClient/Sources/ICNativeClient/Primitives.swift" : {
+    "index-unit-output-path" : "/ICNativeClient.build/Release-iphoneos/ICNativeClient.build/Objects-normal/arm64/Primitives.o",
+    "llvm-bc" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/ICNativeClient.build/Release-iphoneos/ICNativeClient.build/Objects-normal/arm64/Primitives.bc",
+    "object" : "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/seedphrase-validation/release-build/Build/Intermediates.noindex/ICNativeClient.build/Release-iphoneos/ICNativeClient.build/Objects-normal/arm64/Primitives.o"
+  }
+}

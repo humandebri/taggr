@@ -1,0 +1,184 @@
+{
+  "source": "/tmp/taggr-safety-baseline.ezhNRz/ios/TAGGR/TAGGR/Views/ProfileViews.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "No profile",
+        "location": {
+          "startingColumn": 34,
+          "startingLine": 35
+        }
+      },
+      {
+        "comment": "",
+        "key": "This account is deactivated.",
+        "location": {
+          "startingColumn": 38,
+          "startingLine": 23
+        }
+      },
+      {
+        "comment": "",
+        "key": "Unblock",
+        "location": {
+          "startingColumn": 42,
+          "startingLine": 81
+        }
+      },
+      {
+        "comment": "",
+        "key": "Block",
+        "location": {
+          "startingColumn": 54,
+          "startingLine": 81
+        }
+      },
+      {
+        "comment": "",
+        "key": "Cancel",
+        "location": {
+          "startingColumn": 20,
+          "startingLine": 85
+        }
+      },
+      {
+        "comment": "",
+        "key": "Unblock",
+        "location": {
+          "startingColumn": 39,
+          "startingLine": 135
+        }
+      },
+      {
+        "comment": "",
+        "key": "Block",
+        "location": {
+          "startingColumn": 51,
+          "startingLine": 135
+        }
+      },
+      {
+        "comment": "",
+        "key": "Report",
+        "location": {
+          "startingColumn": 23,
+          "startingLine": 142
+        }
+      },
+      {
+        "comment": "",
+        "key": "More actions",
+        "location": {
+          "startingColumn": 19,
+          "startingLine": 145
+        }
+      },
+      {
+        "comment": "",
+        "key": "Photos",
+        "location": {
+          "startingColumn": 19,
+          "startingLine": 172
+        }
+      },
+      {
+        "comment": "",
+        "key": "Links",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 187
+        }
+      },
+      {
+        "comment": "",
+        "key": "Principal",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 199
+        }
+      },
+      {
+        "comment": "",
+        "key": "No posts",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 252
+        }
+      },
+      {
+        "comment": "",
+        "key": "Journal",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 238
+        }
+      },
+      {
+        "comment": "",
+        "key": "Report %@?",
+        "location": {
+          "startingColumn": 13,
+          "startingLine": 425
+        }
+      },
+      {
+        "comment": "",
+        "key": "Cancel",
+        "location": {
+          "startingColumn": 24,
+          "startingLine": 396
+        }
+      },
+      {
+        "comment": "",
+        "key": "Report",
+        "location": {
+          "startingColumn": 24,
+          "startingLine": 399
+        }
+      },
+      {
+        "comment": "",
+        "key": "Report",
+        "location": {
+          "startingColumn": 20,
+          "startingLine": 429
+        }
+      },
+      {
+        "comment": "",
+        "key": "Cancel",
+        "location": {
+          "startingColumn": 20,
+          "startingLine": 430
+        }
+      },
+      {
+        "comment": "",
+        "key": "This sends your report to TAGGR moderators.",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 432
+        }
+      },
+      {
+        "comment": "",
+        "key": "#%@",
+        "location": {
+          "startingColumn": 38,
+          "startingLine": 474
+        }
+      },
+      {
+        "comment": "",
+        "key": "Done",
+        "location": {
+          "startingColumn": 28,
+          "startingLine": 492
+        }
+      }
+    ]
+  },
+  "version": 1
+}

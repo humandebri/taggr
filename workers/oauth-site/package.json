@@ -4,7 +4,7 @@
     "private": true,
     "type": "module",
     "scripts": {
-        "test": "node --test test/site.test.mjs",
+        "test": "node --test test/*.test.mjs",
         "check": "wrangler deploy --dry-run",
         "deploy": "wrangler deploy"
     },

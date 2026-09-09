@@ -1,0 +1,44 @@
+{
+  "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/ios/TAGGR/TAGGR/TaggrAPI/TaggrAPI.swift" : {
+    "const-values" : "/tmp/taggr-safety-build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGR.build/Objects-normal/x86_64/TaggrAPI.swiftconstvalues",
+    "dependencies" : "/tmp/taggr-safety-build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGR.build/Objects-normal/x86_64/TaggrAPI.d",
+    "diagnostics" : "/tmp/taggr-safety-build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGR.build/Objects-normal/x86_64/TaggrAPI.dia",
+    "object" : "/tmp/taggr-safety-build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGR.build/Objects-normal/x86_64/TaggrAPI.o",
+    "swift-dependencies" : "/tmp/taggr-safety-build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGR.build/Objects-normal/x86_64/TaggrAPI.swiftdeps"
+  },
+  "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/ios/TAGGR/TAGGR/TaggrAPI/TaggrCandidAdapter.swift" : {
+    "const-values" : "/tmp/taggr-safety-build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGR.build/Objects-normal/x86_64/TaggrCandidAdapter.swiftconstvalues",
+    "dependencies" : "/tmp/taggr-safety-build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGR.build/Objects-normal/x86_64/TaggrCandidAdapter.d",
+    "diagnostics" : "/tmp/taggr-safety-build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGR.build/Objects-normal/x86_64/TaggrCandidAdapter.dia",
+    "object" : "/tmp/taggr-safety-build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGR.build/Objects-normal/x86_64/TaggrCandidAdapter.o",
+    "swift-dependencies" : "/tmp/taggr-safety-build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGR.build/Objects-normal/x86_64/TaggrCandidAdapter.swiftdeps"
+  },
+  "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/ios/TAGGR/TAGGR/TaggrAPI/TaggrCandidSupport.swift" : {
+    "const-values" : "/tmp/taggr-safety-build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGR.build/Objects-normal/x86_64/TaggrCandidSupport.swiftconstvalues",
+    "dependencies" : "/tmp/taggr-safety-build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGR.build/Objects-normal/x86_64/TaggrCandidSupport.d",
+    "diagnostics" : "/tmp/taggr-safety-build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGR.build/Objects-normal/x86_64/TaggrCandidSupport.dia",
+    "object" : "/tmp/taggr-safety-build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGR.build/Objects-normal/x86_64/TaggrCandidSupport.o",
+    "swift-dependencies" : "/tmp/taggr-safety-build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGR.build/Objects-normal/x86_64/TaggrCandidSupport.swiftdeps"
+  },
+  "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/ios/TAGGR/TAGGR/TaggrModels/TaggrEditPatch.swift" : {
+    "const-values" : "/tmp/taggr-safety-build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGR.build/Objects-normal/x86_64/TaggrEditPatch.swiftconstvalues",
+    "dependencies" : "/tmp/taggr-safety-build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGR.build/Objects-normal/x86_64/TaggrEditPatch.d",
+    "diagnostics" : "/tmp/taggr-safety-build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGR.build/Objects-normal/x86_64/TaggrEditPatch.dia",
+    "object" : "/tmp/taggr-safety-build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGR.build/Objects-normal/x86_64/TaggrEditPatch.o",
+    "swift-dependencies" : "/tmp/taggr-safety-build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGR.build/Objects-normal/x86_64/TaggrEditPatch.swiftdeps"
+  },
+  "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/ios/TAGGR/TAGGR/TaggrModels/TaggrRelativeTime.swift" : {
+    "const-values" : "/tmp/taggr-safety-build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGR.build/Objects-normal/x86_64/TaggrRelativeTime.swiftconstvalues",
+    "dependencies" : "/tmp/taggr-safety-build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGR.build/Objects-normal/x86_64/TaggrRelativeTime.d",
+    "diagnostics" : "/tmp/taggr-safety-build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGR.build/Objects-normal/x86_64/TaggrRelativeTime.dia",
+    "object" : "/tmp/taggr-safety-build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGR.build/Objects-normal/x86_64/TaggrRelativeTime.o",
+    "swift-dependencies" : "/tmp/taggr-safety-build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGR.build/Objects-normal/x86_64/TaggrRelativeTime.swiftdeps"
+  },
+  "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/ios/TAGGR/TAGGR/TaggrNavigation/TaggrNavigation.swift" : {
+    "const-values" : "/tmp/taggr-safety-build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGR.build/Objects-normal/x86_64/TaggrNavigation.swiftconstvalues",
+    "dependencies" : "/tmp/taggr-safety-build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGR.build/Objects-normal/x86_64/TaggrNavigation.d",
+    "diagnostics" : "/tmp/taggr-safety-build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGR.build/Objects-normal/x86_64/TaggrNavigation.dia",
+    "object" : "/tmp/taggr-safety-build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGR.build/Objects-normal/x86_64/TaggrNavigation.o",
+    "swift-dependencies" : "/tmp/taggr-safety-build/Build/Intermediates.noindex/TAGGR.build/Debug-iphonesimulator/TAGGR.build/Objects-normal/x86_64/TaggrNavigation.swiftdeps"
+  }
+}
