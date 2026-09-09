@@ -73,7 +73,7 @@ final class NavigationStore {
 
     func rememberHomeFeedMode(_ mode: TaggrFeedMode) {
         switch mode {
-        case .hot, .latest, .personal:
+        case .hot, .latest, .personal, .realms:
             lastHomeFeedMode = mode
             defaults.set(Self.rawValue(for: mode), forKey: Self.homeFeedModeKey)
             hasStoredHomeFeedMode = true
@@ -87,6 +87,7 @@ final class NavigationStore {
         case .hot: return "hot"
         case .latest: return "latest"
         case .personal: return "personal"
+        case .realms: return "realms"
         case .realm, .tags: return "hot"
         }
     }
@@ -96,6 +97,7 @@ final class NavigationStore {
         case "hot": return .hot
         case "latest": return .latest
         case "personal": return .personal
+        case "realms": return .realms
         default: return nil
         }
     }
@@ -164,6 +166,12 @@ final class FeedStore {
 final class ContentStore {
     var focusedPost: TaggrPost?
     var profile: TaggrUser?
+    var profileActionInFlight = false
+    var journalPosts: [TaggrPost] = []
+    var journalPage = 0
+    var journalOffset = 0
+    var journalCanLoadMore = false
+    var journalIsLoading = false
     var realms: [TaggrRealm] = []
     var nextAllRealmsPage = 0
     var canLoadMoreRealms = false

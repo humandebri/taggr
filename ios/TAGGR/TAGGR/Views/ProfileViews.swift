@@ -5,11 +5,9 @@ struct ProfileView: View {
     @State private var showingReport = false
     @State private var blockConfirmationPresented = false
     @State private var presentedRealmList: ProfileRealmList?
-    @State private var journalPosts: [TaggrPost] = []
-    @State private var journalPage = 0
-    @State private var journalOffset = 0
-    @State private var journalCanLoadMore = false
-    @State private var journalIsLoading = false
+    @State private var presentedUserList: ProfileUserListKind?
+    @State private var creditRecipient: TaggrUser?
+    @State private var muteConfirmationPresented = false
 
     var body: some View {
         ZStack {
@@ -59,12 +57,7 @@ struct ProfileView: View {
                 TaggrBackToolbarButton(title: "Back", action: returnToPreviousScreen)
             }
         }
-        .task(id: profileHandle) {
-            await loadJournalForCurrentProfile()
-        }
-        .taggrRefreshable {
-            await reloadJournal()
-        }
+        .taggrRefreshable()
         .sheet(isPresented: $showingReport) {
             if let user = state.profile {
                 ReportUserSheet(user: user, isPresented: $showingReport)
@@ -76,6 +69,25 @@ struct ProfileView: View {
                 presentedRealmList = nil
                 state.navigateToRealm(realm)
             }
+        }
+        .sheet(item: $presentedUserList) { kind in
+            if let profile = state.profile {
+                ProfileUserListSheet(kind: kind, profileID: profile.id) { userID in
+                    presentedUserList = nil
+                    state.navigateToProfile(String(userID))
+                }
+            }
+        }
+        .sheet(item: $creditRecipient) { recipient in
+            ProfileCreditTransferSheet(recipient: recipient)
+        }
+        .confirmationDialog("Mute this user?", isPresented: $muteConfirmationPresented, titleVisibility: .visible) {
+            if let user = state.profile {
+                Button("Mute") { Task { await state.setMutedUser(user.id, muted: true) } }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Their posts will be hidden from filtered feeds and you will unfollow them. You can still open their profile. Following them again will unmute them.")
         }
         .confirmationDialog(
             blockConfirmationTitle,
@@ -122,40 +134,65 @@ struct ProfileView: View {
         .clipShape(RoundedRectangle(cornerRadius: 8))
     }
 
-    @ViewBuilder private func profileActionRow(_ user: TaggrUser) -> some View {
-        if canShowPhotos(user) || canModerate(user) {
+    private func profileActionRow(_ user: TaggrUser) -> some View {
+        ViewThatFits(in: .horizontal) {
             HStack(spacing: 10) {
+                ProfileFollowButton(userID: user.id)
                 if canShowPhotos(user) { profilePhotosButton(user) }
-                if canModerate(user) { profileMoreActionsMenu(user) }
+                profileMoreActionsMenu(user)
+            }
+            VStack(alignment: .leading, spacing: 10) {
+                ProfileFollowButton(userID: user.id)
+                HStack(spacing: 10) {
+                    if canShowPhotos(user) { profilePhotosButton(user) }
+                    profileMoreActionsMenu(user)
+                }
             }
         }
     }
 
     private func profileMoreActionsMenu(_ user: TaggrUser) -> some View {
         Menu {
-            Button(role: isBlocked(user) ? nil : .destructive) {
-                blockConfirmationPresented = true
-            } label: {
-                Label(
-                    isBlocked(user) ? "Unblock" : "Block",
-                    systemImage: isBlocked(user) ? "person.crop.circle.badge.checkmark" : "person.crop.circle.badge.xmark"
-                )
+            ShareLink(item: TaggrNavigation.universalURL(for: .profile(String(user.id)))) {
+                Label("Share profile", systemImage: "square.and.arrow.up")
             }
-            Button(role: .destructive) {
-                showingReport = true
-            } label: {
-                Label("Report", systemImage: "exclamationmark.bubble")
+            ShareLink(item: TaggrNavigation.journalURL(userID: user.id)) {
+                Label("Share journal", systemImage: "book")
+            }
+            if state.canInteractWithProfile(userID: user.id) {
+                Button {
+                    if state.isMutedUser(user.id) {
+                        Task { await state.setMutedUser(user.id, muted: false) }
+                    } else {
+                        muteConfirmationPresented = true
+                    }
+                } label: {
+                    Label(state.isMutedUser(user.id) ? "Unmute" : "Mute", systemImage: "speaker.slash")
+                }
+                Button { creditRecipient = user } label: {
+                    Label("Send credits", systemImage: "arrow.up.forward.circle")
+                }
+            }
+            if canModerate(user) {
+                Button(role: isBlocked(user) ? nil : .destructive) {
+                    blockConfirmationPresented = true
+                } label: {
+                    Label(isBlocked(user) ? "Unblock" : "Block", systemImage: "person.crop.circle.badge.xmark")
+                }
+                Button(role: .destructive) { showingReport = true } label: {
+                    Label("Report", systemImage: "exclamationmark.bubble")
+                }
             }
         } label: {
             Label("More actions", systemImage: "ellipsis")
                 .labelStyle(.iconOnly)
                 .font(.subheadline.weight(.bold))
                 .foregroundStyle(TaggrTheme.text)
-                .frame(width: 42, height: 42)
+                .frame(width: 44, height: 44)
                 .background(TaggrTheme.panelRaised)
                 .clipShape(RoundedRectangle(cornerRadius: 8))
         }
-        .disabled(state.isBusy)
+        .disabled(state.isBusy || state.contentStore.profileActionInFlight)
     }
 
     private var blockConfirmationTitle: String {
@@ -220,8 +257,8 @@ struct ProfileView: View {
         let follows = max(0, user.followees.count - (user.followees.contains(user.id) ? 1 : 0))
         let stats: [ProfileStatistic] = [
             profileStat("Posts", value: user.numPosts ?? 0),
-            profileStat("Follows", value: follows),
-            profileStat("Followers", value: user.followers.count),
+            profileStat("Follows", value: follows, users: .follows),
+            profileStat("Followers", value: user.followers.count, users: .followers),
             profileStat("Joined realms", value: user.realms.count, realms: user.realms),
             profileStat("Controls realms", value: user.controlledRealms.count, realms: user.controlledRealms),
             profileStat("Bookmarks", value: user.bookmarks.count),
@@ -238,13 +275,15 @@ struct ProfileView: View {
     }
 
     private func journalSection() -> some View {
-        VStack(alignment: .leading, spacing: 0) {
+        let journal = state.contentStore
+        let isLoading = state.isBusy || journal.journalIsLoading
+        return VStack(alignment: .leading, spacing: 0) {
             HStack {
                 Text("Journal")
                     .font(.headline.weight(.black))
                     .foregroundStyle(TaggrTheme.text)
                 Spacer()
-                if Self.showsJournalHeaderSpinner(isLoading: journalIsLoading, hasPosts: !journalPosts.isEmpty) {
+                if Self.showsJournalHeaderSpinner(isLoading: isLoading, hasPosts: !journal.journalPosts.isEmpty) {
                     ProgressView()
                         .tint(.white)
                 }
@@ -253,7 +292,7 @@ struct ProfileView: View {
             .padding(.top, 8)
             .padding(.bottom, 8)
             .background(TaggrTheme.panel)
-            if journalPosts.isEmpty && !journalIsLoading {
+            if journal.journalPosts.isEmpty && !isLoading {
                 Text("No posts")
                     .font(.headline)
                     .foregroundStyle(TaggrTheme.secondaryText)
@@ -261,21 +300,23 @@ struct ProfileView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .background(TaggrTheme.background)
             } else {
-                ForEach(journalPosts) { post in
+                ForEach(journal.journalPosts) { post in
                     PostRow(post: post) {
                         state.navigateToPost(post.id, from: .latest)
                     }
                 }
-                if journalCanLoadMore {
-                    TaggrLoadMoreView(loading: journalIsLoading, height: 44, load: loadMoreJournalPosts)
+                if journal.journalCanLoadMore {
+                    TaggrLoadMoreView(loading: isLoading, height: 44) {
+                        Task { await state.loadMoreProfileJournal() }
+                    }
                 }
             }
         }
     }
 
-    private func profileStat(_ label: String, value: Int, realms: [String] = []) -> ProfileStatistic? {
+    private func profileStat(_ label: String, value: Int, realms: [String] = [], users: ProfileUserListKind? = nil) -> ProfileStatistic? {
         guard value > 0 else { return nil }
-        return ProfileStatistic(label: label, value: value.formatted(), realms: realms)
+        return ProfileStatistic(label: label, value: value.formatted(), realms: realms, users: users)
     }
 
     private func profileTokenStat(_ label: String, value: Int) -> ProfileStatistic? {
@@ -283,7 +324,14 @@ struct ProfileView: View {
     }
 
     @ViewBuilder private func profileStatCard(_ stat: ProfileStatistic) -> some View {
-        if !stat.realms.isEmpty {
+        if let users = stat.users {
+            Button { presentedUserList = users } label: {
+                profileStatCardContent(stat)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("\(stat.label), \(stat.value)")
+            .accessibilityHint("Opens the user list")
+        } else if !stat.realms.isEmpty {
             Button {
                 presentedRealmList = ProfileRealmList(title: stat.label, realms: stat.realms)
             } label: {
@@ -332,57 +380,8 @@ struct ProfileView: View {
         state.isUserBlocked(user.id)
     }
 
-    private var profileHandle: String? {
-        guard case .profile(let handle) = state.route else { return nil }
-        return handle
-    }
-
-    private func loadJournalForCurrentProfile() async {
-        guard let handle = profileHandle else { return }
-        resetJournalPosts()
-        await loadJournalPosts(handle: handle, reset: true)
-    }
-
-    private func reloadJournal() async {
-        guard let handle = profileHandle else { return }
-        resetJournalPosts()
-        await loadJournalPosts(handle: handle, reset: true)
-    }
-
-    private func loadMoreJournalPosts() {
-        guard let handle = profileHandle else { return }
-        Task { await loadJournalPosts(handle: handle, reset: false) }
-    }
-
     static func showsJournalHeaderSpinner(isLoading: Bool, hasPosts: Bool) -> Bool {
         isLoading && !hasPosts
-    }
-
-    private func loadJournalPosts(handle: String, reset: Bool) async {
-        guard !journalIsLoading else { return }
-        journalIsLoading = true
-        defer { journalIsLoading = false }
-        do {
-            let page = reset ? 0 : journalPage + 1
-            let offset = reset ? 0 : journalOffset
-            let posts = try await state.loadJournalPosts(handle: handle, page: page, offset: offset)
-            journalPosts = reset ? posts : journalPosts + posts
-            journalPage = page
-            if reset {
-                journalOffset = posts.first?.id ?? 0
-            }
-            journalCanLoadMore = posts.count >= (state.cache?.config?.feedPageSize ?? 30)
-        } catch {
-            guard !state.isCancellation(error) else { return }
-            state.errorMessage = error.localizedDescription
-        }
-    }
-
-    private func resetJournalPosts() {
-        journalPosts = []
-        journalPage = 0
-        journalOffset = 0
-        journalCanLoadMore = false
     }
 }
 
@@ -447,11 +446,13 @@ private struct ProfileStatistic: Identifiable {
     let label: String
     let value: String
     let realms: [String]
+    let users: ProfileUserListKind?
 
-    init(label: String, value: String, realms: [String] = []) {
+    init(label: String, value: String, realms: [String] = [], users: ProfileUserListKind? = nil) {
         self.label = label
         self.value = value
         self.realms = realms
+        self.users = users
     }
 
     var id: String { label }

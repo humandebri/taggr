@@ -18,11 +18,13 @@ final class TaggrTests: XCTestCase {
 
     func testFeedFragmentRoutesSupportTags() {
         XCTAssertEqual(TaggrNavigation.route(from: URL(string: "https://6qfxa-ryaaa-aaaai-qbhsq-cai.icp0.io/#/feed/latest")!), .feed(.latest))
+        XCTAssertEqual(TaggrNavigation.route(from: URL(string: "https://6qfxa-ryaaa-aaaai-qbhsq-cai.icp0.io/#/feed/realms")!), .feed(.realms))
         XCTAssertEqual(TaggrNavigation.route(from: URL(string: "https://6qfxa-ryaaa-aaaai-qbhsq-cai.icp0.io/#/feed/tag")!), .feed(.tags(["tag"])))
         XCTAssertEqual(TaggrNavigation.route(from: URL(string: "https://6qfxa-ryaaa-aaaai-qbhsq-cai.icp0.io/#/feed/TAG")!), .feed(.tags(["TAG"])))
         XCTAssertEqual(TaggrNavigation.route(from: URL(string: "https://6qfxa-ryaaa-aaaai-qbhsq-cai.icp0.io/#/feed/@alice+tag")!), .feed(.tags(["@alice", "tag"])))
         XCTAssertEqual(TaggrNavigation.universalURL(for: .feed(.tags(["TAG"]))).path, "/feed/TAG")
         XCTAssertEqual(TaggrNavigation.universalURL(for: .feed(.realm("DEV"))).path, "/realm/DEV")
+        XCTAssertEqual(TaggrNavigation.universalURL(for: .feed(.realms)).path, "/feed/realms")
     }
 
     func testTokenAndWalletRoutesOpenAccount() {

@@ -121,7 +121,7 @@ private struct TaggrImagePagerPhoto: View {
     @State private var imageSize: CGSize?
     @State private var zoomScale: CGFloat = 1
     @State private var panOffset: CGSize = .zero
-    @GestureState private var pinchScale: CGFloat = 1
+    @GestureState private var magnifyValue: MagnifyGesture.Value?
     @GestureState private var dragTranslation: CGSize = .zero
 
     var body: some View {
@@ -144,7 +144,7 @@ private struct TaggrImagePagerPhoto: View {
             .onTapGesture {}
             .onTapGesture(count: 2, perform: toggleZoom)
             .simultaneousGesture(magnificationGesture)
-            .highPriorityGesture(panGesture)
+            .simultaneousGesture(panGesture)
             .allowsHitTesting(imageSize != nil)
             .accessibilityLabel(accessibilityLabel)
             .accessibilityHint("Pinch to zoom. Drag to pan when enlarged.")
@@ -153,36 +153,55 @@ private struct TaggrImagePagerPhoto: View {
     }
 
     private var effectiveZoomScale: CGFloat {
-        clampedZoomScale(zoomScale * pinchScale)
+        clampedZoomScale(zoomScale * (magnifyValue?.magnification ?? 1))
     }
 
     private var effectivePanOffset: CGSize {
-        clampedPanOffset(
+        let adjustedPanOffset: CGSize
+        if let magnifyValue {
+            adjustedPanOffset = magnifiedPanOffset(
+                panOffset,
+                magnification: effectiveZoomScale / zoomScale,
+                startLocation: magnifyValue.startLocation
+            )
+        } else {
+            adjustedPanOffset = panOffset
+        }
+        return clampedPanOffset(
             CGSize(
-                width: panOffset.width + dragTranslation.width,
-                height: panOffset.height + dragTranslation.height
+                width: adjustedPanOffset.width + dragTranslation.width,
+                height: adjustedPanOffset.height + dragTranslation.height
             ),
             scale: effectiveZoomScale
         )
     }
 
     private var magnificationGesture: some Gesture {
-        MagnificationGesture()
-            .updating($pinchScale) { value, state, _ in
+        MagnifyGesture()
+            .updating($magnifyValue) { value, state, _ in
                 state = value
             }
             .onEnded { value in
-                setZoomScale(zoomScale * value)
+                let scale = clampedZoomScale(zoomScale * value.magnification)
+                setZoomScale(
+                    scale,
+                    panOffset: magnifiedPanOffset(
+                        panOffset,
+                        magnification: scale / zoomScale,
+                        startLocation: value.startLocation
+                    )
+                )
             }
     }
 
     private var panGesture: some Gesture {
-        DragGesture(minimumDistance: zoomScale > 1 ? 0 : .infinity)
+        DragGesture(minimumDistance: 0)
             .updating($dragTranslation) { value, state, _ in
+                guard magnifyValue == nil, zoomScale > 1 else { return }
                 state = value.translation
             }
             .onEnded { value in
-                guard zoomScale > 1 else { return }
+                guard magnifyValue == nil, zoomScale > 1 else { return }
                 panOffset = clampedPanOffset(
                     CGSize(
                         width: panOffset.width + value.translation.width,
@@ -197,12 +216,12 @@ private struct TaggrImagePagerPhoto: View {
         setZoomScale(zoomScale > 1 ? 1 : 2.5)
     }
 
-    private func setZoomScale(_ scale: CGFloat) {
+    private func setZoomScale(_ scale: CGFloat, panOffset: CGSize? = nil) {
         zoomScale = clampedZoomScale(scale)
         if zoomScale == 1 {
-            panOffset = .zero
+            self.panOffset = .zero
         } else {
-            panOffset = clampedPanOffset(panOffset, scale: zoomScale)
+            self.panOffset = clampedPanOffset(panOffset ?? self.panOffset, scale: zoomScale)
         }
     }
 
@@ -213,6 +232,18 @@ private struct TaggrImagePagerPhoto: View {
 
     private func clampedZoomScale(_ scale: CGFloat) -> CGFloat {
         min(max(scale, 1), Self.maximumZoomScale)
+    }
+
+    private func magnifiedPanOffset(
+        _ offset: CGSize,
+        magnification: CGFloat,
+        startLocation: CGPoint
+    ) -> CGSize {
+        let center = CGPoint(x: availableSize.width / 2, y: availableSize.height / 2)
+        return CGSize(
+            width: offset.width * magnification + (1 - magnification) * (startLocation.x - center.x),
+            height: offset.height * magnification + (1 - magnification) * (startLocation.y - center.y)
+        )
     }
 
     private func clampedPanOffset(_ offset: CGSize, scale: CGFloat) -> CGSize {

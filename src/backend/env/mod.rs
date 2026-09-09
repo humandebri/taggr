@@ -4001,6 +4001,98 @@ pub(crate) mod tests {
     }
 
     #[test]
+    fn test_realms_feed() {
+        mutate(|state| {
+            state.init();
+            let viewer = pr(0);
+            let joined_author = pr(1);
+            let controlled_author = pr(2);
+            let muted_author = pr(3);
+            let blocked_author = pr(4);
+            let viewer_id = create_user(state, viewer);
+            create_user(state, joined_author);
+            create_user(state, controlled_author);
+            let blocked_author_id = create_user(state, blocked_author);
+            create_user(state, muted_author);
+
+            for realm_id in ["JOINED", "CONTROLLED", "MUTED"] {
+                state.realms.insert(realm_id.into(), Realm::default());
+            }
+            assert!(state.toggle_realm_membership(viewer, "JOINED".into()));
+            state
+                .users
+                .get_mut(&viewer_id)
+                .unwrap()
+                .controlled_realms
+                .insert("CONTROLLED".into());
+            assert!(state.toggle_realm_membership(joined_author, "JOINED".into()));
+            assert!(state.toggle_realm_membership(controlled_author, "CONTROLLED".into()));
+            assert!(state.toggle_realm_membership(muted_author, "MUTED".into()));
+            assert!(state.toggle_realm_membership(blocked_author, "JOINED".into()));
+
+            let joined_post = Post::create(
+                state,
+                "joined".into(),
+                &[],
+                joined_author,
+                0,
+                None,
+                Some("JOINED".into()),
+                None,
+            )
+            .unwrap();
+            let controlled_post = Post::create(
+                state,
+                "controlled".into(),
+                &[],
+                controlled_author,
+                0,
+                None,
+                Some("CONTROLLED".into()),
+                None,
+            )
+            .unwrap();
+            let _muted_post = Post::create(
+                state,
+                "muted".into(),
+                &[],
+                muted_author,
+                0,
+                None,
+                Some("MUTED".into()),
+                None,
+            )
+            .unwrap();
+            let _blocked_post = Post::create(
+                state,
+                "blocked".into(),
+                &[],
+                blocked_author,
+                0,
+                None,
+                Some("JOINED".into()),
+                None,
+            )
+            .unwrap();
+
+            let viewer = state.users.get_mut(&viewer_id).unwrap();
+            viewer.realms.push("CONTROLLED".into());
+            viewer.realms.push("MUTED".into());
+            viewer.filters.realms.insert("MUTED".into());
+            viewer.blacklist.insert(blocked_author_id);
+
+            let feed = state
+                .users
+                .get(&viewer_id)
+                .unwrap()
+                .realms_feed("localhost".into(), state, 0)
+                .map(|post| post.id)
+                .collect::<Vec<_>>();
+            assert_eq!(feed, vec![controlled_post, joined_post]);
+        });
+    }
+
+    #[test]
     fn test_clean_up() {
         mutate(|state| {
             state.init();

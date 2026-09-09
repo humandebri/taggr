@@ -9,6 +9,7 @@ enum TaggrFeedMode: Hashable, Sendable {
     case hot
     case latest
     case personal
+    case realms
     case realm(String)
     case tags([String])
 }
@@ -541,40 +542,18 @@ enum TaggrNotification: Codable, Equatable, Sendable {
     }
 
     var safetyMessage: String {
-        switch self {
-        case .watchedPostEntries(let postID, let entries):
-            return "\(entries.count) new thread update(s) on watched post #\(postID)."
-        case .newPost(_, let postID):
-            return "New post #\(postID)."
-        case .conditional(_, let predicate):
-            switch predicate {
-            case .reportOpen(let id): return "Open moderation report for post #\(id)."
-            case .userReportOpen(let id): return "Open moderation report for user #\(id)."
-            case .proposal(let id): return "Governance proposal on post #\(id) needs attention."
-            }
-        case .generic(let text):
-            // Generic notifications also embed untrusted follower bios. Only known
-            // system templates with numeric values can retain their original text.
-            let number = #"[0-9]+(?:\.[0-9]+)?"#
-            let templates = [
-                "You received `\(number)` ICP as (?:rewards|revenue)(?: and `\(number)` ICP as revenue)?! 💸",
-                "TAGGR minted `\(number)` \\$TAGGR tokens for you! 💎",
-                "Congratulations! You received `\(number)` \\$TAGGR as a weekly random reward! 🎲",
-                "`\(number)` \\$TAGGR tokens were minted for you via proposal execution.",
-                "Congratulations! You are a TAGGR stalwart now!",
-            ]
-            if templates.contains(where: { text.range(of: "\\A(?:" + $0 + ")\\z", options: .regularExpression) != nil }) {
-                return text
-            }
-            if text.hasPrefix("@"), text.contains(" followed you (") { return "Someone followed you." }
-            if text.hasPrefix("Your invite was used by @") { return "Your invite was used. Thank you for helping TAGGR grow!" }
-            if text.hasPrefix("**Welcome!**") { return "Welcome to TAGGR! Read the community rules before posting." }
-            if text.hasPrefix("CRITICAL SYSTEM ERROR:") { return "A critical system error was reported. Contact support." }
-            if text.hasPrefix("Your report for "), text.contains(" was confirmed by stalwarts.") { return "Your moderation report was confirmed by stalwarts." }
-            if text.hasPrefix("Your report of "), text.hasSuffix(" was rejected by stalwarts") { return "Your moderation report was rejected by stalwarts." }
-            return "Account update. Full details are available in the TAGGR web inbox."
+        // Preserve the server's notification details, as the web inbox does.
+        // Follower biographies are user-authored and are not needed to identify the event.
+        if case .generic(let text) = self,
+           let range = text.range(of: #"\A@[A-Za-z][A-Za-z0-9]{1,15}(?= followed you \()"#, options: .regularExpression) {
+            return "\(text[range]) followed you."
         }
+        if message.localizedCaseInsensitiveContains("#nsfw") {
+            return "This notification contains restricted content."
+        }
+        return message
     }
+
 }
 
 enum TaggrNotificationPredicate: Codable, Equatable, Sendable {
@@ -911,6 +890,17 @@ enum JSONValue: Decodable, Equatable, Sendable {
     }
 }
 
+struct TaggrUserFilters: Codable, Equatable, Sendable {
+    let users: [Int]
+
+    init(users: [Int] = []) { self.users = users }
+
+    init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        users = try values.decodeIfPresent([Int].self, forKey: .users) ?? []
+    }
+}
+
 struct TaggrUser: Codable, Identifiable, Equatable, Sendable {
     let id: Int
     let name: String
@@ -920,6 +910,7 @@ struct TaggrUser: Codable, Identifiable, Equatable, Sendable {
     let followees: [Int]
     let followers: [Int]
     let blacklist: [Int]
+    let filters: TaggrUserFilters
     let bookmarks: [Int]
     let pinnedPosts: [Int]
     let settings: [String: String]
@@ -948,6 +939,7 @@ struct TaggrUser: Codable, Identifiable, Equatable, Sendable {
         case followees
         case followers
         case blacklist
+        case filters
         case bookmarks
         case pinnedPosts
         case settings
@@ -977,6 +969,7 @@ struct TaggrUser: Codable, Identifiable, Equatable, Sendable {
         followees: [Int],
         followers: [Int],
         blacklist: [Int],
+        filters: TaggrUserFilters = TaggrUserFilters(),
         bookmarks: [Int] = [],
         pinnedPosts: [Int] = [],
         settings: [String: String] = [:],
@@ -1004,6 +997,7 @@ struct TaggrUser: Codable, Identifiable, Equatable, Sendable {
         self.followees = followees
         self.followers = followers
         self.blacklist = blacklist
+        self.filters = filters
         self.bookmarks = bookmarks
         self.pinnedPosts = pinnedPosts
         self.settings = settings
@@ -1034,6 +1028,7 @@ struct TaggrUser: Codable, Identifiable, Equatable, Sendable {
         followees = try values.decodeIfPresent([Int].self, forKey: .followees) ?? []
         followers = try values.decodeIfPresent([Int].self, forKey: .followers) ?? []
         blacklist = try values.decodeIfPresent([Int].self, forKey: .blacklist) ?? []
+        filters = try values.decodeIfPresent(TaggrUserFilters.self, forKey: .filters) ?? TaggrUserFilters()
         bookmarks = try values.decodeIfPresent([Int].self, forKey: .bookmarks) ?? []
         pinnedPosts = try values.decodeIfPresent([Int].self, forKey: .pinnedPosts) ?? []
         settings = try values.decodeIfPresent([String: String].self, forKey: .settings) ?? [:]
@@ -1064,6 +1059,7 @@ struct TaggrUser: Codable, Identifiable, Equatable, Sendable {
             followees: followees,
             followers: followers,
             blacklist: blacklist,
+            filters: filters,
             bookmarks: bookmarks,
             pinnedPosts: pinnedPosts,
             settings: settings,
@@ -1095,6 +1091,7 @@ struct TaggrUser: Codable, Identifiable, Equatable, Sendable {
             followees: followees,
             followers: followers,
             blacklist: blacklist,
+            filters: filters,
             bookmarks: bookmarks,
             pinnedPosts: pinnedPosts,
             settings: settings,
@@ -1217,6 +1214,7 @@ struct TaggrConfig: Codable, Equatable, Sendable {
     let pollCost: Int?
     let postDeletionPenaltyFactor: Int?
     let votingPowerActivityWeeks: Int?
+    let creditTransactionFee: Int?
 
     enum CodingKeys: String, CodingKey {
         case name
@@ -1235,6 +1233,7 @@ struct TaggrConfig: Codable, Equatable, Sendable {
         case pollCost
         case postDeletionPenaltyFactor
         case votingPowerActivityWeeks
+        case creditTransactionFee
     }
 }
 

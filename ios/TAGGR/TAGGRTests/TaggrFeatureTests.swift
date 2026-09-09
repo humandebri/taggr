@@ -1721,15 +1721,114 @@ extension TaggrTests {
         }
         let state = TaggrAppCoordinator(api: api)
 
-        state.navigateToProfile("alice")
+        state.currentUser = try JSONDecoder.taggr.decode(TaggrUser.self, from: Self.userFixture())
+        state.route = .settings
+        state.navigateToProfile(try XCTUnwrap(state.currentUser).name)
         XCTAssertEqual(userQueryCount, 0)
         await state.loadCurrentRoute()
-        let journal = try await state.loadJournalPosts(handle: "alice", page: 0, offset: 0)
 
         XCTAssertEqual(userQueryCount, 1)
         XCTAssertEqual(journalQueryCount, 1)
         XCTAssertEqual(state.profile?.name, "alice")
-        XCTAssertEqual(journal.map(\.id), [303])
+        XCTAssertEqual(state.contentStore.journalPosts.map(\.id), [303])
+
+        state.contentStore.journalPosts = []
+        await state.refreshVisibleRoute()
+        XCTAssertEqual(userQueryCount, 2)
+        XCTAssertEqual(journalQueryCount, 2)
+        XCTAssertEqual(state.contentStore.journalPosts.map(\.id), [303])
+    }
+
+    func testProfileJournalUsesResolvedUserIDAndStablePaginationOffset() async throws {
+        var journalArgs: [Data] = []
+        let api = makeStubbedAPI { request in
+            let call = self.requestMethodAndArg(from: request)
+            let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
+            if call?.method == "journal" {
+                journalArgs.append(try XCTUnwrap(call).arg)
+                let id = journalArgs.count == 1 ? 303 : 302
+                return (response, Self.queryReply(Data("[\(String(data: self.postEnvelopeFixture(id: id), encoding: .utf8)!)]".utf8)))
+            }
+            return (response, Self.queryReply(Self.userFixture()))
+        }
+        let state = TaggrAppCoordinator(api: api)
+        state.cache = TaggrBackendCache(stats: nil, config: try JSONDecoder.taggr.decode(
+            TaggrConfig.self, from: Data(#"{"feed_page_size":1}"#.utf8)
+        ))
+        state.navigateToProfile("alice")
+        await state.loadCurrentRoute()
+        await state.loadMoreProfileJournal()
+
+        XCTAssertEqual(journalArgs, [
+            try TaggrCandid.jsonArguments([TaggrRuntimeConfig.productionDomain, "7", 0, 0]),
+            try TaggrCandid.jsonArguments([TaggrRuntimeConfig.productionDomain, "7", 1, 303]),
+        ])
+        XCTAssertEqual(state.contentStore.journalPosts.map(\.id), [303, 302])
+        XCTAssertFalse(state.contentStore.journalIsLoading)
+    }
+
+    @MainActor
+    func testProfileTransitionClearsPreviousJournalBeforeTheNextProfileLoads() async throws {
+        let secondProfileStarted = expectation(description: "second profile query started")
+        let releaseSecondProfile = DispatchSemaphore(value: 0)
+        var userQueries = 0
+        let api = makeStubbedAPI { request in
+            let method = self.requestMethodAndArg(from: request)?.method
+            let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
+            if method == "user" {
+                userQueries += 1
+                if userQueries == 2 {
+                    secondProfileStarted.fulfill()
+                    guard releaseSecondProfile.wait(timeout: .now() + 5) == .success else {
+                        throw URLError(.timedOut)
+                    }
+                    return (response, Self.queryReply(Self.userFixture(id: 8, name: "bob")))
+                }
+                return (response, Self.queryReply(Self.userFixture()))
+            }
+            let postID = userQueries == 1 ? 303 : 302
+            let body = Data("[\(String(data: self.postEnvelopeFixture(id: postID), encoding: .utf8)!)]".utf8)
+            return (response, Self.queryReply(body))
+        }
+        let state = TaggrAppCoordinator(api: api)
+        state.navigateToProfile("alice")
+        await state.loadCurrentRoute()
+        XCTAssertEqual(state.contentStore.journalPosts.map(\.id), [303])
+
+        state.navigateToProfile("bob")
+        let loadingProfile = Task { await state.loadCurrentRoute() }
+        await fulfillment(of: [secondProfileStarted], timeout: 2)
+        XCTAssertTrue(state.contentStore.journalPosts.isEmpty)
+        XCTAssertTrue(state.contentStore.journalIsLoading)
+
+        releaseSecondProfile.signal()
+        await loadingProfile.value
+        XCTAssertEqual(state.profile?.name, "bob")
+        XCTAssertEqual(state.contentStore.journalPosts.map(\.id), [302])
+        XCTAssertFalse(state.contentStore.journalIsLoading)
+    }
+
+    func testProfileJournalFailureCanBeRetriedByRefreshingRoute() async throws {
+        var attempts = 0
+        let api = makeStubbedAPI { request in
+            let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
+            if self.requestMethodAndArg(from: request)?.method == "journal" {
+                attempts += 1
+                if attempts == 1 { throw URLError(.notConnectedToInternet) }
+                return (response, Self.queryReply(Data("[\(String(data: self.postEnvelopeFixture(id: 303), encoding: .utf8)!)]".utf8)))
+            }
+            return (response, Self.queryReply(Self.userFixture()))
+        }
+        let state = TaggrAppCoordinator(api: api)
+        state.navigateToProfile("alice")
+        await state.loadCurrentRoute()
+        XCTAssertNotNil(state.errorMessage)
+        XCTAssertNil(state.profile)
+
+        await state.refreshVisibleRoute()
+        XCTAssertEqual(attempts, 2)
+        XCTAssertEqual(state.profile?.name, "alice")
+        XCTAssertEqual(state.contentStore.journalPosts.map(\.id), [303])
     }
 }
 

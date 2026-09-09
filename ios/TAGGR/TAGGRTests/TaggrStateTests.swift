@@ -1583,26 +1583,4 @@ extension TaggrTests {
         XCTAssertEqual(state.feed.map(\.id), [101])
         XCTAssertFalse(state.canLoadMoreFeed)
     }
-
-    @MainActor
-    func testJournalPostsUseJournalQueryAndStableOffset() async throws {
-        var calls: [(method: String, arg: Data)] = []
-        let api = makeStubbedAPI { request in
-            if let call = self.requestMethodAndArg(from: request) {
-                calls.append(call)
-            }
-            let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
-            return (response, Self.queryReply(Data("[]".utf8)))
-        }
-        let state = TaggrAppCoordinator(api: api)
-
-        _ = try await state.loadJournalPosts(handle: "alice", page: 0, offset: 0)
-        _ = try await state.loadJournalPosts(handle: "alice", page: 1, offset: 101)
-
-        XCTAssertEqual(calls.map(\.method), ["journal", "journal"])
-        XCTAssertEqual(calls.map(\.arg), [
-            try TaggrCandid.jsonArguments([TaggrRuntimeConfig.productionDomain, "alice", 0, 0]),
-            try TaggrCandid.jsonArguments([TaggrRuntimeConfig.productionDomain, "alice", 1, 101]),
-        ])
-    }
 }

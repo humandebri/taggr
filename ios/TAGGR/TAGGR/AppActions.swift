@@ -1045,6 +1045,11 @@ extension TaggrAppCoordinator {
             NSLog("TAGGR identity session could not be cleared: %@", error.localizedDescription)
         }
         authSession = nil
+        userRefreshTask?.cancel()
+        userRefreshTask = nil
+        userRefreshKey = nil
+        userRefreshID = nil
+        notificationRefreshFailed = false
         currentUser = nil
         icpBalanceE8s = nil
         icpInvoice = nil
@@ -1086,6 +1091,11 @@ extension TaggrAppCoordinator {
     }
 
     func markLocalNotificationsRead(_ ids: [Int]) {
+        // A query begun before this mutation must not restore unread entries.
+        userRefreshTask?.cancel()
+        userRefreshTask = nil
+        userRefreshKey = nil
+        userRefreshID = nil
         guard let user = currentUser else { return }
         var notifications = user.notifications
         for id in ids {
@@ -1222,6 +1232,31 @@ extension TaggrAppCoordinator {
         }
     }
 
+    func refreshNotifications() async {
+        let scope = safetyScope
+        let generation = runtimeGeneration
+        guard authSession != nil else { return }
+        do {
+            try await loadCurrentUserIfNeeded()
+            guard scope == safetyScope, generation == runtimeGeneration else { return }
+            notificationRefreshFailed = false
+        } catch {
+            guard scope == safetyScope, generation == runtimeGeneration, !isCancellation(error) else { return }
+            notificationRefreshFailed = true
+        }
+    }
+
+    func pollNotifications(
+        sleep: @escaping @Sendable () async throws -> Void = { try await Task.sleep(for: .seconds(30)) }
+    ) async {
+        guard authSession != nil else { return }
+        let scope = safetyScope
+        while !Task.isCancelled, authSession != nil, scope == safetyScope {
+            await refreshNotifications()
+            do { try await sleep() } catch { return }
+        }
+    }
+
     func loadCurrentUserIfNeeded(generation: Int? = nil, api activeAPI: TaggrAPI? = nil) async throws {
         let generation = generation ?? runtimeGeneration
         let activeAPI = activeAPI ?? api
@@ -1230,8 +1265,33 @@ extension TaggrAppCoordinator {
             currentUser = nil
             return
         }
-        let loadedUser = try await activeAPI.signedQuery("user", args: [activeAPI.domain, []], identity: authSession, as: Optional<TaggrUser>.self) ?? nil
-        guard isCurrentRuntimeGeneration(generation), self.authSession?.principal == authSession.principal else { return }
+        let key = "\(generation):\(authSession.principal)"
+        let task: Task<TaggrUser?, Error>
+        let requestID: UUID
+        if userRefreshKey == key, let existing = userRefreshTask, let existingID = userRefreshID {
+            task = existing
+            requestID = existingID
+        } else {
+            userRefreshTask?.cancel()
+            requestID = UUID()
+            task = Task {
+                try await activeAPI.signedQuery("user", args: [activeAPI.domain, []], identity: authSession, as: Optional<TaggrUser>.self) ?? nil
+            }
+            userRefreshKey = key
+            userRefreshID = requestID
+            userRefreshTask = task
+        }
+        defer {
+            if userRefreshID == requestID {
+                userRefreshTask = nil
+                userRefreshID = nil
+                userRefreshKey = nil
+            }
+        }
+        let loadedUser = try await task.value
+        try Task.checkCancellation()
+        guard userRefreshID == requestID, isCurrentRuntimeGeneration(generation), self.authSession?.principal == authSession.principal else { return }
+        notificationRefreshFailed = false
         currentUser = loadedUser
         storageCreationState = Self.storageCreationState(from: loadedUser?.settings)
         if let loadedUser {

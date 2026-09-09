@@ -3,6 +3,7 @@ import AuthenticationServices
 import CBlst
 import CryptoKit
 import UIKit
+import SwiftUI
 @testable import ICNativeClient
 @testable import TAGGR
 
@@ -100,6 +101,129 @@ extension TaggrTests {
         XCTAssertEqual(state.unreadNotificationCount, 2)
         XCTAssertEqual(state.notificationEntries(read: false).map(\.id), [3, 1])
         XCTAssertEqual(state.notificationEntries(read: true).map(\.id), [2])
+    }
+
+    @MainActor
+    func testInboxRetryInteractiveUI() async throws {
+        guard ProcessInfo.processInfo.arguments.contains("--inbox-ui-review") else {
+            throw XCTSkip("Run with --inbox-ui-review and idb.")
+        }
+        var attempts = 0
+        let api = makeStubbedAPI { request in
+            let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
+            if self.requestMethodAndArg(from: request)?.method == "posts" {
+                attempts += 1
+                if attempts == 1 { throw URLError(.notConnectedToInternet) }
+                return (response, Self.queryReply(Data("[\(String(data: self.postEnvelopeFixture(id: 42, parent: 10), encoding: .utf8)!)]".utf8)))
+            }
+            return (response, Self.queryReply(Data("null".utf8)))
+        }
+        let state = TaggrAppCoordinator(safety: makeSafetyStore(), api: api)
+        state.authSession = makeAuthSession(privateKey: Curve25519.Signing.PrivateKey())
+        state.safety.accept(scope: state.safetyScope)
+        state.currentUser = notificationUser([
+            1: TaggrNotificationEntry(notification: .generic("@alice followed you (bio, `2` followers)"), read: false),
+            2: TaggrNotificationEntry(notification: .newPost(message: "A new reply to your post", postId: 42), read: false),
+        ])
+        let scene = try XCTUnwrap(UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first)
+        let previous = scene.windows.first { $0.isKeyWindow }
+        let window = UIWindow(windowScene: scene)
+        window.rootViewController = UIHostingController(rootView: NavigationStack { InboxView().environment(state) })
+        window.makeKeyAndVisible()
+        defer { window.isHidden = true; previous?.makeKeyAndVisible() }
+        for _ in 0..<90 {
+            try await Task.sleep(for: .seconds(1))
+            if attempts >= 2, state.currentUser?.notifications[2]?.read == true {
+                XCTAssertEqual(attempts, 2)
+                return
+            }
+        }
+        XCTFail("Retry and mark the reply read using idb.")
+    }
+
+    @MainActor
+    func testNotificationRefreshRetainsEntriesOnFailureThenRecovers() async throws {
+        var shouldFail = true
+        let api = makeStubbedAPI { request in
+            if shouldFail { throw URLError(.notConnectedToInternet) }
+            let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
+            return (response, Self.queryReply(Self.currentUserFixture()))
+        }
+        let state = TaggrAppCoordinator(api: api)
+        state.authSession = makeAuthSession(privateKey: Curve25519.Signing.PrivateKey())
+        state.currentUser = notificationUser([1: TaggrNotificationEntry(notification: .newPost(message: "A new reply to your post", postId: 42), read: false)])
+        await state.refreshNotifications()
+        XCTAssertTrue(state.notificationRefreshFailed)
+        XCTAssertEqual(state.unreadNotificationCount, 1)
+        XCTAssertFalse(state.isBusy)
+        XCTAssertNil(state.errorMessage)
+        shouldFail = false
+        await state.refreshNotifications()
+        XCTAssertFalse(state.notificationRefreshFailed)
+        XCTAssertNil(state.userRefreshTask)
+    }
+
+    @MainActor
+    func testNotificationRefreshSharesConcurrentRequests() async throws {
+        let started = expectation(description: "user query started")
+        let release = DispatchSemaphore(value: 0)
+        var calls = 0
+        let api = makeStubbedAPI { request in
+            calls += 1
+            started.fulfill()
+            guard release.wait(timeout: .now() + 5) == .success else { throw URLError(.timedOut) }
+            let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
+            return (response, Self.queryReply(Self.currentUserFixture()))
+        }
+        let state = TaggrAppCoordinator(api: api)
+        state.authSession = makeAuthSession(privateKey: Curve25519.Signing.PrivateKey())
+        let first = Task { await state.refreshNotifications() }
+        await fulfillment(of: [started], timeout: 5)
+        let second = Task { await state.refreshNotifications() }
+        await Task.yield()
+        release.signal()
+        await first.value
+        await second.value
+        XCTAssertEqual(calls, 1)
+        XCTAssertFalse(state.notificationRefreshFailed)
+    }
+
+    @MainActor
+    func testNotificationRefreshCannotRestoreUserAfterSignOut() async throws {
+        let started = expectation(description: "user query started")
+        let release = DispatchSemaphore(value: 0)
+        let api = makeStubbedAPI { request in
+            started.fulfill()
+            guard release.wait(timeout: .now() + 5) == .success else { throw URLError(.timedOut) }
+            let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
+            return (response, Self.queryReply(Self.currentUserFixture()))
+        }
+        let state = TaggrAppCoordinator(api: api)
+        state.authSession = makeAuthSession(privateKey: Curve25519.Signing.PrivateKey())
+        let task = Task { await state.refreshNotifications() }
+        await fulfillment(of: [started], timeout: 5)
+        state.authSession = nil
+        state.currentUser = nil
+        release.signal()
+        await task.value
+        XCTAssertNil(state.currentUser)
+    }
+
+    @MainActor
+    func testNotificationPollingStopsWhenSleepIsCancelled() async {
+        var calls = 0
+        let api = makeStubbedAPI { request in
+            calls += 1
+            let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
+            return (response, Self.queryReply(Self.currentUserFixture()))
+        }
+        let state = TaggrAppCoordinator(api: api)
+        state.authSession = makeAuthSession(privateKey: Curve25519.Signing.PrivateKey())
+        await state.pollNotifications(sleep: { throw CancellationError() })
+        XCTAssertEqual(calls, 1)
+        state.authSession = nil
+        await state.pollNotifications(sleep: { throw CancellationError() })
+        XCTAssertEqual(calls, 1)
     }
 
     @MainActor

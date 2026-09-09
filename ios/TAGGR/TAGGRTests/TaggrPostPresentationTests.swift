@@ -200,17 +200,28 @@ extension TaggrTests {
         }
     }
 
+    func testNotificationLabelsIdentifyRepliesAndMentions() {
+        XCTAssertEqual(TaggrNotification.newPost(message: "A new reply to your post", postId: 8).safetyMessage, "A new reply to your post")
+        XCTAssertEqual(TaggrNotification.newPost(message: "You were mentioned in a post", postId: 8).safetyMessage, "You were mentioned in a post")
+        XCTAssertEqual(TaggrNotification.newPost(message: "A new repost of your post", postId: 8).safetyMessage, "A new repost of your post")
+        XCTAssertEqual(TaggrNotification.newPost(message: "A new reply to your post\n#NSFW", postId: 8).safetyMessage, "This notification contains restricted content.")
+        XCTAssertEqual(TaggrNotification.newPost(message: "A new reply to your post", postId: 8).postId, 8)
+        XCTAssertEqual(TaggrNotification.generic("@alice followed you (untrusted bio, `2` followers)").safetyMessage, "@alice followed you.")
+    }
+
     func testSafetyNotificationPreservesSystemDetailsWithoutFollowerBio() {
         let reward = "You received `0.12` ICP as rewards and `0.03` ICP as revenue! 💸"
         XCTAssertEqual(TaggrNotification.generic(reward).safetyMessage, reward)
+        let legacy = "You received `12` credits."
+        XCTAssertEqual(TaggrNotification.generic(legacy).safetyMessage, legacy)
         let mint = "TAGGR minted `12.5` $TAGGR tokens for you! 💎"
         XCTAssertEqual(TaggrNotification.generic(mint).safetyMessage, mint)
         XCTAssertEqual(TaggrNotification.conditional(message: "untrusted", predicate: .proposal(42)).safetyMessage,
-                       "Governance proposal on post #42 needs attention.")
+                       "untrusted")
         XCTAssertEqual(TaggrNotification.watchedPostEntries(postId: 7, entries: [8, 9]).safetyMessage,
-                       "2 new thread update(s) on watched post #7.")
+                       "2 new thread update(s) on a watched post.")
         XCTAssertEqual(TaggrNotification.generic("@name followed you (#NSFW bio, `2` followers)").safetyMessage,
-                       "Someone followed you.")
+                       "@name followed you.")
         XCTAssertFalse(TaggrNotification.generic(reward + "\n#NSFW").safetyMessage.contains("#NSFW"))
         XCTAssertFalse(TaggrNotification.newPost(message: "#NSFW", postId: 5).safetyMessage.contains("#NSFW"))
     }

@@ -15,6 +15,10 @@ struct RootView: View {
                 tabs.id(state.safetyScope)
             }
         }
+        .task(id: "\(state.safetyScope):\(state.runtimeGeneration):\(scenePhase)") {
+            guard scenePhase == .active else { return }
+            await state.pollNotifications()
+        }
         .task(id: "\(state.runtimeConfig.canisterId):\(scenePhase)") {
             guard ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil,
                   ProcessInfo.processInfo.environment["XCTestBundlePath"] == nil,
@@ -187,7 +191,7 @@ struct RootView: View {
 
     static func feedTabReselectionAction(for route: TaggrRoute) -> FeedTabReselectionAction {
         switch route {
-        case .feed(.hot), .feed(.latest), .feed(.personal):
+        case .feed(.hot), .feed(.latest), .feed(.personal), .feed(.realms):
             return .scrollToTop
         default:
             return .returnToHomeFeed

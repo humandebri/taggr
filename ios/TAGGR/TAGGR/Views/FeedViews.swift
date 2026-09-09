@@ -31,7 +31,7 @@ struct FeedView: View {
                         )
                         .id(FeedScrollAnchor.top)
                         if state.feed.isEmpty {
-                            EmptyFeedView()
+                            EmptyFeedView(mode: selectedMode)
                         } else {
                             ForEach(state.feed) { post in
                                 PostRow(post: post, onVisible: {
@@ -242,8 +242,8 @@ struct FeedHeader: View {
             if !selectedMode.isFiltered {
                 HStack(spacing: 4) {
                     ChannelPill(title: "#hot", selected: selectedMode == .hot) { changeMode(.hot) }
-                    ChannelPill(title: "#latest", selected: selectedMode == .latest) { changeMode(.latest) }
                     ChannelPill(title: "#personal", selected: selectedMode == .personal) { changeMode(.personal) }
+                    ChannelPill(title: "#realms", selected: selectedMode == .realms) { changeMode(.realms) }
                 }
                 .fixedSize(horizontal: true, vertical: false)
             }
@@ -296,16 +296,46 @@ struct TaggrHashIconView: View {
 }
 
 struct EmptyFeedView: View {
+    @Environment(TaggrAppCoordinator.self) private var state
+    let mode: TaggrFeedMode
+
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("No posts")
+            Text(title)
                 .font(.headline)
                 .foregroundStyle(TaggrTheme.text)
-            Text("Pull to refresh or switch channels.")
+            Text(message)
                 .font(.subheadline)
                 .foregroundStyle(TaggrTheme.secondaryText)
+            if mode == .realms, state.authSession == nil {
+                Button("Sign in") {
+                    state.startIdentitySignIn(reason: "Sign in to see posts from your realms.")
+                }
+                .font(.subheadline.weight(.bold))
+                .foregroundStyle(TaggrTheme.clickable)
+            } else if mode == .realms, state.currentUser == nil {
+                Button("Create TAGGR user") {
+                    state.route = .settings
+                }
+                .font(.subheadline.weight(.bold))
+                .foregroundStyle(TaggrTheme.clickable)
+            }
         }
         .padding(16)
+    }
+
+    private var title: String {
+        if mode == .realms, state.authSession == nil { return "Sign in to view realms" }
+        if mode == .realms, state.currentUser == nil { return "Create a TAGGR user" }
+        if mode == .realms { return "No realm posts" }
+        return "No posts"
+    }
+
+    private var message: String {
+        if mode == .realms, state.authSession == nil { return "Your joined and controlled realms are personal to your account." }
+        if mode == .realms, state.currentUser == nil { return "Create an account to join and manage realms." }
+        if mode == .realms { return "Join a realm or create one to see its posts here." }
+        return "Pull to refresh or switch channels."
     }
 }
 

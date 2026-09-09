@@ -417,6 +417,22 @@ fn personal_feed() {
     });
 }
 
+#[export_name = "canister_query realms_feed"]
+fn realms_feed() {
+    let (domain, page, offset): (String, usize, PostId) = parse(&arg_data_raw());
+    read(|state| {
+        reply(match state.principal_to_user(caller(state)) {
+            None => Default::default(),
+            Some(user) => user
+                .realms_feed(domain, state, offset)
+                .skip(page * CONFIG.feed_page_size)
+                .take(CONFIG.feed_page_size)
+                .map(|post| post.with_meta(state))
+                .collect::<Vec<_>>(),
+        })
+    });
+}
+
 #[export_name = "canister_query thread"]
 fn thread() {
     let id: PostId = parse(&arg_data_raw());

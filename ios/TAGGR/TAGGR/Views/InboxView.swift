@@ -18,6 +18,12 @@ struct InboxView: View {
                     } else if state.currentUser == nil {
                         InboxNoAccountView()
                     } else {
+                        if state.notificationRefreshFailed {
+                            Text("Could not refresh notifications. Pull to retry.")
+                                .font(.caption)
+                                .foregroundStyle(TaggrTheme.secondaryText)
+                                .padding(.horizontal, 16)
+                        }
                         if freshEntries.isEmpty {
                             InboxZeroView()
                         }
@@ -136,19 +142,43 @@ private struct InboxNotificationCard: View {
     let archive: Bool
     let refreshRevision: Int
     @State private var associatedPost: TaggrPost?
+    @State private var isLoading = true
+    @State private var loadFailed = false
+    @State private var retryRevision = 0
 
     var body: some View {
         Group {
-            if entry.notification.postId == nil || associatedPost.map({ state.canDisplayPost($0) && $0.contentRestriction(viewerID: state.currentUser?.id) == nil }) == true {
+            if let post = associatedPost {
+                if state.canDisplayPost(post), post.contentRestriction(viewerID: state.currentUser?.id) == nil {
+                    cardContent
+                }
+            } else {
                 cardContent
             }
         }
-        .task(id: "\(entry.notification.postId.map(String.init) ?? "none"):\(refreshRevision)") {
-            if let id = entry.notification.postId {
-                let post = try? await state.loadNotificationPost(id)
-                guard !Task.isCancelled else { return }
-                associatedPost = post
-            }
+        .task(id: "\(state.safetyScope):\(entry.notification.postId.map(String.init) ?? "none"):\(refreshRevision):\(retryRevision)") {
+            await loadPost()
+        }
+    }
+
+    private func loadPost() async {
+        let scope = state.safetyScope
+        associatedPost = nil
+        isLoading = true
+        loadFailed = false
+        guard let postID = entry.notification.postId else {
+            isLoading = false
+            return
+        }
+        do {
+            let post = try await state.loadNotificationPost(postID)
+            guard !Task.isCancelled, scope == state.safetyScope else { return }
+            associatedPost = post
+            isLoading = false
+        } catch {
+            guard !Task.isCancelled, scope == state.safetyScope else { return }
+            loadFailed = true
+            isLoading = false
         }
     }
 
@@ -160,14 +190,15 @@ private struct InboxNotificationCard: View {
                     .foregroundStyle(archive ? TaggrTheme.secondaryText : TaggrTheme.clickable)
                     .frame(width: 28)
                 VStack(alignment: .leading, spacing: 8) {
-                    Text(entry.notification.safetyMessage)
+                    TaggrMarkdownText(text: entry.notification.postId != nil && associatedPost == nil ? "Notification" : entry.notification.safetyMessage)
                         .font(.subheadline)
                         .foregroundStyle(TaggrTheme.text)
                         .fixedSize(horizontal: false, vertical: true)
-                    if !entry.notification.watchedEntryIds.isEmpty {
-                        Text(entry.notification.watchedEntryIds.map { "#\($0)" }.joined(separator: ", "))
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(TaggrTheme.secondaryText)
+                    if associatedPost != nil && !entry.notification.watchedEntryIds.isEmpty {
+                        ForEach(entry.notification.watchedEntryIds, id: \.self) { postID in
+                            Button("#\(postID)") { state.navigateToPost(postID) }
+                                .font(.caption.weight(.semibold))
+                        }
                     }
                 }
                 Spacer(minLength: 0)
@@ -176,9 +207,22 @@ private struct InboxNotificationCard: View {
                         .environment(state)
                 }
             }
-            if let postId = entry.notification.postId {
-                NotificationPostPreview(postId: postId)
-                    .environment(state)
+            if let post = associatedPost {
+                PostRow(post: post) {
+                    state.navigateToPost(post.id)
+                }
+            } else if entry.notification.postId != nil {
+                if isLoading {
+                    ProgressView("Loading notification")
+                } else if loadFailed {
+                    HStack {
+                        Text("Could not load notification")
+                        Button("Retry") { retryRevision += 1 }
+                            .accessibilityIdentifier("notificationRetry-\(id)")
+                    }
+                } else {
+                    Text("Post unavailable")
+                }
             }
         }
         .padding(14)
@@ -216,51 +260,5 @@ private struct InboxNotificationActions: View {
             .accessibilityLabel("Mark notification read")
         }
         .foregroundStyle(TaggrTheme.secondaryText)
-    }
-}
-
-private struct NotificationPostPreview: View {
-    @Environment(TaggrAppCoordinator.self) private var state
-    let postId: Int
-    @State private var post: TaggrPost?
-    @State private var isLoading = true
-
-    var body: some View {
-        Group {
-            if let post {
-                PostRow(post: post) {
-                    state.navigateToPost(post.id)
-                }
-            } else if isLoading {
-                HStack(spacing: 8) {
-                    ProgressView()
-                        .tint(.white)
-                    Text("Loading post")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(TaggrTheme.secondaryText)
-                }
-                .padding(.vertical, 8)
-            } else {
-                Text("Post unavailable")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(TaggrTheme.secondaryText)
-                    .padding(.vertical, 8)
-            }
-        }
-        .task(id: postId) {
-            await load()
-        }
-    }
-
-    private func load() async {
-        guard post == nil else { return }
-        isLoading = true
-        defer { isLoading = false }
-        do {
-            post = try await state.loadNotificationPost(postId)
-        } catch {
-            guard !state.isCancellation(error) else { return }
-            state.errorMessage = error.localizedDescription
-        }
     }
 }

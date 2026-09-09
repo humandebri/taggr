@@ -239,6 +239,10 @@ final class TaggrAppCoordinator {
     }
 
     var authorNameCacheOrder: [Int] = []
+    var notificationRefreshFailed = false
+    @ObservationIgnored var userRefreshTask: Task<TaggrUser?, Error>?
+    @ObservationIgnored var userRefreshKey: String?
+    @ObservationIgnored var userRefreshID: UUID?
     var runtimeGeneration = 0
     var requestSequences: [RequestScope: Int] = [:]
     var requestTasks: [RequestScope: Task<Void, Never>] = [:]
@@ -471,17 +475,23 @@ final class TaggrAppCoordinator {
                 let posts: [TaggrPost]
                 switch mode {
                 case .hot:
-                    posts = try await self.loadPostEnvelopes("hot_posts", args: [activeAPI.domain, "", page, offset, true], identity: nil, api: activeAPI)
+                    posts = try await self.loadPostEnvelopes("hot_posts", args: [activeAPI.domain, "", page, offset, true], identity: self.authSession, api: activeAPI)
                 case .latest:
-                    posts = try await self.loadPostEnvelopes("last_posts", args: [activeAPI.domain, "", page, offset, true], identity: nil, api: activeAPI)
+                    posts = try await self.loadPostEnvelopes("last_posts", args: [activeAPI.domain, "", page, offset, true], identity: self.authSession, api: activeAPI)
                 case .personal:
                     if let authSession = self.authSession {
                         posts = try await self.loadPostEnvelopes("personal_feed", args: [activeAPI.domain, page, offset], identity: authSession, api: activeAPI)
                     } else {
                         posts = []
                     }
+                case .realms:
+                    if let authSession = self.authSession {
+                        posts = try await self.loadPostEnvelopes("realms_feed", args: [activeAPI.domain, page, offset], identity: authSession, api: activeAPI)
+                    } else {
+                        posts = []
+                    }
                 case .realm(let name):
-                    posts = try await self.loadPostEnvelopes("last_posts", args: [activeAPI.domain, name, page, offset, true], identity: nil, api: activeAPI)
+                    posts = try await self.loadPostEnvelopes("last_posts", args: [activeAPI.domain, name, page, offset, true], identity: self.authSession, api: activeAPI)
                 case .tags(let tokens):
                     posts = try await self.loadPostEnvelopes("posts_by_tags", args: [activeAPI.domain, "", tokens, page, offset], identity: nil, api: activeAPI)
                 }
@@ -737,11 +747,35 @@ final class TaggrAppCoordinator {
     func loadProfile(_ handle: String) async {
         let request = beginRequest(.profile)
         let activeAPI = api
+        contentStore.journalPosts = []
+        contentStore.journalPage = 0
+        contentStore.journalOffset = 0
+        contentStore.journalCanLoadMore = false
+        contentStore.journalIsLoading = true
         await executeRequest(request) {
+            defer {
+                if self.isCurrentRequest(request) {
+                    self.contentStore.journalIsLoading = false
+                }
+            }
             await self.runBusy(validWhile: { self.isCurrentRequest(request) }) {
                 let loadedProfile = try await activeAPI.query("user", args: [activeAPI.domain, [handle]], as: TaggrUser.self)
                 guard self.isCurrentRequest(request) else { return }
+                let posts: [TaggrPost]
+                if let loadedProfile {
+                    posts = try await self.loadPostEnvelopes(
+                        "journal", args: [activeAPI.domain, String(loadedProfile.id), 0, 0],
+                        identity: nil, api: activeAPI
+                    )
+                } else {
+                    posts = []
+                }
+                guard self.isCurrentRequest(request) else { return }
                 self.profile = loadedProfile
+                self.contentStore.journalPosts = posts
+                self.contentStore.journalPage = 0
+                self.contentStore.journalOffset = posts.first?.id ?? 0
+                self.contentStore.journalCanLoadMore = posts.count >= (self.cache?.config?.feedPageSize ?? 30)
                 if let loadedProfile {
                     self.cacheAuthorName(loadedProfile.name, userID: loadedProfile.id)
                 }
@@ -749,12 +783,38 @@ final class TaggrAppCoordinator {
         }
     }
 
-    func loadUserPosts(handle: String, page: Int, offset: Int) async throws -> [TaggrPost] {
-        try await loadPostEnvelopes("user_posts", args: [api.domain, handle, page, offset], identity: nil)
+    func loadMoreProfileJournal() async {
+        guard case .profile = route, let profile,
+              !isBusy, !contentStore.journalIsLoading, contentStore.journalCanLoadMore else { return }
+        let request = beginRequest(.profile)
+        let activeAPI = api
+        let page = contentStore.journalPage + 1
+        let offset = contentStore.journalOffset
+        contentStore.journalIsLoading = true
+        await executeRequest(request) {
+            defer {
+                if self.requestSequences[request.scope] == request.sequence {
+                    self.contentStore.journalIsLoading = false
+                }
+            }
+            do {
+                let posts = try await self.loadPostEnvelopes(
+                    "journal", args: [activeAPI.domain, String(profile.id), page, offset],
+                    identity: nil, api: activeAPI
+                )
+                guard self.isCurrentRequest(request) else { return }
+                self.contentStore.journalPosts += posts
+                self.contentStore.journalPage = page
+                self.contentStore.journalCanLoadMore = posts.count >= (self.cache?.config?.feedPageSize ?? 30)
+            } catch {
+                guard self.isCurrentRequest(request), !self.isCancellation(error) else { return }
+                self.errorMessage = error.localizedDescription
+            }
+        }
     }
 
-    func loadJournalPosts(handle: String, page: Int, offset: Int) async throws -> [TaggrPost] {
-        try await loadPostEnvelopes("journal", args: [api.domain, handle, page, offset], identity: nil)
+    func loadUserPosts(handle: String, page: Int, offset: Int) async throws -> [TaggrPost] {
+        try await loadPostEnvelopes("user_posts", args: [api.domain, handle, page, offset], identity: nil)
     }
 
     func authorDisplayName(for post: TaggrPost) -> String {
