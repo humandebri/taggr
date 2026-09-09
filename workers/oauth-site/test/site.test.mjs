@@ -60,3 +60,25 @@ test("supports crawlers and rejects unsupported methods", async () => {
     assert.equal((await request("/missing")).status, 404);
     assert.equal((await request("/", { method: "POST" })).status, 405);
 });
+
+test("privacy describes password sign-in and concrete Google safeguards and deletion limits", async () => {
+    const body = await (await request("/privacy-policy")).text();
+    for (const disclosure of [
+        "TAGGR Password and Internet Identity sign-in",
+        "does not persist the entered phrase",
+        "Sign out removes the saved TAGGR session",
+        "does not disconnect YouTube",
+        "HTTPS/TLS",
+        "iOS Keychain",
+        "Complete Until First User Authentication",
+        "excluded from device backups",
+        "when the app next loads the saved job",
+        "not a background deletion guarantee",
+        "If disconnection fails",
+        "YouTube or YouTube Studio",
+        "not removed by disconnection",
+    ])
+        assert.ok(body.includes(disclosure), disclosure);
+    assert.doesNotMatch(body, /incomplete jobs expire after seven days/);
+    assert.equal(body, await (await request("/privacy")).text());
+});

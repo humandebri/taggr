@@ -13,6 +13,7 @@
 # rust
 target/
 release-artifacts/
+artifacts/
 
 # frontend code
 node_modules/
@@ -20,5 +21,6 @@ dist/
 public
 
 # e2e tests
+.playwright-cli/
 test-results/
 playwright-report/

@@ -1,4 +1,0 @@
-module CBlst {
-umbrella "/Volumes/KINGSTON/ICP/ICNativeClient/Vendor/blst/bindings"
-export *
-}

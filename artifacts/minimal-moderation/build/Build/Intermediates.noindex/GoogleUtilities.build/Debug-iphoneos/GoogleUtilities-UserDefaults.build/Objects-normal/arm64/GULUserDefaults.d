@@ -1,6 +1,0 @@
-dependencies: \
-  /Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/taggr-safety-build/SourcePackages/checkouts/GoogleUtilities/GoogleUtilities/UserDefaults/GULUserDefaults.m \
-  /Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/minimal-moderation/build/Build/Intermediates.noindex/GoogleUtilities.build/Debug-iphoneos/GoogleUtilities-UserDefaults.build/DerivedSources/resource_bundle_accessor.h \
-  /Applications/Xcode-26.5.0.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS.sdk/System/Library/Frameworks/Foundation.framework/Modules/module.modulemap \
-  /Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/taggr-safety-build/SourcePackages/checkouts/GoogleUtilities/GoogleUtilities/UserDefaults/Public/GoogleUtilities/GULUserDefaults.h \
-  /Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/minimal-moderation/build/Build/Intermediates.noindex/GeneratedModuleMaps-iphoneos/GoogleUtilities-Logger.modulemap

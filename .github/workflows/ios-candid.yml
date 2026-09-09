@@ -17,10 +17,12 @@ jobs:
 
       - name: Install pinned didc
         run: |
+          mkdir -p "$HOME/.local/bin"
           curl --proto '=https' --tlsv1.2 -LsSf \
-            https://github.com/dfinity/candid/releases/download/didc-v0.5.4/didc-installer.sh \
-            -o /tmp/didc-installer.sh
-          sh /tmp/didc-installer.sh
+            https://github.com/dfinity/candid/releases/download/2025-12-18/didc-macos \
+            -o "$HOME/.local/bin/didc"
+          echo "e7c4f2450ea7eb7535a9fe8853102f6068b2787d6197f6a6587dd96c7f5110bb  $HOME/.local/bin/didc" | shasum -a 256 -c -
+          chmod +x "$HOME/.local/bin/didc"
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
       - name: Check generated Candid bindings

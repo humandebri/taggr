@@ -1,4 +1,0 @@
-module AppAuth {
-umbrella "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/icnativeclient-077/SourcePackages/checkouts/AppAuth-iOS/Sources/AppAuth"
-export *
-}

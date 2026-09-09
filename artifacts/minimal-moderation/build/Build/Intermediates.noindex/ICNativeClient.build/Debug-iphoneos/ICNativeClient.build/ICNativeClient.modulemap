@@ -1,4 +1,0 @@
-module ICNativeClient {
-header "ICNativeClient-Swift.h"
-export *
-}

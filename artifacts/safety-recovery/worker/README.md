@@ -1,1 +1,0 @@
-This folder contains the built output assets for the worker "taggr-oauth-site" generated at 2026-09-09T02:14:48.573Z.

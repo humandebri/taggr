@@ -1,4 +1,0 @@
-module third_party_IsAppEncrypted {
-umbrella "/Volumes/KINGSTON/Offloaded/Desktop/TAGGR/artifacts/taggr-safety-build/SourcePackages/checkouts/GoogleUtilities/third_party/IsAppEncrypted/Public"
-export *
-}

@@ -12,7 +12,7 @@
     -   Open `Links > Privacy policy`.
     -   Open `Links > HELP Realm`.
 -   Account-required review path:
-    -   Open **Account > Sign in > Seed phrase**.
+    -   Open **Account > Sign in > Password**.
     -   Enter the review account's seed phrase provided privately in App Store
         Connect. Preserve spaces and capitalization exactly.
     -   Use the signed-in account to verify reporting and blocking from profile
@@ -55,7 +55,7 @@ Review access:
 
 -   Use the public demo path without login for feed, public posts, realms,
     profiles, token pages, transaction pages, privacy, and support links.
--   For sign-in, open **Account > Sign in > Seed phrase** and enter the phrase
+-   For sign-in, open **Account > Sign in > Password** and enter the phrase
     supplied in the private review access details. The expected username is
     supplied there as well. No new registration or invite is required.
 -   Reporting and local blocking do not require tokens or credits.

@@ -52,7 +52,7 @@ Use `ios/docs/app_store_listing.md` for product-page copy, URLs, keywords, and
 the screenshot capture plan.
 
 Create a dedicated production review account once with the website's Seed Phrase
-method. Verify **Account > Sign in > Seed phrase** opens the same account on iOS,
+method. Verify **Account > Sign in > Password** opens the same account on iOS,
 then provide its expected username and phrase privately in App Store Connect.
 Keep enough credits available for review. Do not store credentials in this repo.
 The same account can be reused across reviews; a new invite is not required.

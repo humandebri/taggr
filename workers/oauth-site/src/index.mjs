@@ -160,7 +160,7 @@ const privacy = layout({
         <li><strong>Purpose:</strong> to display the destination channel and upload the selected video to that channel only when the user requests it.</li>
         <li><strong>Storage:</strong> Google credentials and temporary upload state remain in protected storage on the user’s iOS device; they are not stored in a TAGGR canister or developer-operated server.</li>
         <li><strong>Sharing:</strong> the selected upload data is transferred only to Google/YouTube to perform the requested upload. TAGGR does not sell it or disclose it to advertisers or data brokers.</li>
-        <li><strong>Retention and deletion:</strong> incomplete local upload jobs expire after seven days. Disconnecting YouTube revokes authorization and deletes local YouTube upload state.</li>
+        <li><strong>Retention and deletion:</strong> saved upload jobs older than seven days are deleted when the app next loads the saved job. Disconnect YouTube requests revocation and removes local upload state; successful revocation also clears the Google Sign-In credentials.</li>
       </ul>
 
       <h2>Information handled by TAGGR</h2>
@@ -168,9 +168,13 @@ const privacy = layout({
         <li>Posts, comments, reactions, reports, realm activity, uploaded files, and profile information a user chooses to submit.</li>
         <li>Public identifiers, including Internet Identity principals and TAGGR user identifiers.</li>
         <li>Public ledger information and wallet actions expressly initiated by the signed-in user.</li>
-        <li>An Internet Identity session stored locally on the device to keep the user signed in.</li>
+        <li>A TAGGR authentication session stored locally on the device to keep the user signed in, using Internet Identity or the Password method described below.</li>
       </ul>
       <p>Public content and public identifiers submitted to the Internet Computer may be visible to anyone and may not be fully erasable because of the decentralized, append-only nature of the service.</p>
+
+      <h2>TAGGR Password and Internet Identity sign-in</h2>
+      <p>The Password option signs in to an existing TAGGR account created with the website's Seed Phrase method. The input is processed on the device to derive a signing key, not sent as a password to TAGGR, Google, or the website hosting this policy. The app sends signed requests and public authentication information to the Internet Computer to verify the account. Internet Identity accounts continue to use their original sign-in method.</p>
+      <p>The app does not persist the entered phrase. It clears the input field after successful sign-in or dismissal. A delegated authentication session, including its session signing key, is saved in the iOS Keychain with device-only, unlocked-device access. Sign out removes the saved TAGGR session; an expired session requires signing in again. Signing out does not delete the on-chain account or its published content, and does not disconnect YouTube. Protect the phrase: anyone who knows it can control the associated TAGGR account. TAGGR sign-in is separate from optional Google/YouTube authorization.</p>
 
       <h2>Google and YouTube user data</h2>
       <p>Connecting YouTube is optional and begins only when the user selects “Connect YouTube.” Google shows a consent screen before access is granted.</p>
@@ -183,11 +187,13 @@ const privacy = layout({
       <h3>How the data is used</h3>
       <p>The channel ID and title are used only to show and verify the destination channel before upload. Authorization credentials are used only to access the YouTube Data API for the connected account. A completed video’s canonical YouTube URL is inserted into the user’s TAGGR draft and becomes public only if the user submits that draft.</p>
       <h3>Storage and retention</h3>
-      <p>Google authorization credentials are stored by Google Sign-In in protected device storage. TAGGR does not send them to a TAGGR canister or a developer-operated server. A selected video and resumable-upload metadata may be stored temporarily in protected app storage so an interrupted upload can continue. Upload jobs are removed after completion is acknowledged, cancellation, explicit disconnection, or expiry; incomplete jobs expire after seven days.</p>
+      <p>Google authorization credentials are managed by the Google Sign-In SDK in the iOS Keychain to restore the connection and refresh access when needed. They are retained while the connection is maintained, and cleared by the SDK after successful disconnection. TAGGR does not store Google credentials on its canisters or developer-operated servers. The connected channel ID and title are held in app memory for display and cleared on disconnection; they are fetched again when the connection is restored.</p>
+      <p>The app temporarily copies the selected video and stores upload metadata (title, description, privacy setting, resumable-upload URL, progress, and any returned video ID) in its private app storage. The video copy is removed when upload completion is processed; completion metadata can remain until the draft receives the link and acknowledges completion. Cancellation and explicit disconnection remove local upload jobs. Saved jobs older than seven days from creation are deleted when the app next loads the saved job. This is not a background deletion guarantee: data can remain on the device longer if the app is not run. These operations do not delete the original video from the user's photo library.</p>
       <h3>Sharing</h3>
       <p>The selected video and metadata are sent directly from the device to YouTube at the user’s request. TAGGR does not sell Google user data, use it for advertising, or share it with data brokers. Google user data is not used to train generalized artificial intelligence or machine-learning models.</p>
       <h3>Disconnecting and deleting Google data</h3>
-      <p>A user can select “Disconnect YouTube” in TAGGR. This revokes TAGGR’s Google authorization and removes local YouTube upload state. A user can also revoke access at <a href="https://myaccount.google.com/connections">Google Account Connections</a>. Videos already uploaded to YouTube remain in the user’s YouTube account and can be managed or deleted there.</p>
+      <p>A user can select “Disconnect YouTube” in TAGGR. This requests revocation of TAGGR's Google authorization, clears the displayed channel information, and removes local YouTube upload state. When revocation succeeds, Google Sign-In clears its saved credentials. If disconnection fails, for example because the device is offline, credentials or authorization may remain: retry when connected or revoke access at <a href="https://myaccount.google.com/connections">Google Account Connections</a>. Revoking access on Google's website does not remotely erase files on an offline device; use the in-app disconnection to remove local upload state.</p>
+      <p>Videos already uploaded to YouTube remain in the user's YouTube account. To delete them, use YouTube or YouTube Studio; disconnecting TAGGR does not delete them. A YouTube URL already inserted in a TAGGR draft or published post is separate from the temporary upload job and is not removed by disconnection. Remove it from the draft or edit/delete the post separately, subject to the network's limits on erasing published data.</p>
       <div class="note">TAGGR’s use and transfer of information received from Google APIs adheres to the <a href="https://developers.google.com/terms/api-services-user-data-policy">Google API Services User Data Policy</a>, including the Limited Use requirements.</div>
 
       <h2>Photos and videos</h2>
@@ -197,10 +203,11 @@ const privacy = layout({
       <p>The TAGGR iOS app contains no analytics SDK or advertising SDK and does not perform advertising tracking. It does not collect native contacts, precise location, microphone recordings, HealthKit data, or push-notification tokens.</p>
 
       <h2>Third-party services</h2>
-      <p>Internet Identity provides authentication. Google Sign-In and the YouTube Data API provide optional YouTube connection and upload. Public Internet Computer ledgers provide wallet information. External community links open their respective services, whose own terms and privacy policies apply.</p>
+      <p>Internet Identity provides one TAGGR authentication option; Password sign-in uses locally derived signing keys as described above. Google Sign-In and the YouTube Data API provide optional YouTube connection and upload. Public Internet Computer ledgers provide wallet information. External community links open their respective services, whose own terms and privacy policies apply.</p>
 
       <h2>Security</h2>
-      <p>The iOS app uses platform-protected storage for authentication and upload state. No system can guarantee absolute security. Users should protect access to their device and disconnect services they no longer use.</p>
+      <p>Google sign-in, token refresh/revocation, and YouTube upload requests use HTTPS/TLS to protect data in transit. Google credentials are protected at rest by the iOS Keychain. Temporary video copies, upload chunks, and job metadata are stored in the app's sandbox with iOS Data Protection (Complete Until First User Authentication), allowing background uploads after the first device unlock following a restart. The upload directory is marked as excluded from device backups. These protections rely on iOS and are not end-to-end encryption of videos uploaded to YouTube.</p>
+      <p>Google authorization tokens and temporary upload files are not stored by the operator's policy/moderation service or on TAGGR canisters. Users should enable a device passcode, protect their TAGGR phrase, and disconnect services they no longer use. No system can guarantee absolute security.</p>
 
       <h2>Children</h2>
       <p>TAGGR is not directed to children under the age required to consent to online services in their jurisdiction.</p>
