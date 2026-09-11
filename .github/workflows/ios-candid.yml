@@ -13,7 +13,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install pinned Rust toolchain
-        run: rustup toolchain install 1.90.0 --profile minimal --component rustfmt,clippy
+        run: rustup toolchain install 1.90.0 --profile minimal --component rustfmt,clippy --target wasm32-unknown-unknown
 
       - name: Install pinned didc
         run: |
@@ -27,6 +27,20 @@ jobs:
 
       - name: Check generated Candid bindings
         run: bash scripts/check_candid_bindings.sh
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+          cache: npm
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Build assets embedded by Rust
+        run: |
+          NODE_ENV=production npm run build
+          cargo build --locked --release --target wasm32-unknown-unknown --package bucket
+          gzip -n -c target/wasm32-unknown-unknown/release/bucket.wasm > target/wasm32-unknown-unknown/release/bucket.wasm.gz
 
       - name: Check Rust formatting and types
         run: |
