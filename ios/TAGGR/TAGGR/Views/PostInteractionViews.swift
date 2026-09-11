@@ -413,6 +413,7 @@ struct InlineReplyComposer: View {
     @Binding var hasDraftChanges: Bool
     @StateObject private var draft: PostDraftSession
     @StateObject private var imageImport = ImageImportCoordinator()
+    @StateObject private var quoteEditor = ComposeQuoteEditor()
     @State private var selectedPhotos: [PhotosPickerItem] = []
     @State private var imageImportWarning: String?
     @State private var imageInsertionSegmentID: Int?
@@ -454,6 +455,7 @@ struct InlineReplyComposer: View {
                 moveImage: moveImageMarker,
                 moveImageToTextSegment: moveImageMarker
             )
+            .environmentObject(quoteEditor)
             .disabled(!draft.isLoaded)
             .padding(8)
             .background(TaggrTheme.darkPanel)
@@ -508,6 +510,7 @@ struct InlineReplyComposer: View {
                     itemSpacing: 6,
                     background: .clear
                 )
+                .environmentObject(quoteEditor)
 
                 Button("Submit") {
                     submit()
@@ -1148,9 +1151,13 @@ struct RepostSheet: View {
                 .foregroundStyle(TaggrTheme.clickable)
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
-            TaggrPostBodyView(text: post.displayBody, maximumLines: 4)
-                .font(.subheadline)
-                .foregroundStyle(TaggrTheme.secondaryText)
+            TaggrPostBodyView(
+                text: post.displayBody,
+                maximumLines: 4,
+                textStyle: .subheadline,
+                textColor: TaggrTheme.secondaryText,
+                lineSpacing: 0
+            )
                 .frame(maxWidth: .infinity, alignment: .leading)
             Spacer()
         }

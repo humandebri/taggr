@@ -484,12 +484,6 @@ final class TaggrAppCoordinator {
                     } else {
                         posts = []
                     }
-                case .realms:
-                    if let authSession = self.authSession {
-                        posts = try await self.loadPostEnvelopes("realms_feed", args: [activeAPI.domain, page, offset], identity: authSession, api: activeAPI)
-                    } else {
-                        posts = []
-                    }
                 case .realm(let name):
                     posts = try await self.loadPostEnvelopes("last_posts", args: [activeAPI.domain, name, page, offset, true], identity: self.authSession, api: activeAPI)
                 case .tags(let tokens):

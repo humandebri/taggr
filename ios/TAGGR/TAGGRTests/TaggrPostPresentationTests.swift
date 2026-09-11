@@ -274,15 +274,56 @@ extension TaggrTests {
         XCTAssertFalse(ProfileView.showsJournalHeaderSpinner(isLoading: true, hasPosts: true))
     }
 
-    func testPostBodyMaximumHeightUsesLineCountAndAllowsDetailExpansion() {
-        let feedHeight = TaggrPostBodyView.maximumHeight(for: 10)
-        let compactHeight = TaggrPostBodyView.maximumHeight(for: 4)
+    func testLongLinkedPostKeepsPlainTextAndLinkTapTargetsSeparate() {
+        let body = """
+        I have no words
 
-        XCTAssertNotNil(feedHeight)
-        XCTAssertNotNil(compactHeight)
-        XCTAssertGreaterThan(feedHeight ?? 0, compactHeight ?? 0)
-        XCTAssertNil(TaggrPostBodyView.maximumHeight(for: nil))
-        XCTAssertNil(TaggrPostBodyView.maximumHeight(for: 10, containsYouTube: true))
+        If you're not living under a rock, I'm sure the world has changed.
+
+        Two hours later, the [PR](https://example.com/pr) was ready.
+
+        I have no words to properly express what I feel.
+        """
+
+        let attributed = TaggrInteractiveMarkdownText.attributedText(for: body)
+        let string = attributed.string as NSString
+        let linkOffset = string.range(of: "PR").location
+        let plainOffset = string.range(of: "Two hours later").location
+
+        XCTAssertEqual(
+            TaggrInteractiveMarkdownText.link(atUTF16Offset: linkOffset, in: attributed),
+            URL(string: "https://example.com/pr")
+        )
+        XCTAssertNil(TaggrInteractiveMarkdownText.link(atUTF16Offset: plainOffset, in: attributed))
+        XCTAssertEqual(attributed.string.components(separatedBy: "\n\n").count, 4)
+    }
+
+    func testInteractiveMarkdownPreservesListItemsAsSeparateLines() {
+        let attributed = TaggrInteractiveMarkdownText.attributedText(for: "- first\n- second")
+
+        XCTAssertEqual(attributed.string, "• first\n• second")
+    }
+
+    func testInteractiveMarkdownLayoutStopsAtTenActualLines() {
+        let textView = TaggrInteractiveMarkdownText.TextView(
+            frame: CGRect(x: 0, y: 0, width: 320, height: 1_000)
+        )
+        textView.textContainerInset = .zero
+        textView.textContainer.lineFragmentPadding = 0
+        textView.textContainer.maximumNumberOfLines = 10
+        textView.textContainer.lineBreakMode = .byTruncatingTail
+        textView.attributedText = TaggrInteractiveMarkdownText.attributedText(
+            for: (1...12).map { "line \($0)" }.joined(separator: "  \n")
+        )
+        textView.layoutManager.ensureLayout(for: textView.textContainer)
+        let visibleGlyphs = textView.layoutManager.glyphRange(for: textView.textContainer)
+        var visibleLineCount = 0
+        textView.layoutManager.enumerateLineFragments(forGlyphRange: visibleGlyphs) { _, _, _, _, _ in
+            visibleLineCount += 1
+        }
+
+        XCTAssertEqual(visibleLineCount, 10)
+        XCTAssertLessThan(NSMaxRange(visibleGlyphs), textView.layoutManager.numberOfGlyphs)
     }
 
     func testPostPresentationDerivesBodiesAndReplyCount() {
@@ -331,5 +372,171 @@ extension TaggrTests {
         XCTAssertFalse(TaggrPostContentRestriction.encrypted.isRevealable)
         XCTAssertTrue(TaggrPostContentRestriction.hidden.isRevealable)
         XCTAssertFalse(TaggrPostContentRestriction.nsfw.isRevealable)
+    }
+}
+
+
+@MainActor
+final class TaggrQuoteTests: XCTestCase {
+    func testQuoteSelectionAndCursor() {
+        let selected = ComposeQuoteEdit.quote("one\ntwo\nthree", selection: NSRange(location: 1, length: 7))
+        XCTAssertEqual(selected.text, "> one\n> two\nthree")
+        XCTAssertEqual(selected.selection, NSRange(location: 3, length: 9))
+        XCTAssertEqual(ComposeQuoteEdit.quote("one\ntwo", selection: NSRange(location: 5, length: 0)).text, "one\n> two")
+        XCTAssertEqual(ComposeQuoteEdit.quote("", selection: NSRange(location: 0, length: 0)).text, "> ")
+        XCTAssertEqual(ComposeQuoteEdit.quote("> existing", selection: NSRange(location: 3, length: 0)).text, "> existing")
+    }
+
+    func testUnicodeAndQuoteNewlines() {
+        let text = "日本語😀"
+        let quoted = ComposeQuoteEdit.quote(text, selection: NSRange(location: (text as NSString).length, length: 0))
+        XCTAssertEqual(quoted.text, "> 日本語😀")
+        XCTAssertEqual(quoted.selection.location, (quoted.text as NSString).length)
+        let continued = ComposeQuoteEdit.newline(quoted.text, selection: quoted.selection)!
+        XCTAssertEqual(continued.text, "> 日本語😀\n> ")
+        let ended = ComposeQuoteEdit.newline(continued.text, selection: continued.selection)!
+        XCTAssertEqual(ended.text, "> 日本語😀\n\n")
+        XCTAssertEqual(ComposeQuoteEdit.newline(">a", selection: NSRange(location: 2, length: 0))?.text, ">a\n> ")
+        XCTAssertNil(ComposeQuoteEdit.newline("plain", selection: NSRange(location: 5, length: 0)))
+    }
+
+    func testQuoteOnlyChangesTheActiveImageSegment() {
+        let document = "before\n![image](/blob/photo)\nafter😀"
+        let edit = ComposeQuoteEdit.quote("\nafter😀", selection: NSRange(location: 3, length: 0))
+        XCTAssertEqual(
+            PostDraftDocument.replacingText(in: document, segmentID: 2, with: edit.text),
+            "before\n![image](/blob/photo)\n> after😀"
+        )
+    }
+
+    func testQuoteControllerUsesLastActiveEditorAndRestoresSelection() {
+        let controller = ComposeQuoteEditor()
+        var first = "first"
+        var second = "日本語😀"
+        var activated = false
+        let firstEditor = ComposeSelectableTextEditor(
+            text: Binding(get: { first }, set: { first = $0 }), quoteEditor: controller,
+            isFocused: false, activate: {}
+        ).makeCoordinator()
+        let secondEditor = ComposeSelectableTextEditor(
+            text: Binding(get: { second }, set: { second = $0 }), quoteEditor: controller,
+            isFocused: false, activate: { activated = true }
+        ).makeCoordinator()
+        let firstView = UITextView()
+        firstView.text = first
+        firstEditor.view = firstView
+        firstEditor.textViewDidBeginEditing(firstView)
+        let secondView = UITextView()
+        secondView.text = second
+        secondView.selectedRange = NSRange(location: 3, length: 2)
+        secondEditor.view = secondView
+        secondEditor.textViewDidBeginEditing(secondView)
+        controller.quote()
+        XCTAssertEqual(first, "first")
+        XCTAssertEqual(second, "> 日本語😀")
+        XCTAssertEqual(secondView.selectedRange, NSRange(location: 5, length: 2))
+        XCTAssertTrue(activated)
+    }
+
+    func testQuoteBarsFollowFontSizeAndNestedDepth() {
+        let view = TaggrInteractiveMarkdownText.TextView(frame: CGRect(x: 0, y: 0, width: 320, height: 1000))
+        view.textContainerInset = .zero
+        view.isScrollEnabled = false
+        let text = NSMutableAttributedString(attributedString: TaggrInteractiveMarkdownText.attributedText(for: "> > nested"))
+        view.attributedText = text
+        let original = view.quoteBarRects()
+        XCTAssertEqual(original.count, 2)
+        XCTAssertEqual(original.map(\.minX), [0, 12])
+        text.addAttribute(.font, value: UIFont.systemFont(ofSize: 40), range: NSRange(location: 0, length: text.length))
+        view.attributedText = text
+        XCTAssertGreaterThan(view.quoteBarRects()[0].height, original[0].height)
+    }
+
+    func testQuoteDepthLinksAndNormalParagraph() {
+        let text = TaggrInteractiveMarkdownText.attributedText(for: "> **quoted** [link](https://example.com)\n>\n> > nested\n\nnormal")
+        let source = text.string as NSString
+        for (word, depth) in [("quoted", 1), ("nested", 2)] {
+            let offset = source.range(of: word).location
+            XCTAssertEqual(text.attribute(TaggrInteractiveMarkdownText.quoteDepthAttribute, at: offset, effectiveRange: nil) as? Int, depth)
+            XCTAssertEqual((text.attribute(.paragraphStyle, at: offset, effectiveRange: nil) as? NSParagraphStyle)?.headIndent, CGFloat(depth * 12))
+        }
+        XCTAssertNil(text.attribute(TaggrInteractiveMarkdownText.quoteDepthAttribute, at: source.range(of: "normal").location, effectiveRange: nil))
+        XCTAssertNotNil(text.attribute(.link, at: source.range(of: "link").location, effectiveRange: nil))
+        XCTAssertFalse(text.string.contains(">"))
+    }
+
+    func testHostedEditorQuotesWithoutPriorTyping() async throws {
+        let controller = ComposeQuoteEditor()
+        var text = "日本語😀"
+        let host = UIHostingController(rootView: ComposeSelectableTextEditor(
+            text: Binding(get: { text }, set: { text = $0 }), quoteEditor: controller,
+            isFocused: true, activate: {}
+        ))
+        let scene = try XCTUnwrap(UIApplication.shared.connectedScenes.first as? UIWindowScene)
+        let previousWindow = scene.windows.first(where: \.isKeyWindow)
+        let window = UIWindow(windowScene: scene)
+        window.rootViewController = host
+        window.makeKeyAndVisible()
+        defer {
+            window.isHidden = true
+            previousWindow?.makeKey()
+        }
+        host.view.layoutIfNeeded()
+        await Task.yield()
+        controller.quote()
+        XCTAssertEqual(text, "> 日本語😀")
+        func textView(in view: UIView) -> UITextView? {
+            if let view = view as? UITextView { return view }
+            return view.subviews.compactMap { textView(in: $0) }.first
+        }
+        let input = try XCTUnwrap(textView(in: host.view))
+        XCTAssertTrue(input.isFirstResponder)
+        XCTAssertEqual(input.text, text)
+    }
+
+    func testQuoteDecorationIsActuallyDrawn() {
+        let view = TaggrInteractiveMarkdownText.TextView(frame: CGRect(x: 0, y: 0, width: 320, height: 240))
+        view.textContainerInset = .zero
+        view.backgroundColor = .white
+        view.isScrollEnabled = false
+        view.attributedText = TaggrInteractiveMarkdownText.attributedText(
+            for: "> quoted\n> second line\n\nnormal", textColor: .black
+        )
+        view.layoutIfNeeded()
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        let image = UIGraphicsImageRenderer(size: view.bounds.size, format: format).image { context in
+            view.layer.render(in: context.cgContext)
+        }
+        let attachment = XCTAttachment(image: image)
+        attachment.name = "Quote decoration and normal paragraph"
+        attachment.lifetime = .keepAlways
+        add(attachment)
+        let pixel = image.cgImage!.cropping(to: CGRect(x: 1, y: 8, width: 1, height: 1))!
+        var rgba = [UInt8](repeating: 255, count: 4)
+        rgba.withUnsafeMutableBytes { bytes in
+            let context = CGContext(data: bytes.baseAddress, width: 1, height: 1, bitsPerComponent: 8,
+                                    bytesPerRow: 4, space: CGColorSpaceCreateDeviceRGB(),
+                                    bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
+            context.draw(pixel, in: CGRect(x: 0, y: 0, width: 1, height: 1))
+        }
+        XCTAssertLessThan(rgba[0], 32)
+        XCTAssertLessThan(rgba[1], 32)
+        XCTAssertLessThan(rgba[2], 32)
+    }
+
+    func testQuoteBarsWrapAndRespectLineLimit() {
+        let view = TaggrInteractiveMarkdownText.TextView(frame: CGRect(x: 0, y: 0, width: 150, height: 1000))
+        view.textContainerInset = .zero
+        view.textContainer.lineFragmentPadding = 0
+        view.isScrollEnabled = false
+        view.attributedText = TaggrInteractiveMarkdownText.attributedText(for: "> " + String(repeating: "quoted words ", count: 30))
+        view.layoutIfNeeded()
+        XCTAssertGreaterThan(view.quoteBarRects().count, 2)
+        view.textContainer.maximumNumberOfLines = 2
+        view.textContainer.lineBreakMode = .byTruncatingTail
+        view.layoutManager.ensureLayout(for: view.textContainer)
+        XCTAssertEqual(view.quoteBarRects().count, 2)
+        XCTAssertTrue(view.quoteBarRects().allSatisfy { $0.width == 3 && $0.minX == 0 })
     }
 }

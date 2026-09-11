@@ -5,6 +5,7 @@ import SwiftUI
 
 struct ComposePostAttachmentBar: View {
     @Environment(TaggrAppCoordinator.self) private var state
+    @EnvironmentObject private var quoteEditor: ComposeQuoteEditor
     @Binding var text: String
     @Binding var selectedPhotos: [PhotosPickerItem]
     let youtubeTarget: YouTubeDraftTarget?
@@ -92,7 +93,7 @@ struct ComposePostAttachmentBar: View {
         case .list:
             appendBlock("- item")
         case .quote:
-            appendBlock("> quote")
+            quoteEditor.quote()
         case .link:
             linkSheetPresented = true
         }

@@ -1,51 +1,70 @@
 // TAGGR/Views: PWA-compatible block rendering for post bodies.
 import Foundation
 import SwiftUI
-import UIKit
 
 @MainActor
 struct TaggrPostBodyView: View {
     let text: String
     let maximumLines: Int?
+    let textStyle: UIFont.TextStyle
+    let textColor: UIColor
+    let lineSpacing: CGFloat
+    let accessibilityIdentifier: String?
+    let openPost: (() -> Void)?
+    let onTruncationChange: (Bool) -> Void
 
-    init(text: String, maximumLines: Int? = nil) {
+    init(
+        text: String,
+        maximumLines: Int? = nil,
+        textStyle: UIFont.TextStyle = .body,
+        textColor: Color = TaggrTheme.text,
+        lineSpacing: CGFloat = 3,
+        accessibilityIdentifier: String? = nil,
+        openPost: (() -> Void)? = nil,
+        onTruncationChange: @escaping (Bool) -> Void = { _ in }
+    ) {
         self.text = text
         self.maximumLines = maximumLines
+        self.textStyle = textStyle
+        self.textColor = UIColor(textColor)
+        self.lineSpacing = lineSpacing
+        self.accessibilityIdentifier = accessibilityIdentifier
+        self.openPost = openPost
+        self.onTruncationChange = onTruncationChange
     }
 
     var body: some View {
         let blocks = TaggrPostBodyParser.blocks(in: text)
-        VStack(alignment: .leading, spacing: 16) {
-            ForEach(Array(blocks.enumerated()), id: \.offset) { _, block in
-                switch block {
-                case .markdown(let markdown):
-                    TaggrMarkdownText(text: markdown)
-                case .youtube(let preview):
-                    YouTubePreviewView(preview: preview)
+        if blocks.contains(where: { if case .youtube = $0 { true } else { false } }) {
+            VStack(alignment: .leading, spacing: 16) {
+                ForEach(Array(blocks.enumerated()), id: \.offset) { _, block in
+                    switch block {
+                    case .markdown(let markdown):
+                        interactiveText(markdown, maximumLines: nil)
+                    case .youtube(let preview):
+                        YouTubePreviewView(preview: preview)
+                    }
                 }
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .onAppear { onTruncationChange(false) }
+        } else {
+            interactiveText(text, maximumLines: maximumLines)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        // Keep embedded players intact; the old feed line cap must not crop a player.
-        .frame(
-            maxHeight: Self.maximumHeight(
-                for: maximumLines,
-                containsYouTube: blocks.contains { if case .youtube = $0 { true } else { false } }
-            ),
-            alignment: .top
+    }
+
+    private func interactiveText(_ content: String, maximumLines: Int?) -> some View {
+        TaggrInteractiveMarkdownText(
+            text: content,
+            maximumLines: maximumLines,
+            textStyle: textStyle,
+            textColor: textColor,
+            lineSpacing: lineSpacing,
+            accessibilityIdentifier: accessibilityIdentifier,
+            openPost: openPost,
+            onTruncationChange: onTruncationChange
         )
-        .clipped()
-    }
-
-    static func maximumHeight(for lines: Int?) -> CGFloat? {
-        maximumHeight(for: lines, containsYouTube: false)
-    }
-
-    static func maximumHeight(for lines: Int?, containsYouTube: Bool) -> CGFloat? {
-        guard !containsYouTube else { return nil }
-        guard let lines, lines > 0 else { return nil }
-        let dynamicLineHeight = UIFontMetrics(forTextStyle: .body).scaledValue(for: 22)
-        return dynamicLineHeight * CGFloat(lines)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     static func containsInteractiveLink(in text: String) -> Bool {

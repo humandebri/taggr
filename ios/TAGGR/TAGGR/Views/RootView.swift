@@ -191,7 +191,7 @@ struct RootView: View {
 
     static func feedTabReselectionAction(for route: TaggrRoute) -> FeedTabReselectionAction {
         switch route {
-        case .feed(.hot), .feed(.latest), .feed(.personal), .feed(.realms):
+        case .feed(.hot), .feed(.latest), .feed(.personal):
             return .scrollToTop
         default:
             return .returnToHomeFeed

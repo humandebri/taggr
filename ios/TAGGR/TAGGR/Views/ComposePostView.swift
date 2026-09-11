@@ -13,6 +13,7 @@ struct ComposePostView: View {
     let dismiss: () -> Void
     @StateObject private var draft: PostDraftSession
     @StateObject private var imageImport = ImageImportCoordinator()
+    @StateObject private var quoteEditor = ComposeQuoteEditor()
     @State private var selectedPhotos: [PhotosPickerItem] = []
     @State private var imageImportWarning: String?
     @State private var imageInsertionSegmentID: Int?
@@ -133,6 +134,7 @@ struct ComposePostView: View {
                 )
             }
         }
+        .environmentObject(quoteEditor)
         .onChange(of: selectedPhotos) { _, items in
             loadPhotos(items)
         }
@@ -789,6 +791,7 @@ struct ComposePostDocumentEditor: View {
 }
 
 private struct ComposePostTextSegmentEditor: View {
+    @EnvironmentObject private var quoteEditor: ComposeQuoteEditor
     let segmentID: Int
     let value: String
     let placeholder: String?
@@ -819,13 +822,17 @@ private struct ComposePostTextSegmentEditor: View {
 
     var body: some View {
         ZStack(alignment: .topLeading) {
-            TextEditor(text: $inputText)
-                .scrollContentBackground(.hidden)
-                .font(.title3)
-                .foregroundStyle(TaggrTheme.text)
+            ComposeSelectableTextEditor(
+                text: $inputText,
+                quoteEditor: quoteEditor,
+                isFocused: focusedTextSegmentID.wrappedValue == segmentID,
+                activate: {
+                    focusedTextSegmentID.wrappedValue = segmentID
+                    activate()
+                }
+            )
                 .frame(minHeight: inputText.isEmpty ? 70 : 120)
                 .tint(TaggrTheme.clickable)
-                .focused(focusedTextSegmentID, equals: segmentID)
                 .onTapGesture(perform: activate)
                 .dropDestination(for: PostDraftImageDragItem.self) { items, _ in
                     guard let item = items.first else { return false }
@@ -1011,5 +1018,151 @@ enum TaggrPostCreditCost {
         let length = token.count
         guard length > 0, length <= maxLength, !token.allSatisfy(\.isNumber) else { return }
         tokens.append(token)
+    }
+}
+
+
+struct ComposeQuoteEdit {
+    let text: String
+    let selection: NSRange
+
+    static func quote(_ text: String, selection: NSRange) -> Self {
+        let source = text as NSString
+        let start = min(selection.location, source.length)
+        let end = min(NSMaxRange(selection), source.length)
+        let first = source.lineRange(for: NSRange(location: start, length: 0)).location
+        let last = source.lineRange(for: NSRange(location: end > start ? end - 1 : end, length: 0))
+        var positions: [Int] = []
+        var cursor = first
+        repeat {
+            let line = source.lineRange(for: NSRange(location: cursor, length: 0))
+            if quotePrefix(source.substring(with: line)) == nil { positions.append(cursor) }
+            guard NSMaxRange(line) > cursor else { break }
+            cursor = NSMaxRange(line)
+        } while cursor < NSMaxRange(last)
+        let result = NSMutableString(string: text)
+        for position in positions.reversed() { result.insert("> ", at: position) }
+        let shiftedStart = start + positions.filter { $0 <= start }.count * 2
+        let shiftedEnd = end + positions.filter { $0 <= end }.count * 2
+        return Self(text: result as String, selection: NSRange(location: shiftedStart, length: shiftedEnd - shiftedStart))
+    }
+
+    static func newline(_ text: String, selection: NSRange) -> Self? {
+        let source = text as NSString
+        guard selection.length == 0, selection.location <= source.length else { return nil }
+        let line = source.lineRange(for: selection)
+        let value = source.substring(with: line).trimmingCharacters(in: .newlines)
+        guard selection.location == line.location + (value as NSString).length,
+              let prefix = quotePrefix(value) else { return nil }
+        let result = NSMutableString(string: text)
+        if value.dropFirst(prefix.count).trimmingCharacters(in: .whitespaces).isEmpty {
+            result.replaceCharacters(in: NSRange(location: line.location, length: (value as NSString).length), with: "\n")
+            return Self(text: result as String, selection: NSRange(location: line.location + 1, length: 0))
+        }
+        let insertion = "\n" + prefix + (prefix.hasSuffix(" ") ? "" : " ")
+        result.insert(insertion, at: selection.location)
+        return Self(text: result as String, selection: NSRange(location: selection.location + (insertion as NSString).length, length: 0))
+    }
+
+    private static func quotePrefix(_ line: String) -> String? {
+        let indentation = line.prefix { $0 == " " }
+        guard indentation.count <= 3 else { return nil }
+        var end = line.index(line.startIndex, offsetBy: indentation.count)
+        guard end < line.endIndex, line[end] == ">" else { return nil }
+        repeat {
+            end = line.index(after: end)
+            while end < line.endIndex, line[end] == " " { end = line.index(after: end) }
+        } while end < line.endIndex && line[end] == ">"
+        let prefix = String(line[..<end])
+        return prefix
+    }
+}
+
+@MainActor
+final class ComposeQuoteEditor: ObservableObject {
+    fileprivate weak var active: ComposeSelectableTextEditor.Coordinator?
+
+    func quote() { active?.quote() }
+}
+
+struct ComposeSelectableTextEditor: UIViewRepresentable {
+    @Environment(\.isEnabled) private var isEnabled
+    @Binding var text: String
+    let quoteEditor: ComposeQuoteEditor
+    let isFocused: Bool
+    let activate: () -> Void
+
+    func makeCoordinator() -> Coordinator { Coordinator(self) }
+
+    func makeUIView(context: Context) -> UITextView {
+        let view = UITextView()
+        view.delegate = context.coordinator
+        view.backgroundColor = .clear
+        view.font = UIFont.preferredFont(forTextStyle: .title3)
+        view.adjustsFontForContentSizeCategory = true
+        view.textColor = UIColor(TaggrTheme.text)
+        view.tintColor = UIColor(TaggrTheme.clickable)
+        view.isScrollEnabled = false
+        view.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        context.coordinator.view = view
+        if quoteEditor.active == nil { quoteEditor.active = context.coordinator }
+        return view
+    }
+
+    func updateUIView(_ view: UITextView, context: Context) {
+        context.coordinator.parent = self
+        view.isEditable = isEnabled
+        view.isSelectable = isEnabled
+        if view.markedTextRange == nil, view.text != text {
+            let selection = view.selectedRange
+            view.text = text
+            let start = min(selection.location, (text as NSString).length)
+            view.selectedRange = NSRange(location: start, length: min(selection.length, (text as NSString).length - start))
+        }
+        if isFocused, isEnabled, !view.isFirstResponder {
+            view.becomeFirstResponder()
+        } else if (!isFocused || !isEnabled), view.isFirstResponder {
+            view.resignFirstResponder()
+        }
+    }
+
+    func sizeThatFits(_ proposal: ProposedViewSize, uiView: UITextView, context: Context) -> CGSize? {
+        guard let width = proposal.width else { return nil }
+        return uiView.sizeThatFits(CGSize(width: width, height: .greatestFiniteMagnitude))
+    }
+
+    final class Coordinator: NSObject, UITextViewDelegate {
+        var parent: ComposeSelectableTextEditor
+        weak var view: UITextView?
+        init(_ parent: ComposeSelectableTextEditor) { self.parent = parent }
+
+        func textViewDidBeginEditing(_ textView: UITextView) {
+            parent.quoteEditor.active = self
+            parent.activate()
+        }
+
+        func textViewDidChange(_ textView: UITextView) { parent.text = textView.text }
+
+        func quote() {
+            guard let view, view.isEditable else { return }
+            view.unmarkText()
+            apply(ComposeQuoteEdit.quote(view.text, selection: view.selectedRange), to: view)
+            parent.activate()
+            view.becomeFirstResponder()
+        }
+
+        func textView(_ textView: UITextView, shouldChangeTextIn range: NSRange, replacementText text: String) -> Bool {
+            guard text == "\n", textView.markedTextRange == nil,
+                  let edit = ComposeQuoteEdit.newline(textView.text, selection: range) else { return true }
+            apply(edit, to: textView)
+            return false
+        }
+
+        private func apply(_ edit: ComposeQuoteEdit, to view: UITextView) {
+            view.text = edit.text
+            view.selectedRange = edit.selection
+            parent.text = edit.text
+            view.invalidateIntrinsicContentSize()
+        }
     }
 }

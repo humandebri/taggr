@@ -475,29 +475,6 @@ impl User {
         )
     }
 
-    pub fn realms_feed<'a>(
-        &'a self,
-        domain: String,
-        state: &'a State,
-        offset: PostId,
-    ) -> Box<dyn Iterator<Item = &'a Post> + 'a> {
-        let realm_ids = self
-            .realms
-            .iter()
-            .cloned()
-            .chain(self.controlled_realms.iter().cloned())
-            .collect::<BTreeSet<_>>();
-        let iterators = realm_ids
-            .iter()
-            .map(|realm_id| state.last_posts(domain.clone(), Some(realm_id), offset, 0, false))
-            .collect();
-
-        Box::new(
-            IteratorMerger::new(MergeStrategy::Or, iterators)
-                .filter(move |post| self.should_see(state, None, post)),
-        )
-    }
-
     pub fn notify_with_params<T: AsRef<str>>(&mut self, message: T, predicate: Option<Predicate>) {
         self.insert_notifications(match predicate {
             None => Notification::Generic(message.as_ref().into()),

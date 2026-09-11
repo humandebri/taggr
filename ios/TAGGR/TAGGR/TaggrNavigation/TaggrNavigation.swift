@@ -45,8 +45,6 @@ enum TaggrNavigation {
             return "/feed/latest"
         case .feed(.personal):
             return "/feed/personal"
-        case .feed(.realms):
-            return "/feed/realms"
         case .feed(.realm(let name)):
             return "/realm/\(pathComponent(name))"
         case .feed(.tags(let tokens)):
@@ -102,7 +100,6 @@ enum TaggrNavigation {
             guard let feed = parts.dropFirst().first else { return .feed(.hot) }
             if feed == "latest" { return .feed(.latest) }
             if feed == "personal" { return .feed(.personal) }
-            if feed == "realms" { return .feed(.realms) }
             let tokens = feed
                 .split(separator: "+")
                 .compactMap { String($0).removingPercentEncoding }

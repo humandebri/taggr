@@ -31,7 +31,7 @@ struct FeedView: View {
                         )
                         .id(FeedScrollAnchor.top)
                         if state.feed.isEmpty {
-                            EmptyFeedView(mode: selectedMode)
+                            EmptyFeedView()
                         } else {
                             ForEach(state.feed) { post in
                                 PostRow(post: post, onVisible: {
@@ -242,8 +242,8 @@ struct FeedHeader: View {
             if !selectedMode.isFiltered {
                 HStack(spacing: 4) {
                     ChannelPill(title: "#hot", selected: selectedMode == .hot) { changeMode(.hot) }
+                    ChannelPill(title: "#latest", selected: selectedMode == .latest) { changeMode(.latest) }
                     ChannelPill(title: "#personal", selected: selectedMode == .personal) { changeMode(.personal) }
-                    ChannelPill(title: "#realms", selected: selectedMode == .realms) { changeMode(.realms) }
                 }
                 .fixedSize(horizontal: true, vertical: false)
             }
@@ -296,46 +296,16 @@ struct TaggrHashIconView: View {
 }
 
 struct EmptyFeedView: View {
-    @Environment(TaggrAppCoordinator.self) private var state
-    let mode: TaggrFeedMode
-
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(title)
+            Text("No posts")
                 .font(.headline)
                 .foregroundStyle(TaggrTheme.text)
-            Text(message)
+            Text("Pull to refresh or switch channels.")
                 .font(.subheadline)
                 .foregroundStyle(TaggrTheme.secondaryText)
-            if mode == .realms, state.authSession == nil {
-                Button("Sign in") {
-                    state.startIdentitySignIn(reason: "Sign in to see posts from your realms.")
-                }
-                .font(.subheadline.weight(.bold))
-                .foregroundStyle(TaggrTheme.clickable)
-            } else if mode == .realms, state.currentUser == nil {
-                Button("Create TAGGR user") {
-                    state.route = .settings
-                }
-                .font(.subheadline.weight(.bold))
-                .foregroundStyle(TaggrTheme.clickable)
-            }
         }
         .padding(16)
-    }
-
-    private var title: String {
-        if mode == .realms, state.authSession == nil { return "Sign in to view realms" }
-        if mode == .realms, state.currentUser == nil { return "Create a TAGGR user" }
-        if mode == .realms { return "No realm posts" }
-        return "No posts"
-    }
-
-    private var message: String {
-        if mode == .realms, state.authSession == nil { return "Your joined and controlled realms are personal to your account." }
-        if mode == .realms, state.currentUser == nil { return "Create an account to join and manage realms." }
-        if mode == .realms { return "Join a realm or create one to see its posts here." }
-        return "Pull to refresh or switch channels."
     }
 }
 
@@ -352,6 +322,7 @@ struct PostRow: View {
     @State private var isTranslating = false
     @State private var translationError: String?
     @State private var translationRequestID = 0
+    @State private var bodyIsTruncated = false
 
     init(post: TaggrPost, onVisible: @escaping () -> Void = {}, open: @escaping () -> Void) {
         self.post = post
@@ -363,21 +334,16 @@ struct PostRow: View {
     var postBodyText: some View {
         let text = TaggrPostBodyView(
             text: visibleDisplayBody,
-            maximumLines: isDetail ? nil : 10
+            maximumLines: isDetail || showFullBody ? nil : 10,
+            textStyle: .body,
+            textColor: TaggrTheme.text,
+            lineSpacing: 3,
+            accessibilityIdentifier: "post-\(post.id)-body",
+            openPost: open,
+            onTruncationChange: updateBodyTruncation
         )
-            .font(.body)
-            .foregroundStyle(TaggrTheme.text)
-            .lineSpacing(3)
-            .textSelection(.enabled)
             .frame(maxWidth: .infinity, alignment: .leading)
-        if TaggrPostBodyView.containsInteractiveLink(in: visibleDisplayBody) {
-            text
-        } else {
-            text
-                .contentShape(Rectangle())
-                .onTapGesture(perform: open)
-                .accessibilityAddTraits(.isButton)
-        }
+        text
     }
 
     @ViewBuilder
@@ -435,7 +401,13 @@ struct PostRow: View {
                             .truncationMode(.tail)
                     }
                     .buttonStyle(.plain)
-                    PostTimestampLabel(timestamp: post.timestamp)
+                    Button(action: open) {
+                        PostTimestampLabel(timestamp: post.timestamp)
+                    }
+                    .buttonStyle(.plain)
+                    .frame(minWidth: 44, minHeight: 44, alignment: .leading)
+                    .contentShape(Rectangle())
+                    .accessibilityLabel("Open post from \(TaggrRelativeTime.string(from: post.timestamp))")
                     Spacer(minLength: 8)
                     if let realm = post.realm, !realm.isEmpty {
                         Button {
@@ -460,13 +432,15 @@ struct PostRow: View {
                         postBodyText
                         inlineTranslationView
                     }
-                    if isShortened {
+                    if !showFullBody, isShortened || bodyIsTruncated {
                         Button(action: showFullPost) {
                             Label("Show full post", systemImage: "chevron.down")
                                 .font(.caption.weight(.bold))
                                 .foregroundStyle(TaggrTheme.clickable)
                         }
                         .buttonStyle(.plain)
+                        .frame(minHeight: 44)
+                        .contentShape(Rectangle())
                     }
                     let attachments = TaggrPostPresentationCache.attachments(
                         for: post,
@@ -511,6 +485,7 @@ struct PostRow: View {
         }
         .onAppear(perform: onVisible)
         .onChange(of: visibleDisplayBody) { _, _ in
+            bodyIsTruncated = false
             resetTranslation()
         }
     }
@@ -591,7 +566,13 @@ struct PostRow: View {
 
     func showFullPost() {
         showFullBody = true
+        bodyIsTruncated = false
         resetTranslation()
+    }
+
+    func updateBodyTruncation(_ isTruncated: Bool) {
+        guard bodyIsTruncated != isTruncated else { return }
+        bodyIsTruncated = isTruncated
     }
 
     func toggleTranslation() {
@@ -924,9 +905,13 @@ struct RepostExtensionView: View {
                         UserAttributeBadgesView(
                             badges: TaggrUserBadge.decoded(from: embeddedPost.meta.authorBadges)
                         )
-                        TaggrPostBodyView(text: embeddedPost.displayBody, maximumLines: 4)
-                            .font(.subheadline)
-                            .foregroundStyle(TaggrTheme.secondaryText)
+                        TaggrPostBodyView(
+                            text: embeddedPost.displayBody,
+                            maximumLines: 4,
+                            textStyle: .subheadline,
+                            textColor: TaggrTheme.secondaryText,
+                            lineSpacing: 0
+                        )
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
                     .padding(12)

@@ -9,7 +9,6 @@ enum TaggrFeedMode: Hashable, Sendable {
     case hot
     case latest
     case personal
-    case realms
     case realm(String)
     case tags([String])
 }

@@ -73,7 +73,7 @@ final class NavigationStore {
 
     func rememberHomeFeedMode(_ mode: TaggrFeedMode) {
         switch mode {
-        case .hot, .latest, .personal, .realms:
+        case .hot, .latest, .personal:
             lastHomeFeedMode = mode
             defaults.set(Self.rawValue(for: mode), forKey: Self.homeFeedModeKey)
             hasStoredHomeFeedMode = true
@@ -87,7 +87,6 @@ final class NavigationStore {
         case .hot: return "hot"
         case .latest: return "latest"
         case .personal: return "personal"
-        case .realms: return "realms"
         case .realm, .tags: return "hot"
         }
     }
@@ -97,7 +96,6 @@ final class NavigationStore {
         case "hot": return .hot
         case "latest": return .latest
         case "personal": return .personal
-        case "realms": return .realms
         default: return nil
         }
     }
