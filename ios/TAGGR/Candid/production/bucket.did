@@ -6,6 +6,8 @@ type HttpResponse = record {
   upgrade : opt bool;
 };
 service : {
+  close_media : () -> ();
+  media_closed : () -> (bool);
   add_session : (principal) -> ();
   free : (vec record { nat64; nat64 }) -> ();
   http_request : (HttpRequest) -> (HttpResponse) query;

@@ -25,6 +25,7 @@ struct SettingsView: View {
     @State private var mintConfirmationPresented = false
     @State private var principalCopied = false
     @State private var signOutConfirmationPresented = false
+    @State private var deletionConfirmationPresented = false
 
     var body: some View {
         ZStack {
@@ -166,6 +167,12 @@ struct SettingsView: View {
                             }
                         }
                     }
+                    if state.currentUser != nil {
+                        SettingsPanel(title: "Account deletion") {
+                            Button("Delete account", role: .destructive) { deletionConfirmationPresented = true }
+                                .disabled(state.isBusy)
+                        }
+                    }
                     SettingsPanel(title: "Privacy & support") {
                         Link("Privacy Policy", destination: TaggrSafetyStore.siteURL.appendingPathComponent("privacy-policy"))
                         Link("Contact @FF on TAGGR", destination: TaggrSafetyStore.contactURL)
@@ -175,6 +182,15 @@ struct SettingsView: View {
             }
             .taggrRefreshable()
         }
+        .confirmationDialog("Permanently delete your TAGGR account?", isPresented: $deletionConfirmationPresented, titleVisibility: .visible) {
+            Button("Delete account", role: .destructive) { Task { await state.deleteAccount() } }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Your profile and post contents will be removed and your image storage will stop serving images. This cannot be undone. Images are not physically erased. Asset recovery and transaction/governance records remain. No additional credits are required.")
+        }
+        .alert("Account deleted", isPresented: Binding(get: { state.accountDeletionCompleted }, set: { state.accountDeletionCompleted = $0 })) {
+            Button("OK") {}
+        } message: { Text("Your SNS account has been deleted. You may sign in again only to recover remaining assets.") }
         .taggrNavigationChrome()
         .sheet(isPresented: $accountCreationPresented) {
             AccountCreationSheet()
@@ -848,5 +864,48 @@ private struct SettingsPanel<Content: View>: View {
             .background(TaggrTheme.panel)
             .clipShape(RoundedRectangle(cornerRadius: 8))
         }
+    }
+}
+
+
+struct DeletedAccountView: View {
+    @Environment(TaggrAppCoordinator.self) private var state
+    @State private var sendPresented = false
+    @State private var recipient = ""
+    @State private var amount = ""
+    var body: some View {
+        Form {
+            if let progress = state.accountDeletion {
+                Section("Account deletion") {
+                    Text(progress.state == "deleted" ? "Account deleted" : "Deletion in progress")
+                    Text("Posts processed: \(progress.processed) / \(progress.total)")
+                    if progress.state == "deleting" {
+                        Button("Continue deletion") { Task { await state.deleteAccount() } }.disabled(state.isBusy)
+                    }
+                    if let error = state.errorMessage { Text(error).foregroundStyle(.red) }
+                }
+                Section("Asset recovery") {
+                    Text("TAGGR balance: \(TaggrTokenAmount.format(Int(clamping: progress.balance), decimals: state.cache?.config?.tokenDecimals))")
+                    TextField("Recipient principal", text: $recipient).textInputAutocapitalization(.never).autocorrectionDisabled()
+                    TextField("TAGGR amount", text: $amount).keyboardType(.decimalPad)
+                    Button("Send TAGGR") {
+                        Task {
+                            await state.runBusy {
+                                guard let decimals = state.cache?.config?.tokenDecimals, let value = TaggrTokenAmount.parse(amount, decimals: decimals), value > 0 else { throw TaggrAPIError.rejected("Enter a valid positive TAGGR amount.") }
+                                _ = try await state.api.updateJSON("recover_taggr", args: [recipient, value], identity: state.authSession)
+                                try await state.loadCurrentUserIfNeeded()
+                            }
+                        }
+                    }.disabled(state.isBusy)
+                    Text("Unclaimed ICP: \(ICPAmount.format(progress.treasuryE8s))")
+                    Button("Withdraw ICP rewards") { Task { await state.withdrawRewards() } }.disabled(state.isBusy)
+                    Button("Send ICP") { sendPresented = true }.disabled(state.isBusy)
+                    Text("SNS actions are no longer available. Transaction and governance records are retained.")
+                }
+            }
+            Button("Sign out") { state.signOut() }
+        }
+        .navigationTitle("Account")
+        .sheet(isPresented: $sendPresented) { SendICPSheet().environment(state) }
     }
 }

@@ -299,6 +299,38 @@ impl Post {
         Ok(())
     }
 
+    pub fn erase_account_content(&mut self) {
+        self.delete(vec![String::new()]);
+        self.watchers.clear();
+        self.reactions.clear();
+        self.hidden_for.clear();
+        self.encrypted = false;
+    }
+
+    pub fn publicly_available(&self, state: &State) -> bool {
+        state
+            .users
+            .get(&self.user)
+            .is_some_and(|u| u.deletion.is_active())
+    }
+
+    pub fn public_content(&self, state: &State) -> Self {
+        let mut post = self.clone();
+        if !self.publicly_available(state) {
+            post.erase_account_content();
+        }
+        post
+    }
+
+    pub fn public_with_meta<'a>(&'a self, state: &'a State) -> (Self, Meta<'a>) {
+        let meta = if self.publicly_available(state) {
+            self.with_meta(state).1
+        } else {
+            Meta::default()
+        };
+        (self.public_content(state), meta)
+    }
+
     pub fn is_deleted(&self) -> bool {
         !self.hashes.is_empty()
     }

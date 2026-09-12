@@ -114,6 +114,8 @@ const finalize = async (signUp?: boolean) => {
         window.resetUI();
         await instantiateApi();
         await window.reloadUser();
+        const { deletionStatus } = await import("./account_deletion");
+        if (deletionStatus && deletionStatus.state !== "active") return;
         if (window.user)
             location.href = localStorage.getItem(DELEGATION_PRINCIPAL)
                 ? "#/delegate"

@@ -68,6 +68,7 @@ fn users_data() {
 
         reply(
             iter.filter_map(|id| state.users.get(id))
+                .filter(|u| u.deletion.is_active())
                 .map(|user| (user.id, &user.name))
                 .collect::<HashMap<_, _>>(),
         );
@@ -160,7 +161,7 @@ fn proposals() {
                 .skip(page * CONFIG.feed_page_size)
                 .take(CONFIG.feed_page_size)
                 .filter_map(|proposal| Post::get(state, &proposal.post_id))
-                .map(|post| post.with_meta(state))
+                .map(|post| post.public_with_meta(state))
                 .collect::<Vec<_>>(),
         )
     })
@@ -214,7 +215,7 @@ fn user_posts() {
                 user.posts(Some(&domain), state, offset, true)
                     .skip(CONFIG.feed_page_size * page)
                     .take(CONFIG.feed_page_size)
-                    .map(|post| post.with_meta(state))
+                    .map(|post| post.public_with_meta(state))
                     .collect::<Vec<_>>(),
             )
         })
@@ -231,7 +232,7 @@ fn rewarded_posts() {
                     .filter(|post| !post.reactions.is_empty())
                     .skip(CONFIG.feed_page_size * page)
                     .take(CONFIG.feed_page_size)
-                    .map(|post| post.with_meta(state))
+                    .map(|post| post.public_with_meta(state))
                     .collect::<Vec<_>>(),
             )
         })
@@ -249,7 +250,7 @@ fn user_tags() {
                 .filter(|post| post.body.contains(&tag))
                 .skip(CONFIG.feed_page_size * page)
                 .take(CONFIG.feed_page_size)
-                .map(|post| post.with_meta(state))
+                .map(|post| post.public_with_meta(state))
                 .collect::<Vec<_>>(),
         )
     });
@@ -266,6 +267,9 @@ fn user() {
             _ => return reply(None as Option<User>),
         };
         let mut user = state.users.get(&user_id).expect("user not found").clone();
+        if !user.deletion.is_active() {
+            return reply(None::<User>);
+        }
         user.num_posts = user.posts.len();
         user.posts.clear();
         if own_profile_fetch {
@@ -299,8 +303,10 @@ fn personal_filter(
     user: Option<&User>,
     post: &Post,
 ) -> bool {
-    user.map(|user| user.should_see(state, realm, post))
-        .unwrap_or(true)
+    post.publicly_available(state)
+        && user
+            .map(|user| user.should_see(state, realm, post))
+            .unwrap_or(true)
 }
 
 #[export_name = "canister_query posts"]
@@ -310,7 +316,7 @@ fn posts() {
         reply(
             ids.into_iter()
                 .filter_map(|id| Post::get(state, &id))
-                .map(|post| post.with_meta(state))
+                .map(|post| post.public_with_meta(state))
                 .collect::<Vec<_>>(),
         );
     })
@@ -328,7 +334,7 @@ fn journal() {
                         .filter(|post| !post.is_deleted() && !post.body.starts_with('@'))
                         .skip(page * CONFIG.feed_page_size)
                         .take(CONFIG.feed_page_size)
-                        .map(|post| post.with_meta(state))
+                        .map(|post| post.public_with_meta(state))
                         .collect::<Vec<_>>()
                 })
                 .unwrap_or_default(),
@@ -349,7 +355,7 @@ fn hot_posts() {
                 .filter(|post| !filtered || personal_filter(state, realm.as_ref(), user, post))
                 .skip(page * CONFIG.feed_page_size)
                 .take(CONFIG.feed_page_size)
-                .map(|post| post.with_meta(state))
+                .map(|post| post.public_with_meta(state))
                 .collect::<Vec<_>>(),
         )
     });
@@ -374,7 +380,7 @@ fn last_posts() {
                 .filter(|post| !filtered || personal_filter(state, realm.as_ref(), user, post))
                 .skip(page * CONFIG.feed_page_size)
                 .take(CONFIG.feed_page_size)
-                .map(|post| post.with_meta(state))
+                .map(|post| post.public_with_meta(state))
                 .collect::<Vec<_>>(),
         )
     });
@@ -395,7 +401,7 @@ fn posts_by_tags() {
                 .posts_by_tags_and_users(&domain, optional(realm), offset, &tags_and_users, false)
                 .skip(page * CONFIG.feed_page_size)
                 .take(CONFIG.feed_page_size)
-                .map(|post| post.with_meta(state))
+                .map(|post| post.public_with_meta(state))
                 .collect::<Vec<_>>(),
         )
     });
@@ -411,7 +417,7 @@ fn personal_feed() {
                 .personal_feed(domain, state, offset)
                 .skip(page * CONFIG.feed_page_size)
                 .take(CONFIG.feed_page_size)
-                .map(|post| post.with_meta(state))
+                .map(|post| post.public_with_meta(state))
                 .collect::<Vec<_>>(),
         })
     });
@@ -425,7 +431,7 @@ fn thread() {
             state
                 .thread(id)
                 .filter_map(|id| Post::get(state, &id))
-                .map(|post| post.with_meta(state))
+                .map(|post| post.public_with_meta(state))
                 .collect::<Vec<_>>(),
         )
     })
@@ -526,6 +532,10 @@ fn user_post_index() {
 
 #[query]
 fn stable_mem_read(page: u64) -> Vec<(u64, Blob)> {
+    assert!(
+        api::is_controller(&api::msg_caller()),
+        "controller required"
+    );
     let offset = page * BACKUP_PAGE_SIZE as u64;
     let (heap_off, heap_size) = memory::heap_address();
     let memory_end = heap_off + heap_size;
@@ -547,4 +557,9 @@ fn resolve_handle<'a>(state: &'a State, handle: Option<&'a String>) -> Option<&'
         Some(handle) => state.user(handle),
         None => Some(state.principal_to_user(caller(state))?),
     }
+}
+
+#[export_name = "canister_query account_deletion_status"]
+fn account_deletion_status() {
+    read(|state| reply(state.deletion_progress(caller(state))));
 }

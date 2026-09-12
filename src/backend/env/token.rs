@@ -1,5 +1,5 @@
 use super::MINUTE;
-use crate::{updates::raw_caller, *};
+use crate::*;
 use assets::{add_value_to_certify, certify, root_hash};
 use base64::{engine::general_purpose, Engine as _};
 use candid::{CandidType, Deserialize, Nat, Principal};
@@ -201,7 +201,7 @@ fn icrc1_supported_standards() -> Vec<Standard> {
 
 #[update]
 fn icrc1_transfer(args: TransferArgs) -> Result<u128, TransferError> {
-    let owner = read(raw_caller).map_err(|err| {
+    let owner = read(crate::updates::recovery_raw_caller).map_err(|err| {
         TransferError::GenericError(GenericError {
             error_code: 69,
             message: err,

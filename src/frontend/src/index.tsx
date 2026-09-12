@@ -58,6 +58,11 @@ import {
 } from "./delegation";
 import { LoginMasks } from "./authentication";
 import { maybePromptTopUp } from "./user_storage";
+import {
+    DeletedAccount,
+    deletionStatus,
+    setDeletionStatus,
+} from "./account_deletion";
 const { hash, pathname } = location;
 if (!hash && pathname != "/") {
     location.href = `#${pathname}`;
@@ -103,6 +108,12 @@ const renderFrame = (content: React.ReactNode) => {
 };
 
 const App = () => {
+    if (deletionStatus && deletionStatus.state !== "active") {
+        window.resetUI();
+        headerRoot.render(null);
+        renderFrame(<DeletedAccount />);
+        return;
+    }
     window.lastActivity = new Date();
     const auth = (content: React.ReactNode) =>
         window.principalId ? content : <Unauthorized />;
@@ -432,6 +443,15 @@ const bootstrap = async () => {
     window.reloadUser = async () => {
         if (!window.api) return;
 
+        const status = await window.api.query<any>("account_deletion_status");
+        setDeletionStatus(status?.Ok || null);
+        if (status?.Ok && status.Ok.state !== "active") {
+            window.user = undefined as any;
+            window.resetUI();
+            headerRoot.render(null);
+            renderFrame(<DeletedAccount />);
+            return;
+        }
         const data = await window.api.query<User>("user", domain(), []);
         if (data) {
             let userIds = data.followees.concat(data.followers);

@@ -47,10 +47,14 @@ extension TaggrAppCoordinator {
             )
         }.value
         try Task.checkCancellation()
-        guard let user = try await candidateAPI.signedQuery(
+        let user = try await candidateAPI.signedQuery(
             "user", args: [candidateAPI.domain, []], identity: session, as: Optional<TaggrUser>.self
-        ) ?? nil else {
-            throw TaggrSeedPhraseError.userNotFound
+        ) ?? nil
+        if user == nil {
+            let result = try await candidateAPI.signedQuery("account_deletion_status", args: [], identity: session, as: TaggrDeletionResponse.self)
+            guard let state = result?.Ok?.state, state == "deleting" || state == "deleted" else {
+                throw TaggrSeedPhraseError.userNotFound
+            }
         }
         try Task.checkCancellation()
         try await finishIdentity(session, user: user, api: candidateAPI, store: candidateStore)

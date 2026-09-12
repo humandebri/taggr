@@ -9,7 +9,9 @@ struct RootView: View {
 
     var body: some View {
         Group {
-            if !state.acceptedSafetyTerms {
+            if state.accountDeletion != nil {
+                NavigationStack { DeletedAccountView() }
+            } else if !state.acceptedSafetyTerms {
                 SafetyGateView()
             } else {
                 tabs.id(state.safetyScope)

@@ -1237,6 +1237,16 @@ struct TaggrConfig: Codable, Equatable, Sendable {
 }
 
 enum TaggrTokenAmount {
+    static func parse(_ text: String, decimals: Int) -> UInt64? {
+        guard (0...18).contains(decimals) else { return nil }
+        let parts = text.trimmingCharacters(in: .whitespacesAndNewlines).split(separator: ".", omittingEmptySubsequences: false)
+        guard (1...2).contains(parts.count), !parts[0].isEmpty,
+              parts.allSatisfy({ $0.allSatisfy({ $0.isASCII && $0.isNumber }) }) else { return nil }
+        let fraction = parts.count == 2 ? String(parts[1]) : ""
+        guard fraction.count <= decimals else { return nil }
+        return UInt64(String(parts[0]) + fraction + String(repeating: "0", count: decimals - fraction.count))
+    }
+
     static func format(_ rawAmount: Int, decimals: Int?) -> String {
         let decimals = max(decimals ?? 0, 0)
         guard decimals > 0 else { return rawAmount.formatted() }

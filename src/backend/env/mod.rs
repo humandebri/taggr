@@ -35,6 +35,7 @@ pub mod auction;
 pub mod canisters;
 pub mod config;
 pub mod delegations;
+pub mod deletion;
 pub mod domains;
 pub mod invite;
 pub mod invoices;
@@ -735,6 +736,12 @@ impl State {
         let user = self.principal_to_user(principal).ok_or("user not found")?;
         let user_id = user.id;
         let user_name = user.name.clone();
+        if controllers
+            .iter()
+            .any(|id| self.users.get(id).is_none_or(|u| !u.deletion.is_active()))
+        {
+            return Err("controller account is unavailable".into());
+        }
         let realm = self.realms.get_mut(&realm_id).ok_or("no realm found")?;
         if !realm.controllers.contains(&user_id) {
             return Err("not authorized".into());
@@ -2120,7 +2127,7 @@ impl State {
         let post_filter = |iter: Box<dyn Iterator<Item = &'a Post> + 'a>| {
             Box::new(
                 iter.take_while(move |post| post.creation_timestamp() >= watermark)
-                    .filter(move |post| !post.is_deleted()),
+                    .filter(move |post| !post.is_deleted() && post.publicly_available(self)),
             )
         };
 
@@ -2275,6 +2282,7 @@ impl State {
                     })
                 }),
         }
+        .filter(|u| u.deletion.is_active())
     }
 
     /// Returns for the given principal:
@@ -2327,6 +2335,15 @@ impl State {
             .principal_change_requests
             .get(&new_principal)
             .ok_or("no request found")?;
+
+        if !self
+            .principal_to_user(old_principal)
+            .ok_or("no principal found")?
+            .deletion
+            .is_active()
+        {
+            return Err("account deleted; principal migration unavailable".into());
+        }
 
         if self.voted_on_emergency_proposal(old_principal) {
             return Err("pending proposal with the current principal as voter exists".into());

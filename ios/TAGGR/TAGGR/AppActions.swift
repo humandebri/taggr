@@ -1045,6 +1045,7 @@ extension TaggrAppCoordinator {
             NSLog("TAGGR identity session could not be cleared: %@", error.localizedDescription)
         }
         authSession = nil
+        accountDeletion = nil
         userRefreshTask?.cancel()
         userRefreshTask = nil
         userRefreshKey = nil
@@ -1292,6 +1293,13 @@ extension TaggrAppCoordinator {
         try Task.checkCancellation()
         guard userRefreshID == requestID, isCurrentRuntimeGeneration(generation), self.authSession?.principal == authSession.principal else { return }
         notificationRefreshFailed = false
+        if loadedUser == nil {
+            let result = try await activeAPI.signedQuery("account_deletion_status", args: [], identity: authSession, as: TaggrDeletionResponse.self)
+            guard isCurrentRuntimeGeneration(generation), self.authSession?.principal == authSession.principal else { return }
+            accountDeletion = result?.Ok
+        } else {
+            accountDeletion = nil
+        }
         currentUser = loadedUser
         storageCreationState = Self.storageCreationState(from: loadedUser?.settings)
         if let loadedUser {
@@ -1541,5 +1549,68 @@ extension TaggrAppCoordinator {
             rows = try await activeAPI.query(method, args: args, as: [TaggrPostEnvelope].self)
         }
         return (rows ?? []).map(\.post)
+    }
+}
+
+
+struct TaggrDeletionProgress: Decodable, Sendable {
+    enum CodingKeys: String, CodingKey {
+        case state, processed, total, bucket, mediaClosed, balance, principal
+        case treasuryE8s = "treasuryE8S"
+    }
+    let state: String
+    let processed: Int
+    let total: Int
+    let bucket: String?
+    let mediaClosed: Bool
+    let balance: UInt64
+    let treasuryE8s: UInt64
+    let principal: String
+}
+
+struct TaggrDeletionResponse: Decodable, Sendable {
+    let Ok: TaggrDeletionProgress?
+    let Err: String?
+}
+
+extension TaggrAppCoordinator {
+    func deleteAccount() async {
+        let generation = runtimeGeneration
+        let principal = authSession?.principal
+        let activeAPI = api
+        await runBusy(validWhile: { self.isCurrentRuntimeGeneration(generation) && self.authSession?.principal == principal }) {
+            guard let identity = authSession else { throw TaggrAPIError.missingIdentity }
+            let initial = try await activeAPI.updateJSON("begin_account_deletion", identity: identity)
+            guard isCurrentRuntimeGeneration(generation), authSession?.principal == identity.principal else { return }
+            guard let initialProgress = try JSONDecoder.taggr.decode(TaggrDeletionResponse.self, from: initial).Ok else { throw TaggrAPIError.invalidResponse("Missing deletion progress") }
+            accountDeletion = initialProgress
+            userRefreshTask?.cancel()
+            userRefreshTask = nil
+            userRefreshID = nil
+            userRefreshKey = nil
+            currentUser = nil
+            repliesByPostID = [:]
+            feed = []
+            focusedPost = nil
+            profile = nil
+            clearAuthorNameCache()
+            if let progress = accountDeletion, !progress.mediaClosed, let bucket = progress.bucket {
+                try await activeAPI.closeMediaStorage(bucket, identity: identity)
+            }
+            while accountDeletion?.state == "deleting" {
+                try Task.checkCancellation()
+                guard isCurrentRuntimeGeneration(generation), authSession?.principal == identity.principal else { return }
+                let data = try await activeAPI.updateJSON("continue_account_deletion", identity: identity)
+                guard isCurrentRuntimeGeneration(generation), authSession?.principal == identity.principal else { return }
+                guard let progress = try JSONDecoder.taggr.decode(TaggrDeletionResponse.self, from: data).Ok else { throw TaggrAPIError.invalidResponse("Missing deletion progress") }
+                accountDeletion = progress
+            }
+            if accountDeletion?.state == "deleted" {
+                try identityStore.clear()
+                URLCache.shared.removeAllCachedResponses()
+                signOut()
+                accountDeletionCompleted = true
+            }
+        }
     }
 }

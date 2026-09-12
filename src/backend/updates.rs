@@ -37,13 +37,76 @@ pub fn raw_caller(state: &State) -> Result<Principal, String> {
     if delegations::resolve_delegation(state, principal).is_some() {
         return Err("operation not supported on custom domains".into());
     }
+    assert_active_account(state, principal);
     Ok(principal)
 }
 
 /// Returns the principal for the provided delegate.
 fn caller(state: &State) -> Principal {
     let principal = canonical_principal();
+    let principal = delegations::resolve_delegation(state, principal).unwrap_or(principal);
+    assert_active_account(state, principal);
+    principal
+}
+
+fn assert_active_account(state: &State, principal: Principal) {
+    assert!(
+        state
+            .principal_to_user(principal)
+            .is_none_or(|u| u.deletion.is_active()),
+        "account deleted; only asset recovery is available"
+    );
+}
+
+pub fn recovery_raw_caller(state: &State) -> Result<Principal, String> {
+    let principal = canonical_principal();
+    if delegations::resolve_delegation(state, principal).is_some() {
+        return Err("operation not supported on custom domains".into());
+    }
+    Ok(principal)
+}
+
+pub fn recovery_caller(state: &State) -> Principal {
+    let principal = canonical_principal();
     delegations::resolve_delegation(state, principal).unwrap_or(principal)
+}
+
+#[export_name = "canister_update begin_account_deletion"]
+fn begin_account_deletion() {
+    reply(mutate(|state| state.begin_deletion(recovery_caller(state))));
+}
+
+#[export_name = "canister_update continue_account_deletion"]
+fn continue_account_deletion() {
+    in_executor_context(|| {
+        spawn(async {
+            let principal = read(recovery_caller);
+            let result = async {
+                let progress = mutate(|state| state.continue_deletion(principal))?;
+                if !progress.media_closed {
+                    if let Some(bucket) = progress.bucket {
+                        let (closed,): (bool,) =
+                            env::canisters::call_canister(bucket, "media_closed", ())
+                                .await
+                                .map_err(|e| format!("cannot verify media closure: {e:?}"))?;
+                        if !closed {
+                            return Err("media storage is still serving images".to_string());
+                        }
+                        mutate(|state| {
+                            if let Some(u) = state.principal_to_user_mut(principal) {
+                                if u.bucket == Some(bucket) {
+                                    u.deletion.media_closed = true;
+                                }
+                            }
+                        });
+                    }
+                }
+                mutate(|state| state.continue_deletion(principal))
+            }
+            .await;
+            reply(result);
+        })
+    });
 }
 
 #[init]
@@ -191,7 +254,7 @@ fn link_cold_wallet(user_id: UserId) -> Result<(), String> {
 
 #[update]
 fn unlink_cold_wallet() -> Result<(), String> {
-    mutate(|state| state.unlink_cold_wallet(raw_caller(state)?))
+    mutate(|state| state.unlink_cold_wallet(recovery_raw_caller(state)?))
 }
 
 /// Registers the caller's personal media bucket. Performs no verification — a
@@ -270,7 +333,7 @@ fn migrate_post_impl(post_id: PostId, entries: Vec<FileRef>) -> Result<(), Strin
 fn withdraw_rewards() {
     in_executor_context(|| {
         spawn(async {
-            reply(State::withdraw_rewards(read(caller)).await);
+            reply(State::withdraw_rewards(read(recovery_caller)).await);
         })
     })
 }
@@ -696,7 +759,9 @@ fn create_bid() {
 
 #[export_name = "canister_update cancel_bid"]
 fn cancel_bid() {
-    in_executor_context(|| spawn(async { reply(auction::cancel_bid(read(caller)).await) }));
+    in_executor_context(|| {
+        spawn(async { reply(auction::cancel_bid(read(recovery_caller)).await) })
+    });
 }
 
 #[update]
@@ -747,4 +812,47 @@ fn check_candid_interface_compatibility() {
         "declared candid interface in taggr.did file",
         candid_parser::utils::CandidSource::File(old_interface.as_path()),
     );
+}
+
+#[export_name = "canister_update recover_taggr"]
+fn recover_taggr() {
+    let (recipient, amount): (String, u64) = parse(&arg_data_raw());
+    reply(mutate(|state| {
+        let principal = recovery_raw_caller(state)?;
+        let to = Principal::from_text(recipient).map_err(|e| e.to_string())?;
+        token::transfer(
+            state,
+            time(),
+            principal,
+            token::TransferArgs {
+                from_subaccount: None,
+                to: token::account(to),
+                amount: amount as u128,
+                fee: None,
+                memo: None,
+                created_at_time: None,
+            },
+        )
+        .map_err(|e| format!("{e:?}"))
+    }));
+}
+
+#[cfg(test)]
+mod deletion_auth_tests {
+    use super::*;
+    #[test]
+    fn deletion_blocks_sns_updates_without_removing_asset_identity() {
+        let mut state = State::default();
+        let principal = env::tests::pr(1);
+        env::tests::create_user_with_credits(&mut state, principal, 0);
+        assert_active_account(&state, principal);
+        state.begin_deletion(principal).unwrap();
+        assert!(
+            std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| assert_active_account(
+                &state, principal
+            )))
+            .is_err()
+        );
+        assert!(state.principal_to_user(principal).is_some());
+    }
 }

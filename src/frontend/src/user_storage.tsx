@@ -328,12 +328,17 @@ export const createBucket = async (
 // Controller-only, so canonical-domain only. The bucket's pre/post-upgrade hooks
 // preserve controllers and the free list; ephemeral delegate sessions are dropped
 // and re-registered on the next custom-domain sign-in.
-export const upgradeBucket = async (canisterId: Principal): Promise<void> => {
-    const wasmBuf = await window.api.query_raw(
+export const upgradeBucket = async (
+    canisterId: Principal,
+    shouldContinue: () => boolean = () => true,
+): Promise<void> => {
+    const api = window.api;
+    const wasmBuf = await api.query_raw(
         CANISTER_ID,
         "bucket_wasm",
         new ArrayBuffer(0),
     );
+    if (!shouldContinue()) return;
     const wasm = decodeReply<Uint8Array | number[]>(
         [IDL.Vec(IDL.Nat8)],
         wasmBuf,
@@ -352,7 +357,7 @@ export const upgradeBucket = async (canisterId: Principal): Promise<void> => {
             },
         ],
     );
-    const result = await window.api.call_raw(
+    const result = await api.call_raw(
         MANAGEMENT_CANISTER_ID,
         "install_code",
         arg,

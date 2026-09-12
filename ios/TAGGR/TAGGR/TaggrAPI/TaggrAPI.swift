@@ -133,6 +133,25 @@ actor TaggrAPI {
         return try decode(T.self, from: response, method: method)
     }
 
+    func closeMediaStorage(_ bucket: String, identity: ICAuthSession) async throws {
+        let status = try await storageCanisterStatus(bucket, identity: identity)
+        let moduleHash = status.moduleHash?.icHexString.lowercased()
+        // Rebuilt from bucket source at 4ee528a1 with the repository release/shrink/Oz pipeline.
+        let knownLegacyHash = "418202879263a81a9479620628be4e0543367c178addb92d5fd5873ba23bde10"
+        if moduleHash == knownLegacyHash {
+            guard status.controllers.contains(identity.principal) else {
+                throw TaggrAPIError.rejected("Storage upgrade requires its controller. Deletion remains in progress.")
+            }
+            try await installBucketCode(canisterId: bucket, wasm: try await bucketWasm(), userPrincipal: identity.principal, mode: "upgrade", identity: identity)
+        }
+        // Unknown modules are never overwritten. A supported close operation can still be retried.
+        do {
+            _ = try await updateRaw("close_media", arg: TaggrCandidAdapter.emptyArguments().encode(), canisterId: bucket, identity: identity)
+        } catch {
+            throw TaggrAPIError.rejected("Image storage could not be closed. Unknown modules are not automatically upgraded. Storage: \(bucket). \(error.localizedDescription)")
+        }
+    }
+
     func updateJSON(_ method: String, args: sending [Any?] = [], identity: ICAuthSession?) async throws -> Data {
         let identity = try Self.requireIdentity(identity)
         let arg = try TaggrCandid.jsonArguments(args)

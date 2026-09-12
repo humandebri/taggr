@@ -39,7 +39,15 @@ struct Segment {
     length: u64,
 }
 
+#[derive(CandidType, Deserialize)]
+struct SavedState {
+    version: u32,
+    free_segments: Vec<Segment>,
+    media_closed: bool,
+}
+
 thread_local! {
+    static MEDIA_CLOSED: RefCell<bool> = const { RefCell::new(false) };
     static FREE_SEGMENTS: RefCell<Vec<Segment>> = const { RefCell::new(Vec::new()) };
     static CONTROLLERS: RefCell<Vec<Principal>> = const { RefCell::new(Vec::new()) };
     // Authorized delegate sessions: (principal, expiry_ns). Ephemeral by design —
@@ -139,7 +147,12 @@ fn pre_upgrade() {
     let offset = read_offset();
 
     FREE_SEGMENTS.with(|fl| {
-        let bytes = Encode!(&*fl.borrow()).expect("couldn't serialize free list");
+        let bytes = Encode!(&SavedState {
+            version: 1,
+            free_segments: fl.borrow().clone(),
+            media_closed: MEDIA_CLOSED.with(|v| *v.borrow())
+        })
+        .expect("couldn't serialize storage state");
         let len = bytes.len() as u64;
         grow_to_fit(offset, 8 + len);
         stable_write(offset, &len.to_be_bytes());
@@ -165,15 +178,29 @@ fn post_upgrade() {
     let len = u64::from_be_bytes(len_bytes);
     // On first upgrade from old code (no pre_upgrade), stable memory past the
     // high-water mark is zero-initialized, so len will be 0 and we skip gracefully.
-    if len == 0 || offset + 8 + len > stable_mem_size {
+    if len == 0 {
         return;
     }
 
+    assert!(
+        len <= stable_mem_size - offset - 8,
+        "truncated storage state"
+    );
     let mut bytes = vec![0u8; len as usize];
     stable_read(offset + 8, &mut bytes);
+    restore_storage_state(&bytes);
+}
 
-    if let Ok(free_list) = Decode!(&bytes, Vec<Segment>) {
+fn restore_storage_state(bytes: &[u8]) {
+    if let Ok(saved) = Decode!(bytes, SavedState) {
+        assert_eq!(saved.version, 1, "unsupported storage version");
+        MEDIA_CLOSED.with(|v| *v.borrow_mut() = saved.media_closed);
+        FREE_SEGMENTS.with(|fl| *fl.borrow_mut() = saved.free_segments);
+    } else if let Ok(free_list) = Decode!(bytes, Vec<Segment>) {
+        MEDIA_CLOSED.with(|v| *v.borrow_mut() = false);
         FREE_SEGMENTS.with(|fl| *fl.borrow_mut() = free_list);
+    } else {
+        panic!("invalid storage state");
     }
 }
 
@@ -194,6 +221,13 @@ fn stats() -> (usize, u64) {
 
 #[ic_cdk_macros::query]
 fn http_request(req: HttpRequest) -> HttpResponse {
+    if MEDIA_CLOSED.with(|v| *v.borrow()) {
+        return HttpResponse {
+            status_code: 404,
+            headers: vec![("Cache-Control".into(), "no-store".into())],
+            ..Default::default()
+        };
+    }
     let url = url::parse(&req.url);
     match url.path {
         "/image" => http_image(url.args),
@@ -244,6 +278,7 @@ fn http_image(args: &str) -> HttpResponse {
 
 #[export_name = "canister_update write"]
 fn write() {
+    assert!(!MEDIA_CLOSED.with(|v| *v.borrow()), "media storage closed");
     assert_authorized();
     let blob = msg_arg_data();
     let blob_len = blob.len() as u64;
@@ -345,6 +380,17 @@ fn read_blob(offset: u64, len: u64) -> Result<Vec<u8>, &'static str> {
     Ok(buf)
 }
 
+#[ic_cdk_macros::update]
+fn close_media() {
+    assert_authorized();
+    MEDIA_CLOSED.with(|v| *v.borrow_mut() = true);
+}
+
+#[ic_cdk_macros::update]
+fn media_closed() -> bool {
+    MEDIA_CLOSED.with(|v| *v.borrow())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -366,6 +412,62 @@ mod tests {
                 )
             },
         );
+    }
+
+    #[test]
+    fn closed_media_returns_no_bytes_for_known_and_arbitrary_urls() {
+        MEDIA_CLOSED.with(|v| *v.borrow_mut() = true);
+        for url in [
+            "/image?offset=268&len=42",
+            "/image?offset=0&len=4",
+            "/anything",
+        ] {
+            let response = http_request(HttpRequest {
+                url: url.into(),
+                headers: vec![],
+            });
+            assert_eq!(response.status_code, 404);
+            assert!(response.body.is_empty());
+            assert_eq!(
+                response.headers,
+                vec![("Cache-Control".into(), "no-store".into())]
+            );
+        }
+        let bytes = Encode!(&SavedState {
+            version: 1,
+            free_segments: vec![],
+            media_closed: true
+        })
+        .unwrap();
+        let restored = Decode!(&bytes, SavedState).unwrap();
+        assert!(restored.media_closed);
+        assert_eq!(restored.version, 1);
+        MEDIA_CLOSED.with(|v| *v.borrow_mut() = false);
+    }
+
+    #[test]
+    fn storage_restore_migrates_legacy_and_keeps_closure() {
+        let legacy = Encode!(&Vec::<Segment>::new()).unwrap();
+        restore_storage_state(&legacy);
+        assert!(!MEDIA_CLOSED.with(|v| *v.borrow()));
+        let closed = Encode!(&SavedState {
+            version: 1,
+            free_segments: vec![],
+            media_closed: true,
+        })
+        .unwrap();
+        for _ in 0..2 {
+            MEDIA_CLOSED.with(|v| *v.borrow_mut() = false);
+            restore_storage_state(&closed);
+            assert!(MEDIA_CLOSED.with(|v| *v.borrow()));
+        }
+        MEDIA_CLOSED.with(|v| *v.borrow_mut() = false);
+    }
+
+    #[test]
+    #[should_panic(expected = "invalid storage state")]
+    fn invalid_storage_state_does_not_reopen_media() {
+        restore_storage_state(b"invalid");
     }
 
     #[test]

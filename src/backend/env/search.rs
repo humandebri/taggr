@@ -37,11 +37,15 @@ pub fn search(domain: String, state: &State, mut query: String) -> Vec<SearchRes
         _ => 2,
     });
     let users = |prefix: String| {
-        state.users.values().filter(move |user| {
-            user.name
-                .to_lowercase()
-                .starts_with(&prefix[1..].to_lowercase())
-        })
+        state
+            .users
+            .values()
+            .filter(|user| user.deletion.is_active())
+            .filter(move |user| {
+                user.name
+                    .to_lowercase()
+                    .starts_with(&prefix[1..].to_lowercase())
+            })
     };
 
     match terms.as_slice() {
@@ -50,7 +54,15 @@ pub fn search(domain: String, state: &State, mut query: String) -> Vec<SearchRes
             state
                 .tag_indexes
                 .keys()
-                .filter(|tag| tag.starts_with(query))
+                .filter(|tag| {
+                    tag.starts_with(query)
+                        && state.tag_indexes.get(*tag).is_some_and(|index| {
+                            index.posts.iter().any(|id| {
+                                Post::get(state, id)
+                                    .is_some_and(|p| p.publicly_available(state) && !p.is_deleted())
+                            })
+                        })
+                })
                 .map(|tag| SearchResult {
                     relevant: tag.clone(),
                     result: "tag".to_string(),
@@ -66,7 +78,7 @@ pub fn search(domain: String, state: &State, mut query: String) -> Vec<SearchRes
             let realm_id = &realm[1..].to_uppercase();
             users(user_name_prefix.to_string())
                 .flat_map(|user| user.posts(Some(&domain), state, 0, true))
-                .filter(|post| !post.is_deleted())
+                .filter(|post| !post.is_deleted() && post.publicly_available(state))
                 .filter_map(
                     |Post {
                          id,
@@ -100,7 +112,7 @@ pub fn search(domain: String, state: &State, mut query: String) -> Vec<SearchRes
             let realm_id = &realm[1..].to_uppercase();
             users(user_name_prefix.to_string())
                 .flat_map(|user| user.posts(Some(&domain), state, 0, true))
-                .filter(|post| !post.is_deleted())
+                .filter(|post| !post.is_deleted() && post.publicly_available(state))
                 .filter_map(
                     |Post {
                          id,
@@ -128,7 +140,7 @@ pub fn search(domain: String, state: &State, mut query: String) -> Vec<SearchRes
         [user_name_prefix, word] if user_name_prefix.starts_with('@') => {
             users(user_name_prefix.to_string())
                 .flat_map(|user| user.posts(Some(&domain), state, 0, true))
-                .filter(|post| !post.is_deleted())
+                .filter(|post| !post.is_deleted() && post.publicly_available(state))
                 .filter_map(|Post { id, body, user, .. }| {
                     if body.to_lowercase().contains(word) {
                         return Some(SearchResult {

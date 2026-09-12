@@ -79,8 +79,14 @@ pub fn domain_realm_post_filter(
     realm_id: Option<&RealmId>,
 ) -> Option<Box<dyn Fn(&Post) -> bool>> {
     let cfg = state.domains.get(domain)?;
+    let deleted = state
+        .users
+        .values()
+        .filter(|u| !u.deletion.is_active())
+        .map(|u| u.id)
+        .collect::<HashSet<_>>();
 
-    match (realm_id, &cfg.sub_config) {
+    let filter: Option<Box<dyn Fn(&Post) -> bool>> = match (realm_id, &cfg.sub_config) {
         // Inside realm_id we show no posts if it's not on a domain whitelist.
         (Some(realm_id), DomainSubConfig::WhiteListedRealms(list)) if !list.contains(realm_id) => {
             None
@@ -122,7 +128,11 @@ pub fn domain_realm_post_filter(
                     .unwrap_or(false)
             }))
         }
-    }
+    };
+    filter.map(|filter| {
+        Box::new(move |p: &Post| !deleted.contains(&p.user) && filter(p))
+            as Box<dyn Fn(&Post) -> bool>
+    })
 }
 
 pub fn change_domain_config(

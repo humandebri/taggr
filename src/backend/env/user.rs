@@ -81,6 +81,8 @@ pub enum Mode {
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct User {
+    #[serde(default)]
+    pub deletion: super::deletion::Deletion,
     pub id: UserId,
     pub name: String,
     pub num_posts: usize,
@@ -252,6 +254,7 @@ impl User {
             show_posts_in_realms: true,
             mode: Mode::default(),
             deactivated: false,
+            deletion: Default::default(),
             wallet_tokens: Default::default(),
         }
     }
@@ -270,6 +273,9 @@ impl User {
         offset: PostId,
         with_comments: bool,
     ) -> Box<dyn Iterator<Item = &'a Post> + 'a> {
+        if domain.is_some() && !self.deletion.is_active() {
+            return Box::new(std::iter::empty());
+        }
         let filter = match domain {
             None => Box::new(|_: &Post| true),
             Some(domain) => match domain_realm_post_filter(state, domain, None) {
@@ -361,7 +367,7 @@ impl User {
 
     /// Returns `true` if the user was active within the last `n` time units (days, weeks, etc).
     pub fn active_within(&self, n: u64, time_units: u64, now: u64) -> bool {
-        self.last_activity + n * time_units > now
+        self.deletion.is_active() && self.last_activity + n * time_units > now
     }
 
     pub fn validate_info(
@@ -476,6 +482,9 @@ impl User {
     }
 
     pub fn notify_with_params<T: AsRef<str>>(&mut self, message: T, predicate: Option<Predicate>) {
+        if !self.deletion.is_active() {
+            return;
+        }
         self.insert_notifications(match predicate {
             None => Notification::Generic(message.as_ref().into()),
             Some(predicate) => Notification::Conditional(message.as_ref().into(), predicate),
@@ -487,10 +496,16 @@ impl User {
     }
 
     pub fn notify_about_post<T: AsRef<str>>(&mut self, message: T, post_id: PostId) {
+        if !self.deletion.is_active() {
+            return;
+        }
         self.insert_notifications(Notification::NewPost(message.as_ref().into(), post_id));
     }
 
     pub fn notify_about_watched_post(&mut self, post_id: PostId, comment: PostId, parent: PostId) {
+        if !self.deletion.is_active() {
+            return;
+        }
         let entry = self
             .notifications
             .iter()
@@ -553,6 +568,9 @@ impl User {
     }
 
     pub fn change_rewards<T: ToString>(&mut self, amount: i64, log: T) {
+        if !self.deletion.is_active() {
+            return;
+        }
         // The top up only works if the rewards balance is non-negative
         if self.mode == Mode::Credits && self.rewards() >= 0 && amount > 0 {
             self.change_credits(amount.unsigned_abs(), CreditsDelta::Plus, log)

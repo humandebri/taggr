@@ -1326,3 +1326,41 @@ final class TaggrURLProtocolStub: URLProtocol {
 
     override func stopLoading() {}
 }
+
+extension TaggrTests {
+    func testDeletionProgressDecodesWithoutRecreatingAUser() throws {
+        let data = Data(#"{"Ok":{"state":"deleted","processed":21,"total":21,"bucket":null,"media_closed":true,"balance":123,"treasury_e8s":456,"principal":"aaaaa-aa"}}"#.utf8)
+        let progress = try XCTUnwrap(JSONDecoder.taggr.decode(TaggrDeletionResponse.self, from: data).Ok)
+        XCTAssertEqual(progress.state, "deleted")
+        XCTAssertEqual(progress.processed, progress.total)
+        XCTAssertTrue(progress.mediaClosed)
+        XCTAssertEqual(progress.treasuryE8s, 456)
+    }
+}
+
+extension TaggrTests {
+    func testRecoveryAmountUsesExactDecimalUnits() {
+        XCTAssertEqual(TaggrTokenAmount.parse("1.00000001", decimals: 8), 100000001)
+        XCTAssertNil(TaggrTokenAmount.parse("0.000000001", decimals: 8))
+        XCTAssertNil(TaggrTokenAmount.parse("-1", decimals: 8))
+        XCTAssertNil(TaggrTokenAmount.parse("18446744073709551616", decimals: 0))
+    }
+}
+
+extension TaggrTests {
+    func testDeletedAccountReloadUsesRecoveryStatusInsteadOfRegistration() async throws {
+        let api = makeStubbedAPI { request in
+            let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
+            let method = self.requestMethodAndArg(from: request)?.method
+            let body = method == "account_deletion_status"
+                ? #"{"Ok":{"state":"deleted","processed":0,"total":0,"bucket":null,"media_closed":true,"balance":0,"treasury_e8s":0,"principal":"aaaaa-aa"}}"#
+                : "null"
+            return (response, Self.queryReply(Data(body.utf8)))
+        }
+        let state = TaggrAppCoordinator(api: api)
+        state.authSession = makeAuthSession(privateKey: Curve25519.Signing.PrivateKey())
+        try await state.loadCurrentUserIfNeeded()
+        XCTAssertNil(state.currentUser)
+        XCTAssertEqual(state.accountDeletion?.state, "deleted")
+    }
+}

@@ -253,11 +253,17 @@ impl Proposal {
                 }
                 Payload::AddRealmController(realm_id, user_id) => {
                     if let Some(realm) = state.realms.get_mut(&realm_id.to_uppercase()) {
-                        realm.controllers.insert(*user_id);
-                        state.logger.info(format!(
-                            "User `@{}` was added via proposal execution to the realm /{}",
-                            user_id, realm_id
-                        ));
+                        if state
+                            .users
+                            .get(user_id)
+                            .is_some_and(|u| u.deletion.is_active())
+                        {
+                            realm.controllers.insert(*user_id);
+                            state.logger.info(format!(
+                                "User `@{}` was added via proposal execution to the realm /{}",
+                                user_id, realm_id
+                            ));
+                        }
                     }
                 }
                 Payload::ICPTransfer(account, amount) => {

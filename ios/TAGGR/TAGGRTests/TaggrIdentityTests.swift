@@ -63,6 +63,16 @@ extension TaggrTests {
         XCTAssertFalse(state.isAuthenticatingIdentity)
     }
 
+    func testSeedPhraseDeletedAccountCanRecoverAssets() async throws {
+        let keychain = SeedPhraseTestKeychain()
+        let state = makeSeedPhraseState(keychain: keychain, userExists: false, userDeleted: true)
+        try await state.signInWithSeedPhrase("taggr-test-only-seed")
+        XCTAssertNotNil(state.authSession)
+        XCTAssertNil(state.currentUser)
+        XCTAssertEqual(state.accountDeletion?.state, "deleted")
+        XCTAssertEqual(state.icpBalanceE8s, 200_000_000)
+    }
+
     func testSeedPhraseExpiredSessionRequiresReentry() async throws {
         let keychain = SeedPhraseTestKeychain()
         let state = makeSeedPhraseState(keychain: keychain)
@@ -172,6 +182,7 @@ extension TaggrTests {
     private func makeSeedPhraseState(
         keychain: SeedPhraseTestKeychain,
         userExists: Bool = true,
+        userDeleted: Bool = false,
         networkFailure: Bool = false
     ) -> TaggrAppCoordinator {
         let previousHomeFeed = UserDefaults.standard.string(forKey: "taggr.home-feed-mode")
@@ -199,6 +210,10 @@ extension TaggrTests {
                     matches = false
                 }
                 data = userExists && matches ? Self.currentUserFixture() : Data("null".utf8)
+            case "account_deletion_status":
+                data = userDeleted
+                    ? Data(#"{"Ok":{"state":"deleted","processed":0,"total":0,"bucket":null,"media_closed":true,"balance":0,"treasury_e8s":0,"principal":"b4hy7-sh3si-jcy5w-2wvrx-ft33v-tblad-4rjuh-giw73-vtxwt-awuyd-qqe"}}"#.utf8)
+                    : Data(#"{"Err":"user not found"}"#.utf8)
             case "stats": data = Data(#"{"canister_id":"\#(TaggrRuntimeConfig.productionCanisterId)"}"#.utf8)
             case "config": data = Data(#"{"feed_page_size":30}"#.utf8)
             case "account_balance": data = Self.candidTokens(200_000_000)

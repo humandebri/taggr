@@ -59,6 +59,8 @@ struct TaggrStorageCreationState: Codable, Equatable, Sendable {
 @MainActor
 @Observable
 final class TaggrAppCoordinator {
+    var accountDeletion: TaggrDeletionProgress?
+    var accountDeletionCompleted = false
     static let identityStoreService = ["network", "taggr", "ios", "identity"].joined(separator: ".")
 
     let navigationStore = NavigationStore()
