@@ -23,7 +23,7 @@ struct ComposePostView: View {
     @State private var realmColors: [String: String] = [:]
     @State private var isSubmitting = false
     @State private var discardConfirmationPresented = false
-    @FocusState private var focusedTextSegmentID: Int?
+    @State private var focusedTextSegmentID: Int?
 
     init(mode: PostComposerMode, initialRealm: String? = nil, dismiss: @escaping () -> Void) {
         self.mode = mode
@@ -644,7 +644,7 @@ struct ComposePostDocumentEditor: View {
     let existingImages: [String: TaggrEditablePostImage]
     let placeholder: String
     let documentID: UUID
-    let focusedTextSegmentID: FocusState<Int?>.Binding
+    let focusedTextSegmentID: Binding<Int?>
     @Binding var imageInsertionSegmentID: Int?
     let removeImage: (Int, String) -> Void
     let moveImage: (Int, Int?) -> Void
@@ -656,7 +656,7 @@ struct ComposePostDocumentEditor: View {
         existingImages: [String: TaggrEditablePostImage],
         placeholder: String,
         documentID: UUID,
-        focusedTextSegmentID: FocusState<Int?>.Binding,
+        focusedTextSegmentID: Binding<Int?>,
         imageInsertionSegmentID: Binding<Int?>,
         removeImage: @escaping (Int, String) -> Void,
         moveImage: @escaping (Int, Int?) -> Void,
@@ -795,7 +795,7 @@ private struct ComposePostTextSegmentEditor: View {
     let segmentID: Int
     let value: String
     let placeholder: String?
-    let focusedTextSegmentID: FocusState<Int?>.Binding
+    let focusedTextSegmentID: Binding<Int?>
     let updateText: (String) -> Void
     let activate: () -> Void
     let dropImage: (PostDraftImageDragItem) -> Bool
@@ -805,7 +805,7 @@ private struct ComposePostTextSegmentEditor: View {
         segmentID: Int,
         value: String,
         placeholder: String?,
-        focusedTextSegmentID: FocusState<Int?>.Binding,
+        focusedTextSegmentID: Binding<Int?>,
         updateText: @escaping (String) -> Void,
         activate: @escaping () -> Void,
         dropImage: @escaping (PostDraftImageDragItem) -> Bool
@@ -831,7 +831,7 @@ private struct ComposePostTextSegmentEditor: View {
                     activate()
                 }
             )
-                .frame(minHeight: inputText.isEmpty ? 70 : 120)
+                .frame(maxWidth: .infinity, minHeight: inputText.isEmpty ? 70 : 120, alignment: .topLeading)
                 .tint(TaggrTheme.clickable)
                 .onTapGesture(perform: activate)
                 .dropDestination(for: PostDraftImageDragItem.self) { items, _ in
@@ -1094,8 +1094,8 @@ struct ComposeSelectableTextEditor: UIViewRepresentable {
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
 
-    func makeUIView(context: Context) -> UITextView {
-        let view = UITextView()
+    func makeUIView(context: Context) -> TextView {
+        let view = TextView()
         view.delegate = context.coordinator
         view.backgroundColor = .clear
         view.font = UIFont.preferredFont(forTextStyle: .title3)
@@ -1109,7 +1109,7 @@ struct ComposeSelectableTextEditor: UIViewRepresentable {
         return view
     }
 
-    func updateUIView(_ view: UITextView, context: Context) {
+    func updateUIView(_ view: TextView, context: Context) {
         context.coordinator.parent = self
         view.isEditable = isEnabled
         view.isSelectable = isEnabled
@@ -1119,16 +1119,33 @@ struct ComposeSelectableTextEditor: UIViewRepresentable {
             let start = min(selection.location, (text as NSString).length)
             view.selectedRange = NSRange(location: start, length: min(selection.length, (text as NSString).length - start))
         }
-        if isFocused, isEnabled, !view.isFirstResponder {
-            view.becomeFirstResponder()
-        } else if (!isFocused || !isEnabled), view.isFirstResponder {
-            view.resignFirstResponder()
-        }
+        view.shouldBeFocused = isFocused && isEnabled
+        view.updateFocus()
     }
 
-    func sizeThatFits(_ proposal: ProposedViewSize, uiView: UITextView, context: Context) -> CGSize? {
-        guard let width = proposal.width else { return nil }
-        return uiView.sizeThatFits(CGSize(width: width, height: .greatestFiniteMagnitude))
+    func sizeThatFits(_ proposal: ProposedViewSize, uiView: TextView, context: Context) -> CGSize? {
+        guard let width = proposal.width, width > 0, width.isFinite else { return nil }
+        let fittingSize = uiView.sizeThatFits(CGSize(width: width, height: .greatestFiniteMagnitude))
+        return CGSize(width: width, height: fittingSize.height)
+    }
+
+    final class TextView: UITextView {
+        var shouldBeFocused = false
+
+        override func didMoveToWindow() {
+            super.didMoveToWindow()
+            updateFocus()
+        }
+
+        func updateFocus() {
+            // SwiftUI can request focus before UIKit attaches the input to a window.
+            guard window != nil else { return }
+            if shouldBeFocused, isEditable, !isFirstResponder {
+                becomeFirstResponder()
+            } else if (!shouldBeFocused || !isEditable), isFirstResponder {
+                resignFirstResponder()
+            }
+        }
     }
 
     final class Coordinator: NSObject, UITextViewDelegate {

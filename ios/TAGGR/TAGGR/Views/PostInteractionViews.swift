@@ -420,7 +420,7 @@ struct InlineReplyComposer: View {
     @State private var documentID = UUID()
     @State private var isSubmitting = false
     @State private var clearConfirmationPresented = false
-    @FocusState private var focusedTextSegmentID: Int?
+    @State private var focusedTextSegmentID: Int?
 
     init(
         post: TaggrPost,

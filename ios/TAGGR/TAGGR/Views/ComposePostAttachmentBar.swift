@@ -84,7 +84,7 @@ struct ComposePostAttachmentBar: View {
         }
     }
 
-    private func perform(_ action: ComposeMarkdownAction) {
+    func perform(_ action: ComposeMarkdownAction) {
         switch action {
         case .bold:
             appendInline("**bold**")
@@ -99,7 +99,7 @@ struct ComposePostAttachmentBar: View {
         }
     }
 
-    private func appendInline(_ snippet: String) {
+    func appendInline(_ snippet: String) {
         if text.isEmpty || text.last?.isWhitespace == true {
             text += snippet
         } else {
@@ -118,7 +118,7 @@ struct ComposePostAttachmentBar: View {
     }
 }
 
-private enum ComposeMarkdownAction: Identifiable {
+enum ComposeMarkdownAction: Identifiable {
     case bold
     case italic
     case list
@@ -129,7 +129,7 @@ private enum ComposeMarkdownAction: Identifiable {
 
     var id: String { accessibilityLabel }
 
-    var kind: ComposeMarkdownIconKind {
+    fileprivate var kind: ComposeMarkdownIconKind {
         switch self {
         case .bold: .bold
         case .italic: .italic
@@ -150,7 +150,7 @@ private enum ComposeMarkdownAction: Identifiable {
     }
 }
 
-private enum ComposeMarkdownIconKind {
+fileprivate enum ComposeMarkdownIconKind {
     case bold
     case image
     case italic

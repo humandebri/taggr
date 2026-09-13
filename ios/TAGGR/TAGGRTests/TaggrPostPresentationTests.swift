@@ -465,6 +465,323 @@ final class TaggrQuoteTests: XCTestCase {
         XCTAssertFalse(text.string.contains(">"))
     }
 
+    @MainActor
+    private final class ComposerState: ObservableObject {
+        @Published var text = ""
+        @Published var focused: Int? = 0
+        @Published var imageTarget: Int?
+        @Published var enabled = true
+        @Published var visible = true
+        @Published var revision = 0
+        var changed: ((String) -> Void)?
+        let documentID = UUID()
+        let quotes = ComposeQuoteEditor()
+    }
+
+    private struct ComposerHarness: View {
+        @ObservedObject var state: ComposerState
+        var body: some View {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    if state.visible {
+                        ComposePostDocumentEditor(
+                            text: $state.text, draftImages: [], existingImages: [:],
+                            placeholder: "Write a post \(state.revision)", documentID: state.documentID,
+                            focusedTextSegmentID: $state.focused,
+                            imageInsertionSegmentID: $state.imageTarget,
+                            removeImage: { _, _ in }, moveImage: { _, _ in }
+                        )
+                        .disabled(!state.enabled)
+                    }
+                }
+                .padding(.horizontal, 18)
+                .padding(.top, 16)
+            }
+            .environmentObject(state.quotes)
+            .onChange(of: state.text) { _, text in state.changed?(text) }
+        }
+    }
+
+    @MainActor
+    private final class HostedComposer {
+        let state = ComposerState()
+        let host: UIHostingController<ComposerHarness>
+        let window: UIWindow
+        let previousWindow: UIWindow?
+
+        init(text: String = "") throws {
+            state.text = text
+            host = UIHostingController(rootView: ComposerHarness(state: state))
+            let scene = try XCTUnwrap(UIApplication.shared.connectedScenes.first as? UIWindowScene)
+            previousWindow = scene.windows.first(where: \.isKeyWindow)
+            window = UIWindow(windowScene: scene)
+            window.rootViewController = host
+            window.makeKeyAndVisible()
+        }
+
+        func close() {
+            window.isHidden = true
+            previousWindow?.makeKey()
+        }
+
+        private var awaitingInitialPresentation = true
+
+        func settle() async throws {
+            // Let the initial keyboard presentation finish before driving UITextInput.
+            try await Task.sleep(for: .milliseconds(awaitingInitialPresentation ? 600 : 100))
+            awaitingInitialPresentation = false
+            host.view.layoutIfNeeded()
+        }
+
+        var inputs: [UITextView] {
+            func find(_ view: UIView) -> [UITextView] {
+                if let input = view as? UITextView { return [input] }
+                return view.subviews.flatMap(find)
+            }
+            return find(host.view)
+        }
+
+        func input() throws -> UITextView { try XCTUnwrap(inputs.first) }
+    }
+
+    func testComposerWidthFocusAndMultilineLayout() async throws {
+        let fixture = try HostedComposer()
+        defer { fixture.close() }
+        try await fixture.settle()
+        let input = try fixture.input()
+        for text in ["", "abc", String(repeating: "日本語の長い行を入力して折り返しを確認します。\n", count: 8), ""] {
+            let shortHeight = input.bounds.height
+            input.selectedRange = NSRange(location: 0, length: (input.text as NSString).length)
+            input.insertText(text)
+            try await fixture.settle()
+            XCTAssertEqual(fixture.state.text, text)
+            XCTAssertEqual(input.convert(input.bounds, to: fixture.host.view).minX, 18, accuracy: 1)
+            XCTAssertEqual(input.bounds.width, fixture.host.view.bounds.width - 36, accuracy: 1)
+            XCTAssertTrue(input.isFirstResponder)
+            if text.contains("\n") { XCTAssertGreaterThan(input.bounds.height, shortHeight) }
+        }
+    }
+
+    func testComposerJapaneseCompositionSurvivesParentUpdates() async throws {
+        let fixture = try HostedComposer()
+        defer { fixture.close() }
+        try await fixture.settle()
+        let input = try fixture.input()
+        input.insertText("abc")
+        try await fixture.settle()
+        input.selectedRange = NSRange(location: 3, length: 0)
+        input.setMarkedText("にほん", selectedRange: NSRange(location: 3, length: 0))
+        XCTAssertNotNil(input.markedTextRange, "Immediately after marking")
+        XCTAssertEqual(input.text, "abcにほん", "Immediately after marking")
+        try await fixture.settle()
+        XCTAssertNotNil(input.markedTextRange, "Before parent refresh")
+        fixture.state.revision += 1
+        try await fixture.settle()
+        XCTAssertNotNil(input.markedTextRange)
+        XCTAssertEqual(input.text, "abcにほん")
+        XCTAssertTrue(input.isFirstResponder)
+        input.setMarkedText("日本", selectedRange: NSRange(location: 2, length: 0))
+        input.unmarkText()
+        input.insertText("語")
+        try await fixture.settle()
+        XCTAssertEqual(fixture.state.text, "abc日本語")
+        input.setMarkedText("とりけし", selectedRange: NSRange(location: 4, length: 0))
+        input.setMarkedText("", selectedRange: NSRange(location: 0, length: 0))
+        input.unmarkText()
+        try await fixture.settle()
+        XCTAssertEqual(fixture.state.text, "abc日本語")
+        input.selectedRange = NSRange(location: 3, length: 3)
+        fixture.state.revision += 1
+        try await fixture.settle()
+        XCTAssertEqual(input.selectedRange, NSRange(location: 3, length: 3))
+        input.insertText("😀")
+        try await fixture.settle()
+        XCTAssertEqual(fixture.state.text, "abc😀")
+    }
+
+    func testComposerRestoredMarkedTextSurvivesUpdatesWithoutSystemKeyboard() async throws {
+        let fixture = try HostedComposer(text: "abc")
+        defer { fixture.close() }
+        fixture.state.focused = nil
+        try await fixture.settle()
+        let input = try fixture.input()
+        XCTAssertFalse(input.isFirstResponder)
+        // Synthetic marked text must not compete with the live keyboard's candidate callbacks.
+        input.selectedRange = NSRange(location: 3, length: 0)
+        input.setMarkedText("にほん", selectedRange: NSRange(location: 3, length: 0))
+        fixture.state.revision += 1
+        try await fixture.settle()
+        XCTAssertNotNil(input.markedTextRange)
+        XCTAssertEqual(input.text, "abcにほん")
+        input.setMarkedText("日本", selectedRange: NSRange(location: 2, length: 0))
+        input.unmarkText()
+        input.insertText("語")
+        try await fixture.settle()
+        XCTAssertEqual(fixture.state.text, "abc日本語")
+    }
+
+    func testComposerImageSegmentFocusAndMarkerPreservation() async throws {
+        let fixture = try HostedComposer(text: "before\n![](/blob/test-image)\nafter")
+        defer { fixture.close() }
+        try await fixture.settle()
+        XCTAssertEqual(fixture.inputs.count, 2)
+        let first = try fixture.input()
+        let last = try XCTUnwrap(fixture.inputs.last)
+        XCTAssertTrue(last.becomeFirstResponder())
+        last.selectedRange = NSRange(location: (last.text as NSString).length, length: 0)
+        last.insertText(" 日本語")
+        try await fixture.settle()
+        XCTAssertEqual(fixture.state.text, "before\n![](/blob/test-image)\nafter 日本語")
+        XCTAssertTrue(last.isFirstResponder)
+        XCTAssertFalse(first.isFirstResponder)
+        XCTAssertEqual(last.bounds.width, fixture.host.view.bounds.width - 36, accuracy: 1)
+    }
+
+    func testComposerDisablesAndReopensWithoutLosingText() async throws {
+        let fixture = try HostedComposer(text: "下書き😀")
+        defer { fixture.close() }
+        try await fixture.settle()
+        let input = try fixture.input()
+        fixture.state.enabled = false
+        try await fixture.settle()
+        XCTAssertFalse(input.isEditable)
+        XCTAssertFalse(input.isFirstResponder)
+        fixture.state.enabled = true
+        try await fixture.settle()
+        XCTAssertTrue(input.isFirstResponder)
+        fixture.state.focused = nil
+        try await fixture.settle()
+        XCTAssertFalse(input.isFirstResponder)
+        fixture.state.visible = false
+        try await fixture.settle()
+        XCTAssertTrue(fixture.inputs.isEmpty)
+        fixture.state.visible = true
+        fixture.state.focused = 0
+        try await fixture.settle()
+        let reopened = try fixture.input()
+        XCTAssertEqual(reopened.text, "下書き😀")
+        XCTAssertTrue(reopened.isFirstResponder)
+        reopened.selectedRange = NSRange(location: (reopened.text as NSString).length, length: 0)
+        reopened.insertText("追記")
+        try await fixture.settle()
+        XCTAssertEqual(fixture.state.text, "下書き😀追記")
+    }
+
+    func testComposerCutPasteUndoRedo() async throws {
+        let fixture = try HostedComposer(text: "日本語😀/text")
+        defer { fixture.close() }
+        try await fixture.settle()
+        let input = try fixture.input()
+        let pasteboard = UIPasteboard.general
+        let previousItems = pasteboard.items
+        defer { pasteboard.items = previousItems }
+        input.selectedRange = NSRange(location: 0, length: 5)
+        input.cut(nil)
+        try await fixture.settle()
+        XCTAssertEqual(fixture.state.text, "/text")
+        XCTAssertEqual(pasteboard.string, "日本語😀")
+        // Supply test data explicitly; OS clipboard permission is a separate UI check.
+        // UIKit smart insertion also adds this newline in a standalone UITextView.
+        input.paste(itemProviders: [NSItemProvider(object: "日本語😀" as NSString)])
+        for _ in 0..<20 {
+            try await fixture.settle()
+            if fixture.state.text != "/text" { break }
+        }
+        XCTAssertEqual(fixture.state.text, "日本語😀\n/text")
+        let undo = try XCTUnwrap(input.undoManager)
+        XCTAssertTrue(undo.canUndo)
+        undo.undo()
+        try await fixture.settle()
+        XCTAssertEqual(fixture.state.text, "/text")
+        XCTAssertTrue(undo.canRedo)
+        undo.redo()
+        try await fixture.settle()
+        XCTAssertEqual(fixture.state.text, "日本語😀\n/text")
+    }
+
+    func testComposerToolbarPreservesAppendSemanticsAndSelection() async throws {
+        let fixture = try HostedComposer(text: "日本語😀")
+        defer { fixture.close() }
+        try await fixture.settle()
+        let input = try fixture.input()
+        input.selectedRange = NSRange(location: 0, length: 3)
+        let bar = ComposePostAttachmentBar(
+            text: Binding(get: { fixture.state.text }, set: { fixture.state.text = $0 }),
+            selectedPhotos: .constant([]), youtubeTarget: nil, insertYouTubeURL: { _ in },
+            isSubmitting: false, isImagePickerDisabled: true
+        )
+        for (action, expected) in [
+            (ComposeMarkdownAction.bold, "日本語😀 **bold**"),
+            (.italic, "日本語😀 **bold** _italic_"),
+            (.list, "日本語😀 **bold** _italic_\n- item")
+        ] {
+            bar.perform(action)
+            try await fixture.settle()
+            XCTAssertEqual(fixture.state.text, expected)
+            XCTAssertEqual(input.text, expected)
+            XCTAssertEqual(input.selectedRange, NSRange(location: 0, length: 3))
+        }
+        bar.appendInline("[example](https://example.com)")
+        try await fixture.settle()
+        XCTAssertEqual(input.text, "日本語😀 **bold** _italic_\n- item [example](https://example.com)")
+        fixture.state.quotes.quote()
+        try await fixture.settle()
+        XCTAssertEqual(fixture.state.text, "> 日本語😀 **bold** _italic_\n- item [example](https://example.com)")
+    }
+
+    func testComposerRestoredDraftEditsPersistInEachContext() async throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: "ComposerDraft-\(UUID())")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let store = PostDraftStore(rootURL: root)
+        let namespace = PostDraftNamespace(canisterID: "test", userID: 7)
+        for context in [PostDraftContext.newPost, .reply(42), .edit(42)] {
+            let session = PostDraftSession(context: context, initialText: "", initialRealm: "")
+            await session.load(store: store, namespace: namespace)
+            session.text = "**保存済み**😀"
+            await session.flush()
+            let restored = PostDraftSession(context: context, initialText: "", initialRealm: "")
+            await restored.load(store: store, namespace: namespace)
+            let fixture = try HostedComposer(text: restored.text)
+            fixture.state.changed = { restored.text = $0 }
+            defer { fixture.close() }
+            try await fixture.settle()
+            let input = try fixture.input()
+            XCTAssertEqual(input.text, "**保存済み**😀")
+            input.selectedRange = NSRange(location: (input.text as NSString).length, length: 0)
+            input.insertText("追記")
+            try await fixture.settle()
+            await restored.flush()
+            let saved = await store.load(namespace: namespace, context: context)
+            XCTAssertEqual(saved.text, "**保存済み**😀追記")
+        }
+    }
+
+    func testComposerResizesAndSupportsLargeText() async throws {
+        let fixture = try HostedComposer(text: String(repeating: "日本語の折り返し ", count: 12))
+        defer { fixture.close() }
+        try await fixture.settle()
+        let input = try fixture.input()
+        // Host the same editor at portrait and landscape widths without rotating the user's device.
+        for width: CGFloat in [320, 700] {
+            fixture.window.frame = CGRect(x: 0, y: 0, width: width, height: 700)
+            try await fixture.settle()
+            XCTAssertEqual(input.bounds.width, fixture.host.view.bounds.width - 36, accuracy: 1)
+            XCTAssertEqual(input.convert(input.bounds, to: fixture.host.view).minX, 18, accuracy: 1)
+            XCTAssertEqual(input.text, fixture.state.text)
+        }
+        let originalFont = try XCTUnwrap(input.font).pointSize
+        fixture.host.traitOverrides.preferredContentSizeCategory = .accessibilityExtraExtraExtraLarge
+        try await fixture.settle()
+        XCTAssertGreaterThan(try XCTUnwrap(input.font).pointSize, originalFont)
+        XCTAssertEqual(input.bounds.width, fixture.host.view.bounds.width - 36, accuracy: 1)
+        let attachment = XCTAttachment(image: UIGraphicsImageRenderer(bounds: fixture.host.view.bounds).image { _ in
+            fixture.host.view.drawHierarchy(in: fixture.host.view.bounds, afterScreenUpdates: true)
+        })
+        attachment.name = "Composer large text layout"
+        attachment.lifetime = .keepAlways
+        add(attachment)
+    }
+
     func testHostedEditorQuotesWithoutPriorTyping() async throws {
         let controller = ComposeQuoteEditor()
         var text = "日本語😀"
