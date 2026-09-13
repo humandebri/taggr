@@ -9,19 +9,9 @@ enum PostImageGrid {
         displayedCount(for: count) <= 1 ? 1 : 2
     }
 
-    static func visibleRows(for count: Int) -> Int {
-        let count = displayedCount(for: count)
-        guard count > 0 else { return 0 }
-        return Int(ceil(Double(count) / Double(columns(for: count))))
-    }
-
     static func displayedCount(for count: Int) -> Int {
         guard count > 0 else { return 0 }
         return min(count, maxTimelineImages)
-    }
-
-    static func visibleCount(for count: Int) -> Int {
-        displayedCount(for: count)
     }
 
     static func hiddenCount(for count: Int) -> Int {

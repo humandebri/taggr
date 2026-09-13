@@ -28,25 +28,6 @@ const hasNoPlaceholders = () => {
     ].some((placeholder) => review.includes(placeholder));
 };
 
-const deviceEvidenceComplete = () => {
-    const deviceDoc = read("ios/docs/device_verification.md");
-    return (
-        !deviceDoc.includes("TODO") &&
-        [
-            "Simulator launch: PASS",
-            "Physical device launch: PASS",
-            "Production URL load: PASS",
-            "Internet Identity continuity: PASS",
-            "Internal navigation: PASS",
-            "External navigation: PASS",
-            "Universal link: PASS",
-            "Share sheet: PASS",
-            "Offline reload UI: PASS",
-            "iPhone SE moderation reachability: PASS",
-        ].every((text) => deviceDoc.includes(text))
-    );
-};
-
 let failed = false;
 const check = (ok) => {
     if (!ok) failed = true;
@@ -88,13 +69,15 @@ const reviewOk = hasNoPlaceholders();
 console.log(`${reviewOk ? "PASS" : "FAIL"} App Review access data is filled`);
 check(reviewOk);
 
-const deviceOk = deviceEvidenceComplete();
-console.log(`${deviceOk ? "PASS" : "FAIL"} iOS device evidence is complete`);
-check(deviceOk);
+console.log(
+    "MANUAL Review device verification records separately; this command cannot attest human checks.",
+);
 
 if (failed) {
     console.error("iOS external blockers remain.");
     process.exit(1);
 }
 
-console.log("No iOS external blockers detected.");
+console.log(
+    "No automated iOS external blockers detected; manual review remains separate.",
+);

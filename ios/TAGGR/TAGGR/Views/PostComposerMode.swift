@@ -41,15 +41,7 @@ enum PostComposerMode {
         }
     }
 
-    var timelineModeAfterSubmit: TaggrFeedMode {
-        switch self {
-        case .newPost(let selectedMode):
-            return selectedMode
-        case .reply(_, let selectedMode),
-             .edit(_, let selectedMode):
-            return selectedMode
-        }
-    }
+
 
     var targetRealm: String? {
         switch self {

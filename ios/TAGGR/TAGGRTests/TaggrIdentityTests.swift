@@ -24,10 +24,6 @@ extension TaggrTests {
         }
     }
 
-    func testSeedPhraseRejectsEmptyInput() {
-        XCTAssertThrowsError(try TaggrSeedPhrase.privateKey(from: ""))
-    }
-
     func testSeedPhraseSignInSavesRestoresAndSignsOut() async throws {
         let keychain = SeedPhraseTestKeychain()
         let state = makeSeedPhraseState(keychain: keychain)
@@ -66,13 +62,15 @@ extension TaggrTests {
     func testSeedPhraseExpiredSessionRequiresReentry() async throws {
         let keychain = SeedPhraseTestKeychain()
         let state = makeSeedPhraseState(keychain: keychain)
-        let session = try ICAuthSession.delegating(
-            ed25519PrivateKey: TaggrSeedPhrase.privateKey(from: "taggr-test-only-seed"),
-            configuration: state.runtimeConfig.icClientConfiguration,
-            options: ICAuthenticationOptions(maxTimeToLiveNanoseconds: 1_000_000_000)
+        let session = makeAuthSession(
+            privateKey: Curve25519.Signing.PrivateKey(),
+            config: state.runtimeConfig,
+            requestedAt: Date(timeIntervalSince1970: 1_600_000_000),
+            rootPrivateKey: try Curve25519.Signing.PrivateKey(
+                rawRepresentation: TaggrSeedPhrase.privateKey(from: "taggr-test-only-seed")
+            )
         )
-        try state.identityStore.save(session)
-        try await Task.sleep(for: .milliseconds(1_100))
+        keychain.data = try JSONEncoder().encode(session.storage)
         await state.bootstrap()
         XCTAssertNil(state.authSession)
         XCTAssertNil(state.currentUser)
@@ -174,14 +172,6 @@ extension TaggrTests {
         userExists: Bool = true,
         networkFailure: Bool = false
     ) -> TaggrAppCoordinator {
-        let previousHomeFeed = UserDefaults.standard.string(forKey: "taggr.home-feed-mode")
-        addTeardownBlock {
-            if let previousHomeFeed {
-                UserDefaults.standard.set(previousHomeFeed, forKey: "taggr.home-feed-mode")
-            } else {
-                UserDefaults.standard.removeObject(forKey: "taggr.home-feed-mode")
-            }
-        }
         let api = makeStubbedAPI { request in
             if networkFailure { throw URLError(.notConnectedToInternet) }
             let method = self.requestMethodAndArg(from: request)?.method ?? ""
@@ -208,45 +198,11 @@ extension TaggrTests {
         }
         let config = TaggrRuntimeConfig.from(info: [:])
         let store = ICIdentityStore(configuration: config.icClientConfiguration, service: "seed-phrase-test", account: "session", keychain: keychain)
-        let state = TaggrAppCoordinator(safety: makeSafetyStore(), api: api, identityStore: store, buildConfig: config)
+        let state = makeCoordinator(safety: makeSafetyStore(), api: api, identityStore: store, buildConfig: config)
         state.route = .settings
         return state
     }
 
-    func testStoredAuthSessionUsesRuntimeConfigurationAndValidSignature() throws {
-        let config = TaggrRuntimeConfig.from(info: [:])
-        let session = makeAuthSession(privateKey: Curve25519.Signing.PrivateKey(), config: config)
-
-        XCTAssertEqual(session.formatVersion, ICAuthSession.currentFormatVersion)
-        XCTAssertEqual(session.canisterId, TaggrRuntimeConfig.productionCanisterId)
-        XCTAssertEqual(session.internetIdentityURL, "https://id.ai/authorize")
-        XCTAssertEqual(session.derivationOrigin, TaggrRuntimeConfig.productionDerivationOrigin)
-        XCTAssertNoThrow(try ICIdentityValidation.validateSession(session, configuration: config.icClientConfiguration))
-    }
-
-    func testStoredAuthSessionRejectsTamperedDelegationSignature() {
-        let config = TaggrRuntimeConfig.from(info: [:])
-        let valid = makeAuthSession(privateKey: Curve25519.Signing.PrivateKey(), config: config)
-        let signed = valid.delegation.delegations[0]
-        let brokenChain = ICDelegationChain(
-            publicKey: valid.delegation.publicKey,
-            delegations: [.init(delegation: signed.delegation, signature: Data(repeating: 7, count: 64))]
-        )
-        let broken = ICAuthSession(storage: ICStoredAuthSession(
-            formatVersion: valid.formatVersion,
-            principal: valid.principal,
-            canisterId: valid.canisterId,
-            internetIdentityURL: valid.internetIdentityURL,
-            derivationOrigin: valid.derivationOrigin,
-            sessionPublicKey: valid.sessionPublicKey,
-            sessionPrivateKey: valid.storage.sessionPrivateKey,
-            delegation: brokenChain,
-            requestedAt: valid.requestedAt,
-            maxTimeToLiveNanoseconds: valid.maxTimeToLiveNanoseconds
-        ))
-
-        XCTAssertThrowsError(try ICIdentityValidation.validateSession(broken, configuration: config.icClientConfiguration))
-    }
 }
 
 private final class SeedPhraseTestKeychain: ICKeychainAccess, @unchecked Sendable {

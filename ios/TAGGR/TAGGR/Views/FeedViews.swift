@@ -173,7 +173,7 @@ enum FeedImagePrefetchPolicy {
                 config: config,
                 bodyText: candidate.timelineBody
             )
-            let visibleCount = PostImageGrid.visibleCount(for: attachments.count)
+            let visibleCount = PostImageGrid.displayedCount(for: attachments.count)
             return Array(attachments.prefix(visibleCount))
         }
     }
@@ -215,6 +215,7 @@ enum TaggrPostPresentationCache {
 }
 
 struct FeedHeader: View {
+    @Environment(TaggrAppCoordinator.self) private var state
     let selectedMode: TaggrFeedMode
     let changeMode: (TaggrFeedMode) -> Void
     let backAction: (() -> Void)?
@@ -239,6 +240,9 @@ struct FeedHeader: View {
                 .minimumScaleFactor(0.75)
                 .layoutPriority(1)
             Spacer(minLength: 2)
+            Button("Search", systemImage: "magnifyingglass") { state.navigate(to: .search("")) }
+                .labelStyle(.iconOnly)
+                .frame(minWidth: 30, minHeight: 34)
             if !selectedMode.isFiltered {
                 HStack(spacing: 4) {
                     ChannelPill(title: "#hot", selected: selectedMode == .hot) { changeMode(.hot) }
@@ -764,126 +768,6 @@ struct PostExtensionView: View {
     }
 }
 
-struct PollExtensionView: View {
-    @Environment(TaggrAppCoordinator.self) private var state
-    let post: TaggrPost
-    let poll: TaggrPoll
-    @State private var selectedOption: Int?
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                Label("Poll", systemImage: "chart.bar.xaxis")
-                    .font(.caption.weight(.bold))
-                    .foregroundStyle(TaggrTheme.secondaryText)
-                Spacer()
-                Text(totalVotes == 1 ? "1 vote" : "\(totalVotes) votes")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(TaggrTheme.secondaryText)
-            }
-            ForEach(Array(poll.options.enumerated()), id: \.offset) { index, option in
-                PollOptionRow(
-                    title: option,
-                    votes: poll.votes[index]?.count ?? 0,
-                    total: totalVotes,
-                    selected: selectedOption == index,
-                    selectable: canVote
-                ) {
-                    guard canVote else { return }
-                    selectedOption = index
-                }
-            }
-            if canVote {
-                HStack(spacing: 10) {
-                    Button("Vote") {
-                        vote(anonymously: false)
-                    }
-                    .disabled(selectedOption == nil)
-                    Button("Vote anonymously") {
-                        vote(anonymously: true)
-                    }
-                    .disabled(selectedOption == nil)
-                }
-                .font(.caption.weight(.bold))
-                .foregroundStyle(TaggrTheme.clickable)
-            }
-        }
-        .padding(12)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(TaggrTheme.panel)
-        .clipShape(RoundedRectangle(cornerRadius: 8))
-    }
-
-    var totalVotes: Int {
-        poll.votes.values.reduce(0) { $0 + $1.count }
-    }
-
-    var canVote: Bool {
-        guard let userId = state.currentUser?.id else { return false }
-        if poll.deadline > 0, Date().timeIntervalSince1970 > Double(poll.deadline) {
-            return false
-        }
-        if !poll.voters.contains(userId) {
-            return true
-        }
-        let revoteHours = state.cache?.config?.pollRevoteDeadlineHours ?? 0
-        guard revoteHours > 0 else { return false }
-        let postAgeSeconds = Date().timeIntervalSince1970 - (Double(post.timestamp.value) / 1_000_000_000)
-        return postAgeSeconds <= Double(revoteHours * 3600)
-    }
-
-    func vote(anonymously: Bool) {
-        guard let selectedOption else { return }
-        Task { await state.voteOnPoll(postId: post.id, option: selectedOption, anonymously: anonymously) }
-    }
-}
-
-struct PollOptionRow: View {
-    let title: String
-    let votes: Int
-    let total: Int
-    let selected: Bool
-    let selectable: Bool
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            VStack(alignment: .leading, spacing: 6) {
-                HStack {
-                    Text(title)
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(TaggrTheme.text)
-                        .lineLimit(2)
-                    Spacer()
-                    Text("\(percentage)%")
-                        .font(.caption.weight(.bold))
-                        .foregroundStyle(TaggrTheme.secondaryText)
-                }
-                GeometryReader { geometry in
-                    ZStack(alignment: .leading) {
-                        Capsule()
-                            .fill(TaggrTheme.panelRaised)
-                        Capsule()
-                            .fill(selected ? TaggrTheme.accent : TaggrTheme.secondaryText.opacity(0.55))
-                            .frame(width: geometry.size.width * CGFloat(percentage) / 100)
-                    }
-                }
-                .frame(height: 6)
-            }
-            .padding(10)
-            .background(selected ? TaggrTheme.accent.opacity(0.22) : TaggrTheme.panelRaised.opacity(0.65))
-            .clipShape(RoundedRectangle(cornerRadius: 8))
-        }
-        .buttonStyle(.plain)
-        .disabled(!selectable)
-    }
-
-    var percentage: Int {
-        guard total > 0 else { return 0 }
-        return Int((Double(votes) / Double(total) * 100).rounded())
-    }
-}
-
 struct RepostExtensionView: View {
     @Environment(TaggrAppCoordinator.self) private var state
     let postId: Int
@@ -939,7 +823,7 @@ struct ProposalExtensionView: View {
 
     var body: some View {
         Button {
-            state.navigateToPost(postId)
+            state.navigate(to: .proposal(proposalId))
         } label: {
             HStack(spacing: 10) {
                 Image(systemName: "checklist")
@@ -997,9 +881,6 @@ struct TaggrYouTubePreview: Identifiable {
         return cache
     }()
 
-    var thumbnailURL: URL {
-        URL(string: "https://img.youtube.com/vi/\(id)/hqdefault.jpg")!
-    }
 
     @MainActor
     static func previews(in text: String) -> [TaggrYouTubePreview] {

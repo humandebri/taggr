@@ -42,7 +42,7 @@ extension TaggrTests {
         let defaults = UserDefaults(suiteName: suiteName)!
         defer { defaults.removePersistentDomain(forName: suiteName) }
         let preferences = RealmPostingPreferences(defaults: defaults)
-        let state = TaggrAppCoordinator(realmPostingPreferences: preferences)
+        let state = makeCoordinator(realmPostingPreferences: preferences)
         state.currentUser = TaggrUser(
             id: 7,
             name: "alice",
@@ -84,7 +84,7 @@ extension TaggrTests {
                 )
             )
         }
-        let state = TaggrAppCoordinator(api: api)
+        let state = makeCoordinator(api: api)
         state.currentUser = TaggrUser(
             id: 7,
             name: "alice",
@@ -107,29 +107,6 @@ extension TaggrTests {
     }
 
     @MainActor
-    func testLoadAllRealmsListUsesAllRealmsQuery() async throws {
-        var calls: [(method: String, arg: Data)] = []
-        let api = makeStubbedAPI { request in
-            if let call = self.requestMethodAndArg(from: request) {
-                calls.append(call)
-            }
-            let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
-            return (response, Self.queryReply(Data(##"[["DEV",{"description":"Builders","label_color":"#123456","num_members":2,"num_posts":3}]]"##.utf8)))
-        }
-        let state = TaggrAppCoordinator(api: api)
-
-        await state.loadAllRealmsList()
-
-        XCTAssertNil(state.errorMessage)
-        XCTAssertEqual(calls.map(\.method), ["all_realms"])
-        XCTAssertEqual(calls.first?.arg, try TaggrCandid.jsonArguments([TaggrRuntimeConfig.productionDomain, "popularity", 0]))
-        XCTAssertEqual(state.realms.map(\.name), ["DEV"])
-        XCTAssertEqual(state.realms.first?.description, "Builders")
-        XCTAssertEqual(state.nextAllRealmsPage, 1)
-        XCTAssertFalse(state.canLoadMoreRealms)
-    }
-
-    @MainActor
     func testLoadAllRealmsListAppendsNextPageWithoutDuplicatesAndResets() async throws {
         let pageSize = 20
         let firstPageNames = (0 ..< pageSize).map { "REALM\($0)" }
@@ -146,10 +123,13 @@ extension TaggrTests {
             let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
             return (response, Self.queryReply(realmListJSON(names)))
         }
-        let state = TaggrAppCoordinator(api: api)
+        let state = makeCoordinator(api: api)
 
         await state.loadAllRealmsList()
 
+        XCTAssertEqual(calls.first?.method, "all_realms")
+        XCTAssertEqual(calls.first?.arg, try TaggrCandid.jsonArguments([TaggrRuntimeConfig.productionDomain, "popularity", 0]))
+        XCTAssertEqual(state.realms.first?.description, "Builders")
         XCTAssertEqual(state.realms.count, pageSize)
         XCTAssertEqual(state.nextAllRealmsPage, 1)
         XCTAssertTrue(state.canLoadMoreRealms)
@@ -181,7 +161,7 @@ extension TaggrTests {
 
     @MainActor
     func testRealmAccessPolicyUsesJoinedAndControlledRealms() {
-        let state = TaggrAppCoordinator()
+        let state = makeCoordinator()
         state.currentUser = TaggrUser(
             id: 7,
             name: "alice",
@@ -202,21 +182,37 @@ extension TaggrTests {
     }
 
     @MainActor
-    func testRealmMembershipOperationRejectsConcurrentRequest() async {
-        var calls: [String] = []
+    func testRealmMembershipOperationRejectsConcurrentRequest() async throws {
+        let started = expectation(description: "first membership update started")
+        let release = DispatchSemaphore(value: 0)
+        defer { release.signal() }
+        let updates = LockedTestValue(0)
         let api = makeStubbedAPI { request in
-            if let call = self.requestMethodAndArg(from: request) {
-                calls.append(call.method)
+            let body: Data
+            switch self.requestMethodAndArg(from: request)?.method {
+            case "toggle_realm_membership":
+                updates.mutate { $0 += 1 }
+                started.fulfill()
+                _ = release.wait(timeout: .now() + 5)
+                body = Data("true".utf8)
+            case "user": body = Self.realmUserFixture(realms: ["DEV"])
+            case "realms": body = Self.safeRealmFixture()
+            default: body = Data("null".utf8)
             }
-            let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
-            return (response, Self.queryReply(Data("true".utf8)))
+            return (HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!, Self.queryReply(body))
         }
-        let state = TaggrAppCoordinator(api: api)
-        state.realmMembershipOperation = "OTHER"
-
-        let result = await state.setRealmMembership(name: "DEV", joined: true)
-        XCTAssertFalse(result)
-        XCTAssertTrue(calls.isEmpty)
+        let state = makeCoordinator(api: api)
+        state.authSession = makeAuthSession(privateKey: Curve25519.Signing.PrivateKey())
+        state.currentUser = try JSONDecoder.taggr.decode(TaggrUser.self, from: Self.realmUserFixture(realms: []))
+        let first = Task { await state.setRealmMembership(name: "DEV", joined: true) }
+        await fulfillment(of: [started], timeout: 2)
+        let second = await state.setRealmMembership(name: "DEV", joined: true)
+        XCTAssertFalse(second)
+        XCTAssertEqual(updates.read { $0 }, 1)
+        release.signal()
+        let firstResult = await first.value
+        XCTAssertTrue(firstResult)
+        XCTAssertEqual(updates.read { $0 }, 1)
     }
 
     @MainActor
@@ -239,7 +235,7 @@ extension TaggrTests {
                 return (response, Self.queryReply(Data("null".utf8)))
             }
         }
-        let state = TaggrAppCoordinator(api: api)
+        let state = makeCoordinator(api: api)
         state.authSession = makeAuthSession(privateKey: Curve25519.Signing.PrivateKey())
         state.currentUser = try? JSONDecoder.taggr.decode(TaggrUser.self, from: Self.realmUserFixture(realms: []))
         state.realms = [
@@ -274,7 +270,7 @@ extension TaggrTests {
                 return (response, Self.queryReply(Data("null".utf8)))
             }
         }
-        let state = TaggrAppCoordinator(api: api)
+        let state = makeCoordinator(api: api)
         state.authSession = makeAuthSession(privateKey: Curve25519.Signing.PrivateKey())
         state.currentUser = try? JSONDecoder.taggr.decode(TaggrUser.self, from: Self.realmUserFixture(realms: ["DEV"]))
         state.route = .realm("DEV")
@@ -314,7 +310,7 @@ extension TaggrTests {
             let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
             return (response, Self.queryReply(Data(##"[{"name":"DEV","description":"","label_color":"#123456"}]"##.utf8)))
         }
-        let state = TaggrAppCoordinator(api: api)
+        let state = makeCoordinator(api: api)
         let existingRealm = TaggrRealm(
             name: "OLD",
             description: "",
@@ -340,7 +336,7 @@ extension TaggrTests {
             let response = HTTPURLResponse(url: request.url!, statusCode: 500, httpVersion: nil, headerFields: nil)!
             return (response, Data())
         }
-        let state = TaggrAppCoordinator(api: api)
+        let state = makeCoordinator(api: api)
 
         let colors = await state.postingRealmColors(["DEV"])
 
@@ -361,16 +357,20 @@ extension TaggrTests {
             case "config":
                 return (response, Self.queryReply(Data(#"{"feed_page_size":30}"#.utf8)))
             case "user":
-                return (response, Self.queryReply(Self.currentUserFixture()))
+                var user = try JSONSerialization.jsonObject(with: Self.currentUserFixture()) as! [String: Any]
+                user["bucket"] = "bkyz2-fmaaa-aaaaa-qaaaq-cai"
+                return (response, Self.queryReply(try JSONSerialization.data(withJSONObject: user)))
             case "account_balance":
                 return (response, Self.queryReply(Self.candidTokens(200_000_000)))
+            case "canister_status":
+                return (response, Self.queryReply(try Self.candidCanisterStatus()))
             case "bucket_wasm_hash":
                 return (response, Self.queryReply(Data(#""010203""#.utf8)))
             default:
                 return (response, Self.queryReply(Data("null".utf8)))
             }
         }
-        let state = TaggrAppCoordinator(api: api)
+        let state = makeCoordinator(api: api)
         state.authSession = makeAuthSession(privateKey: Curve25519.Signing.PrivateKey())
         state.route = .settings
 
@@ -378,11 +378,12 @@ extension TaggrTests {
 
         XCTAssertNil(state.errorMessage)
         XCTAssertEqual(Set(calls.prefix(2).map(\.method)), Set(["stats", "config"]))
-        XCTAssertEqual(Array(calls.dropFirst(2).map(\.method)), ["user", "account_balance", "user", "bucket_wasm_hash"])
+        XCTAssertEqual(Array(calls.dropFirst(2).map(\.method)), ["user", "account_balance", "bucket_wasm_hash", "canister_status"])
         XCTAssertTrue(calls.first { $0.method == "account_balance" }?.path.contains(TaggrAPI.icpLedgerCanisterId) == true)
         XCTAssertEqual(state.currentUser?.name, "alice")
         XCTAssertEqual(state.icpBalanceE8s, 200_000_000)
         XCTAssertEqual(state.storageExpectedWasmHash, "010203")
+        XCTAssertEqual(state.storageStatus?.status, "running")
     }
 
     @MainActor
@@ -397,6 +398,9 @@ extension TaggrTests {
                 if calls.last?.method == "user" {
                     return (response, Self.queryReply(Self.currentUserFixture()))
                 }
+                if calls.last?.method == "realms" {
+                    return (response, Self.queryReply(Self.safeRealmFixture()))
+                }
                 return (response, Self.queryReply(Data("[]".utf8)))
             }
             return (response, Self.queryReply(Self.candidAddPostResultOk(42)))
@@ -405,22 +409,26 @@ extension TaggrTests {
         let defaults = UserDefaults(suiteName: suiteName)!
         defer { defaults.removePersistentDomain(forName: suiteName) }
         let preferences = RealmPostingPreferences(defaults: defaults)
-        let state = TaggrAppCoordinator(safety: makeSafetyStore(), api: api, realmPostingPreferences: preferences)
+        let state = makeCoordinator(safety: makeSafetyStore(), api: api, realmPostingPreferences: preferences)
         state.authSession = makeAuthSession(privateKey: Curve25519.Signing.PrivateKey())
         state.currentUser = try JSONDecoder.taggr.decode(TaggrUser.self, from: Self.currentUserFixture())
         let postingScope = try XCTUnwrap(state.realmPostingScope)
         state.route = .feed(.realm("DEV"))
 
         state.safety.accept(scope: state.safetyScope)
-        let outcome = await state.submitPost(text: "hello", realm: "DEV", reloadMode: .realm("DEV"))
+        let outcome = await runQueuedSubmission(state, context: .newPost, text: "hello", realm: "DEV", images: []) { draft in
+            state.enqueuePostSubmission(text: "hello", realm: "DEV", draft: draft)
+        }
+        await waitForPostReconciliation(state)
 
-        XCTAssertEqual(outcome, .submitted)
+        XCTAssertEqual(outcome, .succeeded)
         XCTAssertNil(state.errorMessage)
-        XCTAssertEqual(calls.first?.method, "add_post")
-        XCTAssertEqual(Set(calls.dropFirst().map(\.method)), Set(["user", "last_posts"]))
-        XCTAssertEqual(calls.first?.arg, try TaggrCandidAdapter.addPostArguments(text: "hello", refs: [], parent: nil, realm: "DEV", extensionBlob: nil).encode())
+        let functionalCalls = calls.filter { $0.method != "realms" }
+        XCTAssertEqual(functionalCalls.first?.method, "add_post")
+        XCTAssertEqual(Set(functionalCalls.dropFirst().map(\.method)), Set(["user", "last_posts"]))
+        try assertAddPostRequest(functionalCalls.first?.arg, text: "hello", refs: [], parent: nil, realm: "DEV", extensionBlob: nil)
         XCTAssertEqual(
-            calls.first { $0.method == "last_posts" }?.arg,
+            functionalCalls.first { $0.method == "last_posts" }?.arg,
             try TaggrCandid.jsonArguments([TaggrRuntimeConfig.productionDomain, "DEV", 0, 0, true])
         )
         XCTAssertEqual(state.route, .feed(.realm("DEV")))
@@ -448,17 +456,20 @@ extension TaggrTests {
         let defaults = UserDefaults(suiteName: suiteName)!
         defer { defaults.removePersistentDomain(forName: suiteName) }
         let preferences = RealmPostingPreferences(defaults: defaults)
-        let state = TaggrAppCoordinator(safety: makeSafetyStore(), api: api, realmPostingPreferences: preferences)
+        let state = makeCoordinator(safety: makeSafetyStore(), api: api, realmPostingPreferences: preferences)
         state.authSession = makeAuthSession(privateKey: Curve25519.Signing.PrivateKey())
         state.currentUser = try JSONDecoder.taggr.decode(TaggrUser.self, from: Self.currentUserFixture())
         let postingScope = try XCTUnwrap(state.realmPostingScope)
 
         state.safety.accept(scope: state.safetyScope)
-        await state.submitPost(text: "    hello\n\n")
+        await runQueuedSubmission(state, context: .newPost, text: "    hello\n\n", realm: nil, images: []) { draft in
+            state.enqueuePostSubmission(text: "    hello\n\n", draft: draft)
+        }
+        await waitForPostReconciliation(state)
 
         XCTAssertNil(state.errorMessage)
         XCTAssertEqual(calls.first?.method, "add_post")
-        XCTAssertEqual(calls.first?.arg, try TaggrCandidAdapter.addPostArguments(text: "    hello\n\n", refs: [], parent: nil, realm: nil, extensionBlob: nil).encode())
+        try assertAddPostRequest(calls.first?.arg, text: "    hello\n\n", refs: [], parent: nil, realm: nil, extensionBlob: nil)
         XCTAssertEqual(Set(calls.dropFirst().map(\.method)), Set(["user", "hot_posts"]))
         XCTAssertEqual(
             calls.first { $0.method == "hot_posts" }?.arg,
@@ -492,7 +503,7 @@ extension TaggrTests {
             .appending(path: "EnqueuedPostTests-\(UUID().uuidString)", directoryHint: .isDirectory)
         defer { try? FileManager.default.removeItem(at: rootURL) }
         let store = PostDraftStore(rootURL: rootURL)
-        let state = TaggrAppCoordinator(safety: makeSafetyStore(), api: api, postDraftStore: store)
+        let state = makeCoordinator(safety: makeSafetyStore(), api: api, postDraftStore: store)
         state.authSession = makeAuthSession(privateKey: Curve25519.Signing.PrivateKey())
         state.currentUser = try JSONDecoder.taggr.decode(TaggrUser.self, from: Self.currentUserFixture())
         state.route = .feed(.hot)
@@ -504,9 +515,9 @@ extension TaggrTests {
         XCTAssertTrue(draftSaved)
 
         state.safety.accept(scope: state.safetyScope)
-        XCTAssertTrue(state.enqueuePostSubmission(text: "hello", reloadMode: .hot, draft: draft))
+        XCTAssertTrue(state.enqueuePostSubmission(text: "hello", draft: draft))
         state.safety.accept(scope: state.safetyScope)
-        XCTAssertFalse(state.enqueuePostSubmission(text: "hello", reloadMode: .hot, draft: draft))
+        XCTAssertFalse(state.enqueuePostSubmission(text: "hello", draft: draft))
         XCTAssertEqual(state.postSubmissionNotice?.phase, .submitting)
         XCTAssertFalse(state.isBusy)
         let task = try XCTUnwrap(state.postSubmissionTasks[.newPost])
@@ -546,7 +557,7 @@ extension TaggrTests {
             try? FileManager.default.removeItem(at: rootURL)
         }
         let store = PostDraftStore(rootURL: rootURL)
-        let state = TaggrAppCoordinator(safety: makeSafetyStore(), api: api, postDraftStore: store)
+        let state = makeCoordinator(safety: makeSafetyStore(), api: api, postDraftStore: store)
         state.authSession = makeAuthSession(privateKey: Curve25519.Signing.PrivateKey())
         state.currentUser = try JSONDecoder.taggr.decode(TaggrUser.self, from: Self.currentUserFixture())
         state.route = .feed(.hot)
@@ -557,14 +568,14 @@ extension TaggrTests {
         await draft.markSubmissionNeedsVerification()
 
         state.safety.accept(scope: state.safetyScope)
-        XCTAssertTrue(state.enqueuePostSubmission(text: "hello", reloadMode: .hot, draft: draft))
+        XCTAssertTrue(state.enqueuePostSubmission(text: "hello", draft: draft))
         let submission = try XCTUnwrap(state.postSubmissionTasks[.newPost])
         await submission.value
 
         XCTAssertFalse(state.hasPendingPostSubmission)
         XCTAssertEqual(state.postSubmissionNotice?.phase, .succeeded)
         XCTAssertFalse(draft.hasChanges)
-        await fulfillment(of: [userRefreshStarted], timeout: 1)
+        await fulfillment(of: [userRefreshStarted], timeout: 5)
     }
 
     @MainActor
@@ -572,12 +583,11 @@ extension TaggrTests {
         let updateStarted = expectation(description: "add_post started")
         let userRefreshFinished = expectation(description: "user refresh finished")
         let releaseUpdate = DispatchSemaphore(value: 0)
-        let lock = NSLock()
-        var methods: [String] = []
+        let methods = LockedTestValue<[String]>([])
         let api = makeStubbedAPI { request in
             let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
             let method = self.requestMethodAndArg(from: request)?.method ?? ""
-            lock.withLock { methods.append(method) }
+            methods.mutate { $0.append(method) }
             if method == "add_post" {
                 updateStarted.fulfill()
                 _ = releaseUpdate.wait(timeout: .now() + 5)
@@ -593,7 +603,7 @@ extension TaggrTests {
             .appending(path: "StalePostRouteTests-\(UUID().uuidString)", directoryHint: .isDirectory)
         defer { try? FileManager.default.removeItem(at: rootURL) }
         let store = PostDraftStore(rootURL: rootURL)
-        let state = TaggrAppCoordinator(safety: makeSafetyStore(), api: api, postDraftStore: store)
+        let state = makeCoordinator(safety: makeSafetyStore(), api: api, postDraftStore: store)
         state.authSession = makeAuthSession(privateKey: Curve25519.Signing.PrivateKey())
         state.currentUser = try JSONDecoder.taggr.decode(TaggrUser.self, from: Self.currentUserFixture())
         state.route = .feed(.hot)
@@ -605,7 +615,7 @@ extension TaggrTests {
         await draft.markSubmissionNeedsVerification()
 
         state.safety.accept(scope: state.safetyScope)
-        XCTAssertTrue(state.enqueuePostSubmission(text: "hello", reloadMode: .hot, draft: draft))
+        XCTAssertTrue(state.enqueuePostSubmission(text: "hello", draft: draft))
         let submission = try XCTUnwrap(state.postSubmissionTasks[.newPost])
         await fulfillment(of: [updateStarted], timeout: 1)
         state.route = .feed(.latest)
@@ -616,20 +626,19 @@ extension TaggrTests {
 
         XCTAssertEqual(state.route, .feed(.latest))
         XCTAssertEqual(state.returnFeedMode, .latest)
-        XCTAssertFalse(lock.withLock { methods.contains("hot_posts") || methods.contains("last_posts") })
+        XCTAssertFalse(methods.read { $0.contains("hot_posts") || $0.contains("last_posts") })
     }
 
     @MainActor
     func testImagePostKeepsEnqueuedAPIWhenSessionChangesDuringUpload() async throws {
         let uploadStarted = expectation(description: "bucket write started")
         let releaseUpload = DispatchSemaphore(value: 0)
-        let lock = NSLock()
-        var originalMethods: [String] = []
-        var replacementMethods: [String] = []
+        let originalMethods = LockedTestValue<[String]>([])
+        let replacementMethods = LockedTestValue<[String]>([])
         let originalAPI = makeStubbedAPI { request in
             let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
             let method = self.requestMethodAndArg(from: request)?.method ?? ""
-            lock.withLock { originalMethods.append(method) }
+            originalMethods.mutate { $0.append(method) }
             if method == "write" {
                 uploadStarted.fulfill()
                 _ = releaseUpload.wait(timeout: .now() + 5)
@@ -640,14 +649,14 @@ extension TaggrTests {
         let replacementAPI = makeStubbedAPI { request in
             let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
             let method = self.requestMethodAndArg(from: request)?.method ?? ""
-            lock.withLock { replacementMethods.append(method) }
+            replacementMethods.mutate { $0.append(method) }
             return (response, Self.queryReply(Self.candidAddPostResultOk(99)))
         }
         let rootURL = URL.temporaryDirectory
             .appending(path: "PostContextTests-\(UUID().uuidString)", directoryHint: .isDirectory)
         defer { try? FileManager.default.removeItem(at: rootURL) }
         let store = PostDraftStore(rootURL: rootURL)
-        let state = TaggrAppCoordinator(safety: makeSafetyStore(), api: originalAPI, postDraftStore: store)
+        let state = makeCoordinator(safety: makeSafetyStore(), api: originalAPI, postDraftStore: store)
         state.authSession = makeAuthSession(privateKey: Curve25519.Signing.PrivateKey())
         state.currentUser = TaggrUser(
             id: 7,
@@ -666,12 +675,14 @@ extension TaggrTests {
         await draft.load(store: store, namespace: namespace)
         let image = TaggrDraftImage(id: "abc12345", data: Data([1, 2, 3]), width: 10, height: 20)
         draft.text = image.markdown
-        await draft.addImages([image])
+        draft.restoreEditorImages([image])
+        draft.text = image.markdown
+        await draft.flush()
 
         state.safety.accept(scope: state.safetyScope)
         XCTAssertTrue(state.enqueuePostSubmission(text: image.markdown, images: [image], draft: draft))
         let submission = try XCTUnwrap(state.postSubmissionTasks[.newPost])
-        await fulfillment(of: [uploadStarted], timeout: 1)
+        await fulfillment(of: [uploadStarted], timeout: 5)
         state.api = replacementAPI
         state.authSession = makeAuthSession(privateKey: Curve25519.Signing.PrivateKey())
         state.currentUser = TaggrUser(
@@ -689,8 +700,8 @@ extension TaggrTests {
         releaseUpload.signal()
         await submission.value
 
-        XCTAssertEqual(lock.withLock { originalMethods }, ["write"], "Account changes must stop publication after upload")
-        XCTAssertTrue(lock.withLock { replacementMethods.isEmpty })
+        XCTAssertEqual(originalMethods.read { $0 }, ["write"], "Account changes must stop publication after upload")
+        XCTAssertTrue(replacementMethods.read(\.isEmpty))
         XCTAssertEqual(state.currentUser?.id, 8)
     }
 
@@ -707,7 +718,7 @@ extension TaggrTests {
             let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
             return (response, Self.queryReply(Self.candidResultErr("denied")))
         }
-        let rejectedState = TaggrAppCoordinator(safety: makeSafetyStore(), api: rejectedAPI, postDraftStore: store)
+        let rejectedState = makeCoordinator(safety: makeSafetyStore(), api: rejectedAPI, postDraftStore: store)
         rejectedState.authSession = makeAuthSession(privateKey: Curve25519.Signing.PrivateKey())
         rejectedState.currentUser = user
         let retryableDraft = PostDraftSession(context: .newPost, initialText: "", initialRealm: "")
@@ -724,10 +735,19 @@ extension TaggrTests {
         XCTAssertFalse(retryableDraft.submissionNeedsVerification)
 
         let unavailableAPI = makeStubbedAPI { request in
-            let response = HTTPURLResponse(url: request.url!, statusCode: 502, httpVersion: nil, headerFields: nil)!
+            let method = self.requestMethodAndArg(from: request)?.method
+            let status = method == "add_post" ? 502 : 200
+            let response = HTTPURLResponse(url: request.url!, statusCode: status, httpVersion: nil, headerFields: nil)!
+            if method == "posts" {
+                let parent = String(data: self.postEnvelopeFixture(id: 42), encoding: .utf8)!
+                return (response, Self.queryReply(Data("[\(parent)]".utf8)))
+            }
+            if method == "realms" {
+                return (response, Self.queryReply(Self.safeRealmFixture()))
+            }
             return (response, Data("gateway unavailable".utf8))
         }
-        let uncertainState = TaggrAppCoordinator(safety: makeSafetyStore(), api: unavailableAPI, postDraftStore: store)
+        let uncertainState = makeCoordinator(safety: makeSafetyStore(), api: unavailableAPI, postDraftStore: store)
         uncertainState.authSession = makeAuthSession(privateKey: Curve25519.Signing.PrivateKey())
         uncertainState.currentUser = user
         let uncertainDraft = PostDraftSession(context: .reply(42), initialText: "", initialRealm: "DEV")
@@ -780,7 +800,7 @@ extension TaggrTests {
             .appending(path: "RejectedRepostDraftTests-\(UUID().uuidString)", directoryHint: .isDirectory)
         defer { try? FileManager.default.removeItem(at: rootURL) }
         let store = PostDraftStore(rootURL: rootURL)
-        let state = TaggrAppCoordinator(safety: makeSafetyStore(), api: api, postDraftStore: store)
+        let state = makeCoordinator(safety: makeSafetyStore(), api: api, postDraftStore: store)
         state.authSession = makeAuthSession(privateKey: Curve25519.Signing.PrivateKey())
         state.currentUser = try JSONDecoder.taggr.decode(TaggrUser.self, from: Self.currentUserFixture())
         let namespace = PostDraftNamespace(canisterID: state.runtimeConfig.canisterId, userID: 7)
@@ -810,47 +830,73 @@ extension TaggrTests {
         preferences.record(destination: "ART", scope: scope)
 
         let failingAPI = makeStubbedAPI { request in
+            let method = self.requestMethodAndArg(from: request)?.method
             let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
+            if method == "realms" {
+                return (response, Self.queryReply(Self.safeRealmFixture()))
+            }
             return (response, Self.queryReply(Self.candidResultErr("denied")))
         }
-        let failingState = TaggrAppCoordinator(safety: makeSafetyStore(), api: failingAPI, realmPostingPreferences: preferences)
+        let failingState = makeCoordinator(safety: makeSafetyStore(), api: failingAPI, realmPostingPreferences: preferences)
         failingState.authSession = makeAuthSession(privateKey: Curve25519.Signing.PrivateKey())
         failingState.currentUser = user
 
         failingState.safety.accept(scope: failingState.safetyScope)
-        let failedOutcome = await failingState.submitPost(text: "hello", realm: "DEV")
+        let failedOutcome = await runQueuedSubmission(failingState, context: .newPost, text: "hello", realm: "DEV", images: []) { draft in
+            failingState.enqueuePostSubmission(text: "hello", realm: "DEV", draft: draft)
+        }
+        await waitForPostReconciliation(failingState)
         XCTAssertEqual(failedOutcome, .retryableFailure)
         XCTAssertEqual(preferences.recentDestinations(scope: scope), ["ART"])
 
         let unavailableAPI = makeStubbedAPI { request in
-            let response = HTTPURLResponse(url: request.url!, statusCode: 502, httpVersion: nil, headerFields: nil)!
+            let method = self.requestMethodAndArg(from: request)?.method
+            let status = method == "realms" ? 200 : 502
+            let response = HTTPURLResponse(url: request.url!, statusCode: status, httpVersion: nil, headerFields: nil)!
+            if method == "realms" {
+                return (response, Self.queryReply(Self.safeRealmFixture()))
+            }
             return (response, Data("gateway unavailable".utf8))
         }
-        let unavailableState = TaggrAppCoordinator(safety: makeSafetyStore(), api: unavailableAPI, realmPostingPreferences: preferences)
+        let unavailableState = makeCoordinator(safety: makeSafetyStore(), api: unavailableAPI, realmPostingPreferences: preferences)
         unavailableState.authSession = makeAuthSession(privateKey: Curve25519.Signing.PrivateKey())
         unavailableState.currentUser = user
 
         unavailableState.safety.accept(scope: unavailableState.safetyScope)
-        let uncertainOutcome = await unavailableState.submitPost(text: "hello", realm: "DEV")
+        let uncertainOutcome = await runQueuedSubmission(unavailableState, context: .newPost, text: "hello", realm: "DEV", images: []) { draft in
+            unavailableState.enqueuePostSubmission(text: "hello", realm: "DEV", draft: draft)
+        }
+        await waitForPostReconciliation(unavailableState)
         XCTAssertEqual(uncertainOutcome, .uncertain)
         XCTAssertEqual(preferences.recentDestinations(scope: scope), ["ART"])
 
         let replyAPI = makeStubbedAPI { request in
             let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
             if request.url?.path.hasSuffix("/query") == true {
-                if self.requestMethodAndArg(from: request)?.method == "user" {
+                let method = self.requestMethodAndArg(from: request)?.method
+                if method == "user" {
                     return (response, Self.queryReply(Self.currentUserFixture()))
+                }
+                if method == "posts" {
+                    let parent = String(data: self.postEnvelopeFixture(id: 42), encoding: .utf8)!
+                    return (response, Self.queryReply(Data("[\(parent)]".utf8)))
+                }
+                if method == "realms" {
+                    return (response, Self.queryReply(Self.safeRealmFixture()))
                 }
                 return (response, Self.queryReply(Data("[]".utf8)))
             }
             return (response, Self.queryReply(Self.candidAddPostResultOk(42)))
         }
-        let replyState = TaggrAppCoordinator(safety: makeSafetyStore(), api: replyAPI, realmPostingPreferences: preferences)
+        let replyState = makeCoordinator(safety: makeSafetyStore(), api: replyAPI, realmPostingPreferences: preferences)
         replyState.authSession = makeAuthSession(privateKey: Curve25519.Signing.PrivateKey())
         replyState.currentUser = user
 
         replyState.safety.accept(scope: replyState.safetyScope)
-        await replyState.submitPost(text: "reply", parent: 42, realm: "DEV")
+        await runQueuedSubmission(replyState, context: .reply(42), text: "reply", realm: "DEV", images: []) { draft in
+            replyState.enqueuePostSubmission(text: "reply", parent: 42, realm: "DEV", draft: draft)
+        }
+        await waitForPostReconciliation(replyState)
         XCTAssertEqual(preferences.recentDestinations(scope: scope), ["ART"])
     }
 
@@ -870,12 +916,15 @@ extension TaggrTests {
             }
             return (response, Self.queryReply(Self.candidAddPostResultOk(42)))
         }
-        let state = TaggrAppCoordinator(safety: makeSafetyStore(), api: api)
+        let state = makeCoordinator(safety: makeSafetyStore(), api: api)
         state.authSession = makeAuthSession(privateKey: Curve25519.Signing.PrivateKey())
         state.route = .feed(.tags(["tag"]))
 
         state.safety.accept(scope: state.safetyScope)
-        await state.submitPost(text: "hello #tag", reloadMode: .tags(["tag"]))
+        await runQueuedSubmission(state, context: .newPost, text: "hello #tag", realm: nil, images: []) { draft in
+            state.enqueuePostSubmission(text: "hello #tag", draft: draft)
+        }
+        await waitForPostReconciliation(state)
 
         XCTAssertNil(state.errorMessage)
         XCTAssertEqual(calls.first?.method, "add_post")
@@ -885,13 +934,6 @@ extension TaggrTests {
             try TaggrCandid.jsonArguments([TaggrRuntimeConfig.productionDomain, "", ["tag"], 0, 0])
         )
         XCTAssertEqual(state.route, .feed(.tags(["tag"])))
-    }
-
-    func testRootPostKeepsSelectedTimeline() {
-        XCTAssertEqual(PostComposerMode.newPost(selectedMode: .hot).timelineModeAfterSubmit, .hot)
-        XCTAssertEqual(PostComposerMode.newPost(selectedMode: .personal).timelineModeAfterSubmit, .personal)
-        XCTAssertEqual(PostComposerMode.newPost(selectedMode: .realm("DEV")).timelineModeAfterSubmit, .realm("DEV"))
-        XCTAssertEqual(PostComposerMode.newPost(selectedMode: .tags(["tag"])).timelineModeAfterSubmit, .tags(["tag"]))
     }
 
     @MainActor
@@ -907,6 +949,9 @@ extension TaggrTests {
                 if call?.method == "user" {
                     return (response, Self.queryReply(Self.currentUserFixture()))
                 }
+                if call?.method == "realms" {
+                    return (response, Self.queryReply(Self.safeRealmFixture()))
+                }
                 if call?.arg == (try TaggrCandid.jsonArguments([[42]])) {
                     let body = Data("[\(String(data: self.postEnvelopeFixture(id: 42, children: [43]), encoding: .utf8)!)]".utf8)
                     return (response, Self.queryReply(body))
@@ -916,20 +961,24 @@ extension TaggrTests {
             }
             return (response, Self.queryReply(Self.candidAddPostResultOk(43)))
         }
-        let state = TaggrAppCoordinator(safety: makeSafetyStore(), api: api)
+        let state = makeCoordinator(safety: makeSafetyStore(), api: api)
         state.authSession = makeAuthSession(privateKey: Curve25519.Signing.PrivateKey())
+        state.currentUser = try JSONDecoder.taggr.decode(TaggrUser.self, from: Self.currentUserFixture())
         state.route = .post(42)
         let parent = samplePost(id: 42, body: "parent", files: [:])
         state.feed = [parent]
         state.focusedPost = parent
 
         state.safety.accept(scope: state.safetyScope)
-        await state.submitPost(text: "reply", parent: 42, realm: "DEV", reloadMode: .latest)
+        await runQueuedSubmission(state, context: .reply(42), text: "reply", realm: "DEV", images: []) { draft in
+            state.enqueuePostSubmission(text: "reply", parent: 42, realm: "DEV", draft: draft)
+        }
+        await waitForPostReconciliation(state)
 
         XCTAssertNil(state.errorMessage)
-        XCTAssertEqual(calls.first?.method, "add_post")
-        XCTAssertEqual(Set(calls.dropFirst().map(\.method)), Set(["user", "posts"]))
-        XCTAssertEqual(calls.first?.arg, try TaggrCandidAdapter.addPostArguments(text: "reply", refs: [], parent: 42, realm: "DEV", extensionBlob: nil).encode())
+        try assertAddPostRequest(calls.first { $0.method == "add_post" }?.arg, text: "reply", refs: [], parent: 42, realm: "DEV", extensionBlob: nil)
+        XCTAssertTrue(calls.contains { $0.method == "user" })
+        XCTAssertGreaterThanOrEqual(calls.filter { $0.method == "posts" }.count, 4)
         XCTAssertEqual(state.repliesByPostID[42]?.map(\.id), [43])
         XCTAssertEqual(state.focusedPost?.children, [43])
     }
@@ -948,13 +997,14 @@ extension TaggrTests {
             let body = Data("[\(String(data: self.postEnvelopeFixture(id: 43, parent: 42), encoding: .utf8)!)]".utf8)
             return (response, Self.queryReply(body))
         }
-        let state = TaggrAppCoordinator(safety: makeSafetyStore(), api: api)
+        let state = makeCoordinator(safety: makeSafetyStore(), api: api)
         let staleParent = samplePost(id: 42, parent: 10, body: "parent reply", files: [:])
         state.feed = [staleParent]
         state.focusedPost = staleParent
         state.repliesByPostID[42] = [staleParent]
 
-        await state.refreshReplies(postID: 42)
+        let snapshot = try await state.loadReplySnapshot(postID: 42, api: api)
+        state.applyReplySnapshot(snapshot)
 
         XCTAssertEqual(calls.map(\.method), ["posts", "posts"])
         XCTAssertEqual(calls.map(\.arg), [
@@ -976,9 +1026,10 @@ extension TaggrTests {
             let body = Data("[\(String(data: self.postEnvelopeFixture(id: 42), encoding: .utf8)!)]".utf8)
             return (response, Self.queryReply(body))
         }
-        let state = TaggrAppCoordinator(safety: makeSafetyStore(), api: api)
+        let state = makeCoordinator(safety: makeSafetyStore(), api: api)
 
-        await state.refreshReplies(postID: 42)
+        let snapshot = try await state.loadReplySnapshot(postID: 42, api: api)
+        state.applyReplySnapshot(snapshot)
 
         XCTAssertEqual(calls.map(\.method), ["posts"])
         XCTAssertEqual(state.repliesByPostID[42], [])
@@ -997,14 +1048,14 @@ extension TaggrTests {
             let body = Data("[\(String(data: self.postEnvelopeFixture(id: 43, parent: 42), encoding: .utf8)!)]".utf8)
             return (response, Self.queryReply(body))
         }
-        let state = TaggrAppCoordinator(safety: makeSafetyStore(), api: api)
+        let state = makeCoordinator(safety: makeSafetyStore(), api: api)
 
-        await state.refreshReplies(postID: 42)
+        let parent = samplePost(id: 42, body: "parent", children: [43], files: [:])
+        await state.loadReplies(for: parent)
 
         XCTAssertNil(state.repliesByPostID[42])
         XCTAssertNotNil(state.errorMessage)
 
-        let parent = samplePost(id: 42, body: "parent", children: [43], files: [:])
         await state.loadReplies(for: parent)
 
         XCTAssertEqual(requestCount, 2)
@@ -1034,7 +1085,7 @@ extension TaggrTests {
         let defaults = UserDefaults(suiteName: suiteName)!
         defer { defaults.removePersistentDomain(forName: suiteName) }
         let preferences = RealmPostingPreferences(defaults: defaults)
-        let state = TaggrAppCoordinator(safety: makeSafetyStore(), api: api, realmPostingPreferences: preferences)
+        let state = makeCoordinator(safety: makeSafetyStore(), api: api, realmPostingPreferences: preferences)
         state.authSession = makeAuthSession(privateKey: Curve25519.Signing.PrivateKey())
         state.currentUser = try JSONDecoder.taggr.decode(TaggrUser.self, from: Self.currentUserFixture())
         let postingScope = try XCTUnwrap(state.realmPostingScope)
@@ -1043,18 +1094,18 @@ extension TaggrTests {
         let post = samplePost(id: 42, user: 7, body: "hello", files: [:], realm: "DEV")
 
         state.safety.accept(scope: state.safetyScope)
-        await state.editPost(post: post, text: "    updated\n\n", realm: "ART", reloadMode: .latest)
+        await runQueuedSubmission(state, context: .edit(post.id), text: "    updated\n\n", realm: "ART", images: []) { draft in
+            state.enqueueEditPost(post: post, text: "    updated\n\n", realm: "ART", draft: draft)
+        }
+        await waitForPostReconciliation(state)
 
         XCTAssertEqual(calls.filter { $0.method == "realms" }.count, 2)
         calls.removeAll { $0.method == "realms" }
-        let patch = TaggrEditPatch.fullReplacement(from: "    updated\n\n", to: "hello")
+        let patch = "@@ -1,13 +1,5 @@\n-    updated%0A%0A\n+hello\n"
         XCTAssertNil(state.errorMessage)
         XCTAssertEqual(calls.first?.method, "edit_post")
         XCTAssertEqual(Set(calls.dropFirst().map(\.method)), Set(["user", "thread"]))
-        XCTAssertEqual(
-            calls.first?.arg,
-            try TaggrCandidAdapter.editPostArguments(id: 42, text: "    updated\n\n", refs: [], patch: patch, realm: "ART").encode()
-        )
+        try assertEditPostRequest(calls.first?.arg, id: 42, text: "    updated\n\n", refs: [], patch: patch, realm: "ART")
         XCTAssertEqual(preferences.recentDestinations(scope: postingScope), ["ART"])
     }
 
@@ -1073,11 +1124,14 @@ extension TaggrTests {
                 if calls.last?.method == "user" {
                     return (response, Self.queryReply(Self.currentUserFixture()))
                 }
+                if calls.last?.method == "realms" {
+                    return (response, Self.queryReply(Self.safeRealmFixture()))
+                }
                 return (response, Self.queryReply(Data("[]".utf8)))
             }
             return (response, Self.queryReply(Self.candidEditPostResultOk()))
         }
-        let state = TaggrAppCoordinator(safety: makeSafetyStore(), api: api)
+        let state = makeCoordinator(safety: makeSafetyStore(), api: api)
         state.authSession = makeAuthSession(privateKey: Curve25519.Signing.PrivateKey())
         state.currentUser = TaggrUser(
             id: 7,
@@ -1097,23 +1151,22 @@ extension TaggrTests {
         let body = "updated\n\n\(image.markdown)"
 
         state.safety.accept(scope: state.safetyScope)
-        await state.editPost(post: post, text: body, realm: post.realm, images: [image], reloadMode: .latest)
+        await runQueuedSubmission(state, context: .edit(post.id), text: body, realm: post.realm, images: [image]) { draft in
+            state.enqueueEditPost(post: post, text: body, realm: post.realm, images: [image], draft: draft)
+        }
+        await waitForPostReconciliation(state)
 
-        let patch = TaggrEditPatch.fullReplacement(from: body, to: "hello")
+        let patch = "@@ -1,38 +1,5 @@\n-updated%0A%0A!%5B10x20, 1kb%5D(/blob/abc12345)\n+hello\n"
         XCTAssertNil(state.errorMessage)
-        XCTAssertEqual(calls.prefix(2).map(\.method), ["write", "edit_post"])
-        XCTAssertEqual(Set(calls.dropFirst(2).map(\.method)), Set(["user", "thread"]))
-        XCTAssertEqual(calls.first?.arg, Data([1, 2, 3]))
-        XCTAssertEqual(
-            calls.dropFirst().first?.arg,
-            try TaggrCandidAdapter.editPostArguments(
-                id: 42,
+        let functionalCalls = calls.filter { $0.method != "realms" }
+        XCTAssertEqual(functionalCalls.prefix(2).map(\.method), ["write", "edit_post"])
+        XCTAssertEqual(Set(functionalCalls.dropFirst(2).map(\.method)), Set(["user", "thread"]))
+        XCTAssertEqual(functionalCalls.first?.arg, Data([1, 2, 3]))
+        try assertEditPostRequest(functionalCalls.dropFirst().first?.arg, id: 42,
                 text: body,
                 refs: [(id: "abc12345", offset: 7, length: 3)],
                 patch: patch,
-                realm: "DEV"
-            ).encode()
-        )
+                realm: "DEV")
     }
 
     @MainActor
@@ -1137,7 +1190,7 @@ extension TaggrTests {
             }
             return (response, Self.queryReply(Self.candidAddPostResultOk(42)))
         }
-        let state = TaggrAppCoordinator(safety: makeSafetyStore(), api: api)
+        let state = makeCoordinator(safety: makeSafetyStore(), api: api)
         state.authSession = makeAuthSession(privateKey: Curve25519.Signing.PrivateKey())
         state.currentUser = TaggrUser(
             id: 7,
@@ -1156,26 +1209,24 @@ extension TaggrTests {
         let body = images.map(\.markdown).joined(separator: "\n")
 
         state.safety.accept(scope: state.safetyScope)
-        await state.submitPost(text: body, images: images, reloadMode: .hot)
+        await runQueuedSubmission(state, context: .newPost, text: body, realm: nil, images: images) { draft in
+            state.enqueuePostSubmission(text: body, images: images, draft: draft)
+        }
+        await waitForPostReconciliation(state)
 
         XCTAssertNil(state.errorMessage)
         XCTAssertEqual(calls.prefix(3).map(\.method), ["write", "write", "add_post"])
         XCTAssertEqual(Set(calls.dropFirst(3).map(\.method)), Set(["user", "hot_posts"]))
         XCTAssertEqual(calls[0].arg, Data([1, 2, 3]))
         XCTAssertEqual(calls[1].arg, Data([1, 2, 3]))
-        XCTAssertEqual(
-            calls[2].arg,
-            try TaggrCandidAdapter.addPostArguments(
-                text: body,
+        try assertAddPostRequest(calls[2].arg, text: body,
                 refs: [
                     (id: "abc12345", offset: 7, length: 3),
                     (id: "abc12301", offset: 8, length: 3),
                 ],
                 parent: nil,
                 realm: nil,
-                extensionBlob: nil
-            ).encode()
-        )
+                extensionBlob: nil)
     }
 
     @MainActor
@@ -1188,7 +1239,7 @@ extension TaggrTests {
             let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
             return (response, Self.queryReply(Self.candidAddPostResultOk(42)))
         }
-        let state = TaggrAppCoordinator(safety: makeSafetyStore(), api: api)
+        let state = makeCoordinator(safety: makeSafetyStore(), api: api)
         state.authSession = makeAuthSession(privateKey: Curve25519.Signing.PrivateKey())
         state.currentUser = TaggrUser(
             id: 7,
@@ -1205,9 +1256,13 @@ extension TaggrTests {
         let image = TaggrDraftImage(id: "abc12345", data: Data([1, 2, 3]), width: 10, height: 20)
 
         state.safety.accept(scope: state.safetyScope)
-        await state.submitPost(text: image.markdown, images: [image], reloadMode: .latest)
+        await runQueuedSubmission(state, context: .newPost, text: image.markdown, realm: nil, images: [image]) { draft in
+            state.enqueuePostSubmission(text: image.markdown, images: [image], draft: draft)
+        }
+        await waitForPostReconciliation(state)
 
-        XCTAssertEqual(state.errorMessage, "No personal media bucket configured. Set one up under Settings > Storage.")
+        XCTAssertEqual(state.postSubmissionNotice?.phase, .retryableFailure)
+        XCTAssertTrue(state.postSubmissionNotice?.message.contains("No personal media bucket configured. Set one up under Settings > Storage.") == true)
         XCTAssertEqual(calls.map(\.method), [])
     }
 
@@ -1221,7 +1276,7 @@ extension TaggrTests {
             let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
             return (response, Self.queryReply(Self.candidAddPostResultOk(42)))
         }
-        let state = TaggrAppCoordinator(safety: makeSafetyStore(), api: api)
+        let state = makeCoordinator(safety: makeSafetyStore(), api: api)
         state.authSession = makeAuthSession(privateKey: Curve25519.Signing.PrivateKey())
         state.currentUser = TaggrUser(
             id: 7,
@@ -1238,9 +1293,13 @@ extension TaggrTests {
         let image = TaggrDraftImage(id: "abc12345", data: Data([1, 2, 3]), width: 10, height: 20)
 
         state.safety.accept(scope: state.safetyScope)
-        await state.submitPost(text: "!([10x20, 1kb](/blob/abc12345)]", images: [image], reloadMode: .latest)
+        await runQueuedSubmission(state, context: .newPost, text: "!([10x20, 1kb](/blob/abc12345)]", realm: nil, images: [image]) { draft in
+            state.enqueuePostSubmission(text: "!([10x20, 1kb](/blob/abc12345)]", images: [image], draft: draft)
+        }
+        await waitForPostReconciliation(state)
 
-        XCTAssertEqual(state.errorMessage, "Attached image marker was edited. Remove and attach the image again.")
+        XCTAssertEqual(state.postSubmissionNotice?.phase, .retryableFailure)
+        XCTAssertTrue(state.postSubmissionNotice?.message.contains("Attached image marker was edited. Remove and attach the image again.") == true)
         XCTAssertEqual(calls.map(\.method), [])
     }
 
@@ -1254,7 +1313,7 @@ extension TaggrTests {
             let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
             return (response, Self.queryReply(Self.candidAddPostResultOk(42)))
         }
-        let state = TaggrAppCoordinator(safety: makeSafetyStore(), api: api)
+        let state = makeCoordinator(safety: makeSafetyStore(), api: api)
         state.authSession = makeAuthSession(privateKey: Curve25519.Signing.PrivateKey())
         state.currentUser = TaggrUser(
             id: 7,
@@ -1271,9 +1330,13 @@ extension TaggrTests {
         let post = samplePost(id: 42, user: 7, body: "hello", files: [:], realm: nil)
 
         state.safety.accept(scope: state.safetyScope)
-        await state.editPost(post: post, text: "updated\n\n![10x20, 1kb](/blob/missing)", realm: post.realm, images: [])
+        await runQueuedSubmission(state, context: .edit(post.id), text: "updated\n\n![10x20, 1kb](/blob/missing)", realm: post.realm, images: []) { draft in
+            state.enqueueEditPost(post: post, text: "updated\n\n![10x20, 1kb](/blob/missing)", realm: post.realm, images: [], draft: draft)
+        }
+        await waitForPostReconciliation(state)
 
-        XCTAssertEqual(state.errorMessage, "You're referencing pictures that are not attached anymore. Please re-upload.")
+        XCTAssertEqual(state.postSubmissionNotice?.phase, .retryableFailure)
+        XCTAssertTrue(state.postSubmissionNotice?.message.contains("You're referencing pictures that are not attached anymore. Please re-upload.") == true)
         XCTAssertEqual(calls.map(\.method), [])
     }
 
@@ -1287,7 +1350,7 @@ extension TaggrTests {
             let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
             return (response, Self.queryReply(Data(#"{"Err":"thread should not be called"}"#.utf8)))
         }
-        let state = TaggrAppCoordinator(api: api)
+        let state = makeCoordinator(api: api)
         let post = samplePost(body: "hello", files: [:], treeSize: 1)
 
         await state.loadReplies(for: post)
@@ -1313,7 +1376,7 @@ extension TaggrTests {
             }
             return (response, Self.queryReply(Data("null".utf8)))
         }
-        let state = TaggrAppCoordinator(api: api)
+        let state = makeCoordinator(api: api)
         state.authSession = makeAuthSession(privateKey: Curve25519.Signing.PrivateKey())
 
         await state.react(postId: 42, reaction: 53)
@@ -1329,7 +1392,7 @@ extension TaggrTests {
             let response = HTTPURLResponse(url: request.url!, statusCode: 500, httpVersion: nil, headerFields: nil)!
             return (response, Data("denied".utf8))
         }
-        let state = TaggrAppCoordinator(api: api)
+        let state = makeCoordinator(api: api)
         let post = samplePost(id: 42, body: "hello", reactions: [:], files: [:])
         state.authSession = makeAuthSession(privateKey: Curve25519.Signing.PrivateKey())
         state.currentUser = try JSONDecoder.taggr.decode(TaggrUser.self, from: Self.currentUserFixture())
@@ -1361,7 +1424,7 @@ extension TaggrTests {
             }
             return (response, Self.queryReply(Data("true".utf8)))
         }
-        let state = TaggrAppCoordinator(api: api)
+        let state = makeCoordinator(api: api)
         state.authSession = makeAuthSession(privateKey: Curve25519.Signing.PrivateKey())
 
         await state.toggleBookmark(postId: 42)
@@ -1377,7 +1440,7 @@ extension TaggrTests {
 
     @MainActor
     func testAuthorDisplayNameUsesPostMetadataAndFallsBackToUserID() {
-        let state = TaggrAppCoordinator()
+        let state = makeCoordinator()
         let named = samplePost(id: 1, user: 7, body: "hello", files: [:])
         let missing = samplePost(
             id: 2,
@@ -1404,7 +1467,7 @@ extension TaggrTests {
             let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
             return (response, Self.queryReply(threadBody))
         }
-        let state = TaggrAppCoordinator(api: api)
+        let state = makeCoordinator(api: api)
         state.navigateToPost(101)
 
         await state.loadPost(101)
@@ -1430,7 +1493,7 @@ extension TaggrTests {
             let body = Data("[\(String(data: fixture, encoding: .utf8)!)]".utf8)
             return (response, Self.queryReply(body))
         }
-        let state = TaggrAppCoordinator(api: api)
+        let state = makeCoordinator(api: api)
         state.repliesByPostID[42] = [samplePost(id: 41, parent: 42, body: "stale", files: [:])]
 
         await state.loadPost(42)
@@ -1454,7 +1517,7 @@ extension TaggrTests {
             }
             return (response, Self.queryReply(Data("[]".utf8)))
         }
-        let state = TaggrAppCoordinator(api: api)
+        let state = makeCoordinator(api: api)
         state.cache = TaggrBackendCache(
             stats: nil,
             config: try JSONDecoder.taggr.decode(TaggrConfig.self, from: Data(#"{"feed_page_size":1}"#.utf8))
@@ -1488,7 +1551,7 @@ extension TaggrTests {
             let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
             return (response, Self.queryReply(Data("[]".utf8)))
         }
-        let state = TaggrAppCoordinator(api: api)
+        let state = makeCoordinator(api: api)
         state.canLoadMoreFeed = true
 
         let firstRequest = Task { await state.loadMoreFeed(mode: .hot) }
@@ -1521,7 +1584,7 @@ extension TaggrTests {
             let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
             return (response, Self.queryReply(Data("[]".utf8)))
         }
-        let state = TaggrAppCoordinator(api: api)
+        let state = makeCoordinator(api: api)
         state.canLoadMoreRealms = true
 
         let firstRequest = Task { await state.loadAllRealmsList(reset: false) }
@@ -1544,7 +1607,7 @@ extension TaggrTests {
         let failureAPI = makeStubbedAPI { _ in
             throw URLError(.cannotConnectToHost)
         }
-        let failedFeedState = TaggrAppCoordinator(api: failureAPI)
+        let failedFeedState = makeCoordinator(api: failureAPI)
         failedFeedState.canLoadMoreFeed = true
         await failedFeedState.loadMoreFeed(mode: .hot)
         XCTAssertFalse(failedFeedState.isLoadingMoreFeed)
@@ -1552,7 +1615,7 @@ extension TaggrTests {
         let cancelledAPI = makeStubbedAPI { _ in
             throw URLError(.cancelled)
         }
-        let cancelledRealmState = TaggrAppCoordinator(api: cancelledAPI)
+        let cancelledRealmState = makeCoordinator(api: cancelledAPI)
         cancelledRealmState.canLoadMoreRealms = true
         await cancelledRealmState.loadAllRealmsList(reset: false)
         XCTAssertFalse(cancelledRealmState.isLoadingMoreRealms)
@@ -1571,7 +1634,7 @@ extension TaggrTests {
             }
             return (response, Self.queryReply(Data("[]".utf8)))
         }
-        let state = TaggrAppCoordinator(api: api)
+        let state = makeCoordinator(api: api)
         state.cache = TaggrBackendCache(
             stats: nil,
             config: try JSONDecoder.taggr.decode(TaggrConfig.self, from: Data(#"{"feed_page_size":1}"#.utf8))

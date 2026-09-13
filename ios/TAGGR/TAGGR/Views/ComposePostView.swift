@@ -323,7 +323,7 @@ struct ComposePostView: View {
                     text: body,
                     realm: selectedTargetRealm,
                     images: images,
-                    reloadMode: mode.selectedMode,
+
                     draft: draft
                 )
             } else {
@@ -332,7 +332,7 @@ struct ComposePostView: View {
                     parent: mode.parentPostID,
                     realm: selectedTargetRealm,
                     images: images,
-                    reloadMode: mode.timelineModeAfterSubmit,
+
                     draft: draft
                 )
             }
@@ -1133,11 +1133,17 @@ final class ComposeEditingController: ObservableObject {
     func capture(suspend: Bool = false) -> Snapshot? {
         guard let documentID, let document, var current = documentText else { return nil }
         let hadMarkedText = active?.view?.markedTextRange != nil
+        let textIncludingMarkedText = active?.view?.text
+        let selectionIncludingMarkedText = active?.view?.selectedRange
         active?.view?.unmarkText()
         // Commit IME text synchronously, but never overwrite a newer model update.
         if let active, let view = active.view {
             if hadMarkedText {
-                current = PostDraftDocument.replacingText(in: current, segmentID: active.parent.segmentID, with: view.text)
+                current = PostDraftDocument.replacingText(
+                    in: current,
+                    segmentID: active.parent.segmentID,
+                    with: textIncludingMarkedText ?? view.text
+                )
                 documentText = current
                 document.wrappedValue = current
             } else {
@@ -1148,7 +1154,8 @@ final class ComposeEditingController: ObservableObject {
         let selection: NSRange
         if let active, let view = active.view,
            let offset = PostDraftDocument.textOffset(in: text, segmentID: active.parent.segmentID) {
-            selection = NSRange(location: offset + view.selectedRange.location, length: view.selectedRange.length)
+            let localSelection = hadMarkedText ? selectionIncludingMarkedText ?? view.selectedRange : view.selectedRange
+            selection = NSRange(location: offset + localSelection.location, length: localSelection.length)
         } else {
             selection = NSRange(location: text.utf16.count, length: 0)
         }
@@ -1337,6 +1344,7 @@ struct ComposeSelectableTextEditor: UIViewRepresentable {
     final class TextView: UITextView {
         var shouldBeFocused = false
         weak var editorUndoManager: UndoManager?
+        private var focusTask: Task<Void, Never>?
         override var undoManager: UndoManager? { editorUndoManager ?? super.undoManager }
 
         override func didMoveToWindow() {
@@ -1344,11 +1352,27 @@ struct ComposeSelectableTextEditor: UIViewRepresentable {
             updateFocus()
         }
 
+        override func traitCollectionDidChange(_ previousTraitCollection: UITraitCollection?) {
+            super.traitCollectionDidChange(previousTraitCollection)
+            guard previousTraitCollection?.preferredContentSizeCategory != traitCollection.preferredContentSizeCategory else { return }
+            font = UIFont.preferredFont(forTextStyle: .title3, compatibleWith: traitCollection)
+            invalidateIntrinsicContentSize()
+        }
+
         func updateFocus() {
-            // SwiftUI can request focus before UIKit attaches the input to a window.
+            focusTask?.cancel()
+            focusTask = nil
             guard window != nil else { return }
             if shouldBeFocused, isEditable, !isFirstResponder {
-                becomeFirstResponder()
+                // Defer focus until SwiftUI has finished updating the representable.
+                // Becoming first responder synchronously invokes the delegate, which
+                // publishes the focused segment and is undefined during a view update.
+                focusTask = Task { @MainActor [weak self] in
+                    await Task.yield()
+                    guard !Task.isCancelled, let self, self.window != nil,
+                          self.shouldBeFocused, self.isEditable, !self.isFirstResponder else { return }
+                    self.becomeFirstResponder()
+                }
             } else if (!shouldBeFocused || !isEditable), isFirstResponder {
                 resignFirstResponder()
             }
@@ -1373,6 +1397,7 @@ struct ComposeSelectableTextEditor: UIViewRepresentable {
 
         func textViewDidChange(_ textView: UITextView) {
             parent.editingController.recordTyping(segmentID: parent.segmentID, text: textView.text, beforeSelection: beforeSelection, selection: textView.selectedRange)
+            textView.invalidateIntrinsicContentSize()
         }
 
         func textViewDidChangeSelection(_ textView: UITextView) {

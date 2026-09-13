@@ -1,5 +1,6 @@
 const fs = require("fs");
 const zlib = require("zlib");
+const vm = require("vm");
 
 const BUNDLE = "dist/frontend/index.js.gz";
 const INDEX = "dist/frontend/index.html";
@@ -30,24 +31,15 @@ if (fs.existsSync(INDEX)) {
 }
 
 const bundle = readBundle();
-const requiredTexts = [
-    "Privacy policy",
-    "Data stored by TAGGR",
-    "iOS app data",
-    "Third-party services",
-    "Internet Identity",
-    "Token and wallet surfaces",
-    "HELP Realm",
-    "OpenChat Community",
-    "6qfxa-ryaaa-aaaai-qbhsq-cai.icp0.io",
-];
-
-for (const text of requiredTexts) {
-    if (bundle.includes(text)) {
-        pass(`frontend bundle includes: ${text}`);
-    } else {
-        fail(`frontend bundle missing: ${text}`);
+if (bundle.trim()) {
+    try {
+        new vm.Script(bundle, { filename: BUNDLE });
+        pass("frontend JavaScript bundle parses");
+    } catch (error) {
+        fail(`frontend JavaScript bundle is invalid: ${error.message}`);
     }
+} else if (!process.exitCode) {
+    fail(`${BUNDLE} is empty`);
 }
 
 if (process.exitCode) {

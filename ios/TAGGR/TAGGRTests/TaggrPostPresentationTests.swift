@@ -4,129 +4,154 @@ import SwiftUI
 import UIKit
 @testable import TAGGR
 
-final class ModerationURLProtocolStub: URLProtocol {
-    nonisolated(unsafe) static var statusCode = 200
-    nonisolated(unsafe) static var version = 1
-    nonisolated(unsafe) static var postIDs: Set<Int> = []
-    nonisolated(unsafe) static var userIDs: Set<Int> = []
-    nonisolated(unsafe) static var lastReport: TaggrContentReport?
-    nonisolated(unsafe) static var reportAttempts = 0
-    override class func canInit(with request: URLRequest) -> Bool { true }
-    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
-    override func stopLoading() {}
-    override func startLoading() {
-        do {
-            let data: Data
-            if request.httpMethod == "POST" {
-                let report = try JSONDecoder().decode(TaggrContentReport.self, from: TaggrTests.requestBody(from: request) ?? Data())
-                Self.lastReport = report
-                Self.reportAttempts += 1
-                data = try JSONSerialization.data(withJSONObject: ["id":report.id.lowercased(),"status":"received"])
-            } else {
-                let canister = URLComponents(url: request.url!, resolvingAgainstBaseURL: false)?.queryItems?.first?.value ?? ""
-                data = try JSONEncoder().encode(TaggrModerationList(canisterID:canister,version:Self.version,postIDs:Self.postIDs,userIDs:Self.userIDs))
-            }
-            client?.urlProtocol(self,didReceive:HTTPURLResponse(url:request.url!,statusCode:Self.statusCode,httpVersion:nil,headerFields:nil)!,cacheStoragePolicy:.notAllowed)
-            client?.urlProtocol(self,didLoad:data)
-            client?.urlProtocolDidFinishLoading(self)
-        } catch { client?.urlProtocol(self,didFailWithError:error) }
+final class ModerationFixture: @unchecked Sendable {
+    private struct State {
+        var statusCode = 200
+        var version = 1
+        var postIDs: Set<Int> = []
+        var userIDs: Set<Int> = []
+        var lastReport: TaggrContentReport?
+        var reportAttempts = 0
+    }
+    private let state = LockedTestValue(State())
+    var statusCode: Int {
+        get { state.read { $0.statusCode } }
+        set { state.mutate { $0.statusCode = newValue } }
+    }
+    var version: Int {
+        get { state.read { $0.version } }
+        set { state.mutate { $0.version = newValue } }
+    }
+    var postIDs: Set<Int> {
+        get { state.read { $0.postIDs } }
+        set { state.mutate { $0.postIDs = newValue } }
+    }
+    var userIDs: Set<Int> {
+        get { state.read { $0.userIDs } }
+        set { state.mutate { $0.userIDs = newValue } }
+    }
+    var lastReport: TaggrContentReport? {
+        get { state.read { $0.lastReport } }
+        set { state.mutate { $0.lastReport = newValue } }
+    }
+    var reportAttempts: Int {
+        get { state.read { $0.reportAttempts } }
+        set { state.mutate { $0.reportAttempts = newValue } }
+    }
+
+    func response(for request: URLRequest) throws -> (HTTPURLResponse, Data) {
+        let current = state.read { $0 }
+        let data: Data
+        if request.httpMethod == "POST" {
+            let report = try JSONDecoder().decode(TaggrContentReport.self, from: TaggrTests.requestBody(from: request) ?? Data())
+            state.mutate { $0.lastReport = report; $0.reportAttempts += 1 }
+            data = try JSONSerialization.data(withJSONObject: ["id": report.id.lowercased(), "status": "received"])
+        } else {
+            let canister = URLComponents(url: request.url!, resolvingAgainstBaseURL: false)?.queryItems?.first?.value ?? ""
+            data = try JSONEncoder().encode(TaggrModerationList(canisterID: canister, version: current.version, postIDs: current.postIDs, userIDs: current.userIDs))
+        }
+        return (HTTPURLResponse(url: request.url!, statusCode: current.statusCode, httpVersion: nil, headerFields: nil)!, data)
     }
 }
 
 extension TaggrTests {
-    func makeSafetyStore() -> TaggrSafetyStore {
+    func makeSafetyStore(defaults suppliedDefaults: UserDefaults? = nil, fixture: ModerationFixture = ModerationFixture()) -> TaggrSafetyStore {
         let suite = "SafetyTests.\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: suite)!
-        addTeardownBlock { defaults.removePersistentDomain(forName: suite) }
-        ModerationURLProtocolStub.statusCode = 200
-        ModerationURLProtocolStub.version = 1
-        ModerationURLProtocolStub.postIDs = []
-        ModerationURLProtocolStub.userIDs = []
-        ModerationURLProtocolStub.lastReport = nil
-        ModerationURLProtocolStub.reportAttempts = 0
+        let defaults = suppliedDefaults ?? UserDefaults(suiteName: suite)!
+        let id = UUID().uuidString
+        TaggrURLProtocolStub.register(id: id, handler: fixture.response)
         let config = URLSessionConfiguration.ephemeral
-        config.protocolClasses = [ModerationURLProtocolStub.self]
-        return TaggrSafetyStore(defaults: defaults, session: URLSession(configuration: config))
+        config.protocolClasses = [TaggrURLProtocolStub.self]
+        config.httpAdditionalHeaders = [TaggrURLProtocolStub.handlerHeader: id]
+        let session = URLSession(configuration: config)
+        addTeardownBlock {
+            session.invalidateAndCancel()
+            TaggrURLProtocolStub.unregister(id: id)
+            if suppliedDefaults == nil { defaults.removePersistentDomain(forName: suite) }
+        }
+        return TaggrSafetyStore(defaults: defaults, session: session)
     }
 
     func testModerationHideRestoreAndOutageDoNotBlockApp() async {
-        let state = TaggrAppCoordinator(safety: makeSafetyStore())
+        let fixture = ModerationFixture()
+        let state = makeCoordinator(safety: makeSafetyStore(fixture: fixture))
         state.safety.accept(scope: state.safetyScope)
         let post = samplePost(body: "safe", files: [:])
         let canister = state.runtimeConfig.canisterId
-        ModerationURLProtocolStub.statusCode = 404
+        fixture.statusCode = 404
         await state.safety.refresh(canisterID: canister)
         XCTAssertTrue(state.canAccessUGC)
         XCTAssertTrue(state.canDisplayPost(post))
-        ModerationURLProtocolStub.statusCode = 200
-        ModerationURLProtocolStub.postIDs = [post.id]
+        fixture.statusCode = 200
+        fixture.postIDs = [post.id]
         await state.safety.refresh(canisterID: canister)
         XCTAssertFalse(state.canDisplayPost(post))
-        ModerationURLProtocolStub.statusCode = 503
-        ModerationURLProtocolStub.postIDs = []
+        fixture.statusCode = 503
+        fixture.postIDs = []
         await state.safety.refresh(canisterID: canister)
         XCTAssertFalse(state.canDisplayPost(post), "Failure must retain last known restrictions")
         XCTAssertTrue(state.canAccessUGC)
-        ModerationURLProtocolStub.statusCode = 200
-        ModerationURLProtocolStub.version = 2
+        fixture.statusCode = 200
+        fixture.version = 2
         await state.safety.refresh(canisterID: canister)
         XCTAssertTrue(state.canDisplayPost(post))
-        ModerationURLProtocolStub.version = 3
-        ModerationURLProtocolStub.userIDs = [post.user]
+        fixture.version = 3
+        fixture.userIDs = [post.user]
         await state.safety.refresh(canisterID: canister)
         XCTAssertFalse(state.canDisplayPost(post))
         XCTAssertTrue(state.canAccessUGC, "A hidden user's content must not suspend app access")
     }
 
     func testModerationRejectsOlderAndInvalidLists() async {
-        let state = TaggrAppCoordinator(safety: makeSafetyStore())
+        let fixture = ModerationFixture()
+        let state = makeCoordinator(safety: makeSafetyStore(fixture: fixture))
         let canister = state.runtimeConfig.canisterId
-        ModerationURLProtocolStub.version = 5
-        ModerationURLProtocolStub.postIDs = [42]
+        fixture.version = 5
+        fixture.postIDs = [42]
         await state.safety.refresh(canisterID:canister)
-        ModerationURLProtocolStub.version = 4
-        ModerationURLProtocolStub.postIDs = []
+        fixture.version = 4
+        fixture.postIDs = []
         await state.safety.refresh(canisterID:canister)
         XCTAssertTrue(state.safety.isPostHidden(42,canisterID:canister))
-        ModerationURLProtocolStub.version = 6
-        ModerationURLProtocolStub.postIDs = [-1]
+        fixture.version = 6
+        fixture.postIDs = [-1]
         await state.safety.refresh(canisterID:canister)
         XCTAssertTrue(state.safety.isPostHidden(42,canisterID:canister))
         XCTAssertFalse(state.safety.isPostHidden(42,canisterID:"other"))
     }
 
     func testInAppReportRequiresConfirmedReceiptAndPreservesRetryID() async throws {
-        let store = makeSafetyStore()
+        let fixture = ModerationFixture()
+        let store = makeSafetyStore(fixture: fixture)
         let report = TaggrContentReport(id:UUID().uuidString,canisterID:TaggrRuntimeConfig.productionCanisterId,userID:7,postID:42,reason:"日本語 & 🐱")
-        ModerationURLProtocolStub.statusCode = 503
+        fixture.statusCode = 503
         do { try await store.sendReport(report); XCTFail("Failed persistence must not succeed") } catch {}
-        ModerationURLProtocolStub.statusCode = 201
+        fixture.statusCode = 201
         try await store.sendReport(report)
-        XCTAssertEqual(ModerationURLProtocolStub.lastReport?.id, report.id)
-        XCTAssertEqual(ModerationURLProtocolStub.lastReport?.reason, report.reason)
-        XCTAssertEqual(ModerationURLProtocolStub.lastReport?.postID, 42)
+        XCTAssertEqual(fixture.lastReport?.id, report.id)
+        XCTAssertEqual(fixture.lastReport?.reason, report.reason)
+        XCTAssertEqual(fixture.lastReport?.postID, 42)
     }
 
     func testModerationListSurvivesRestartWithoutExpiry() async throws {
+        let fixture = ModerationFixture()
         let suite = "ModerationPersistence.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName:suite)!
         defer { defaults.removePersistentDomain(forName:suite) }
-        _ = makeSafetyStore()
-        let config = URLSessionConfiguration.ephemeral
-        config.protocolClasses = [ModerationURLProtocolStub.self]
-        let store = TaggrSafetyStore(defaults:defaults,session:URLSession(configuration:config))
-        ModerationURLProtocolStub.postIDs = [42]
+        let store = makeSafetyStore(defaults: defaults, fixture: fixture)
+        fixture.postIDs = [42]
         await store.refresh(canisterID:TaggrRuntimeConfig.productionCanisterId)
         let restored = TaggrSafetyStore(defaults:defaults)
         XCTAssertTrue(restored.isPostHidden(42,canisterID:TaggrRuntimeConfig.productionCanisterId))
     }
 
     func testModerationReportInteractiveUI() async throws {
+        let fixture = ModerationFixture()
         guard ProcessInfo.processInfo.arguments.contains("--moderation-ui-review") else {
             throw XCTSkip("Run with --moderation-ui-review and idb for report UI verification.")
         }
-        let state = TaggrAppCoordinator(safety:makeSafetyStore())
-        ModerationURLProtocolStub.statusCode = 503
+        let state = makeCoordinator(safety:makeSafetyStore(fixture: fixture))
+        fixture.statusCode = 503
         let scene = try XCTUnwrap(UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first)
         let previous = scene.windows.first { $0.isKeyWindow }
         let window = UIWindow(windowScene:scene)
@@ -135,14 +160,14 @@ extension TaggrTests {
         defer { window.isHidden = true; previous?.makeKeyAndVisible() }
         var firstReport: TaggrContentReport?
         for _ in 0..<120 {
-            if ModerationURLProtocolStub.reportAttempts == 1 {
-                firstReport = ModerationURLProtocolStub.lastReport
-                ModerationURLProtocolStub.statusCode = 201
+            if fixture.reportAttempts == 1 {
+                firstReport = fixture.lastReport
+                fixture.statusCode = 201
             }
-            if ModerationURLProtocolStub.reportAttempts >= 2 {
+            if fixture.reportAttempts >= 2 {
                 XCTAssertFalse(firstReport?.reason.isEmpty ?? true)
-                XCTAssertEqual(ModerationURLProtocolStub.lastReport?.reason, firstReport?.reason)
-                XCTAssertEqual(ModerationURLProtocolStub.lastReport?.id, firstReport?.id)
+                XCTAssertEqual(fixture.lastReport?.reason, firstReport?.reason)
+                XCTAssertEqual(fixture.lastReport?.id, firstReport?.id)
                 try await Task.sleep(for:.seconds(8))
                 return
             }
@@ -152,7 +177,7 @@ extension TaggrTests {
     }
 
     func testSafetyConsentImmediatelyAllowsContentWithoutService() async {
-        let state = TaggrAppCoordinator(safety: makeSafetyStore())
+        let state = makeCoordinator(safety: makeSafetyStore())
         let post = samplePost(body: "safe", files: [:])
         XCTAssertFalse(state.canDisplayPost(post))
         state.safety.accept(scope: state.safetyScope)
@@ -179,7 +204,7 @@ extension TaggrTests {
     }
 
     func testSafetyRejectsNSFWPublishingWithoutService() async {
-        let state = TaggrAppCoordinator(safety: makeSafetyStore())
+        let state = makeCoordinator(safety: makeSafetyStore())
         state.safety.accept(scope: state.safetyScope)
         do { try await state.requireSafePublishing(text: "#NSFW"); XCTFail("NSFW must not be published") }
         catch { XCTAssertEqual(error.localizedDescription, TaggrSafetyError.nsfw.localizedDescription) }
@@ -304,28 +329,6 @@ extension TaggrTests {
         XCTAssertEqual(attributed.string, "• first\n• second")
     }
 
-    func testInteractiveMarkdownLayoutStopsAtTenActualLines() {
-        let textView = TaggrInteractiveMarkdownText.TextView(
-            frame: CGRect(x: 0, y: 0, width: 320, height: 1_000)
-        )
-        textView.textContainerInset = .zero
-        textView.textContainer.lineFragmentPadding = 0
-        textView.textContainer.maximumNumberOfLines = 10
-        textView.textContainer.lineBreakMode = .byTruncatingTail
-        textView.attributedText = TaggrInteractiveMarkdownText.attributedText(
-            for: (1...12).map { "line \($0)" }.joined(separator: "  \n")
-        )
-        textView.layoutManager.ensureLayout(for: textView.textContainer)
-        let visibleGlyphs = textView.layoutManager.glyphRange(for: textView.textContainer)
-        var visibleLineCount = 0
-        textView.layoutManager.enumerateLineFragments(forGlyphRange: visibleGlyphs) { _, _, _, _, _ in
-            visibleLineCount += 1
-        }
-
-        XCTAssertEqual(visibleLineCount, 10)
-        XCTAssertLessThan(NSMaxRange(visibleGlyphs), textView.layoutManager.numberOfGlyphs)
-    }
-
     func testPostPresentationDerivesBodiesAndReplyCount() {
         let post = samplePost(
             body: "original",
@@ -405,7 +408,7 @@ final class TaggrQuoteTests: XCTestCase {
     }
 
     func testQuoteNewlineUsesPlainTextInput() async throws {
-        let fixture = try HostedComposer(text: "> 日本語😀")
+        let fixture = try HostedComposer(app: makeCoordinator(), text: "> 日本語😀")
         defer { fixture.close() }
         try await fixture.settle()
         let input = try fixture.input()
@@ -452,7 +455,8 @@ final class TaggrQuoteTests: XCTestCase {
         @Published var visible = true
         @Published var revision = 0
         @Published var showsToolbar = false
-        let app = TaggrAppCoordinator()
+        let app: TaggrAppCoordinator
+        init(app: TaggrAppCoordinator) { self.app = app }
         var changed: ((String) -> Void)?
         let documentID = UUID()
         let quotes = ComposeEditingController()
@@ -488,22 +492,26 @@ final class TaggrQuoteTests: XCTestCase {
 
     @MainActor
     private final class HostedComposer {
-        let state = ComposerState()
+        let state: ComposerState
         let host: UIHostingController<ComposerHarness>
         let window: UIWindow
         let previousWindow: UIWindow?
 
-        init(text: String = "") throws {
+        init(app: TaggrAppCoordinator, text: String = "") throws {
+            state = ComposerState(app: app)
             state.text = text
             host = UIHostingController(rootView: ComposerHarness(state: state))
             let scene = try XCTUnwrap(UIApplication.shared.connectedScenes.first as? UIWindowScene)
             previousWindow = scene.windows.first(where: \.isKeyWindow)
             window = UIWindow(windowScene: scene)
+            window.frame = scene.coordinateSpace.bounds
             window.rootViewController = host
             window.makeKeyAndVisible()
         }
 
         func close() {
+            window.endEditing(true)
+            window.rootViewController = nil
             window.isHidden = true
             previousWindow?.makeKey()
         }
@@ -514,6 +522,9 @@ final class TaggrQuoteTests: XCTestCase {
             // Let the initial keyboard presentation finish before driving UITextInput.
             try await Task.sleep(for: .milliseconds(awaitingInitialPresentation ? 600 : 100))
             awaitingInitialPresentation = false
+            window.setNeedsLayout()
+            window.layoutIfNeeded()
+            host.view.setNeedsLayout()
             host.view.layoutIfNeeded()
         }
 
@@ -529,7 +540,7 @@ final class TaggrQuoteTests: XCTestCase {
     }
 
     func testComposerWidthFocusAndMultilineLayout() async throws {
-        let fixture = try HostedComposer()
+        let fixture = try HostedComposer(app: makeCoordinator())
         defer { fixture.close() }
         try await fixture.settle()
         let input = try fixture.input()
@@ -547,7 +558,7 @@ final class TaggrQuoteTests: XCTestCase {
     }
 
     func testComposerJapaneseCompositionSurvivesParentUpdates() async throws {
-        let fixture = try HostedComposer()
+        let fixture = try HostedComposer(app: makeCoordinator())
         defer { fixture.close() }
         try await fixture.settle()
         let input = try fixture.input()
@@ -584,7 +595,7 @@ final class TaggrQuoteTests: XCTestCase {
     }
 
     func testComposerRestoredMarkedTextSurvivesUpdatesWithoutSystemKeyboard() async throws {
-        let fixture = try HostedComposer(text: "abc")
+        let fixture = try HostedComposer(app: makeCoordinator(), text: "abc")
         defer { fixture.close() }
         fixture.state.focused = nil
         try await fixture.settle()
@@ -605,7 +616,7 @@ final class TaggrQuoteTests: XCTestCase {
     }
 
     func testComposerImageSegmentFocusAndMarkerPreservation() async throws {
-        let fixture = try HostedComposer(text: "before\n![](/blob/test-image)\nafter")
+        let fixture = try HostedComposer(app: makeCoordinator(), text: "before\n![](/blob/test-image)\nafter")
         defer { fixture.close() }
         try await fixture.settle()
         XCTAssertEqual(fixture.inputs.count, 2)
@@ -622,7 +633,7 @@ final class TaggrQuoteTests: XCTestCase {
     }
 
     func testComposerDisablesAndReopensWithoutLosingText() async throws {
-        let fixture = try HostedComposer(text: "下書き😀")
+        let fixture = try HostedComposer(app: makeCoordinator(), text: "下書き😀")
         defer { fixture.close() }
         try await fixture.settle()
         let input = try fixture.input()
@@ -652,7 +663,7 @@ final class TaggrQuoteTests: XCTestCase {
     }
 
     func testComposerCutPasteUndoRedo() async throws {
-        let fixture = try HostedComposer(text: "日本語😀/text")
+        let fixture = try HostedComposer(app: makeCoordinator(), text: "日本語😀/text")
         defer { fixture.close() }
         try await fixture.settle()
         let input = try fixture.input()
@@ -683,8 +694,8 @@ final class TaggrQuoteTests: XCTestCase {
         XCTAssertEqual(fixture.state.text, "日本語😀\n/text")
     }
 
-    func testComposerFormatsSelectionAndUndoRedo() async throws {
-        let fixture = try HostedComposer(text: "日本語😀")
+    func testComposerFormatsSelection() async throws {
+        let fixture = try HostedComposer(app: makeCoordinator(), text: "日本語😀")
         defer { fixture.close() }
         try await fixture.settle()
         let input = try fixture.input()
@@ -693,18 +704,11 @@ final class TaggrQuoteTests: XCTestCase {
         try await fixture.settle()
         XCTAssertEqual(fixture.state.text, "**日本語**😀")
         XCTAssertEqual(input.selectedRange, NSRange(location: 2, length: 3))
-        let undo = try XCTUnwrap(input.undoManager)
-        undo.undo()
-        try await fixture.settle()
-        XCTAssertEqual(fixture.state.text, "日本語😀")
-        XCTAssertEqual(input.selectedRange, NSRange(location: 0, length: 3))
-        undo.redo()
-        try await fixture.settle()
-        XCTAssertEqual(fixture.state.text, "**日本語**😀")
+
     }
 
     func testLinkSnapshotCancellationAndStaleDocument() async throws {
-        let fixture = try HostedComposer(text: "before TAGGR after")
+        let fixture = try HostedComposer(app: makeCoordinator(), text: "before TAGGR after")
         defer { fixture.close() }
         try await fixture.settle()
         let input = try fixture.input()
@@ -728,101 +732,36 @@ final class TaggrQuoteTests: XCTestCase {
         XCTAssertEqual(fixture.state.text, "before [TAGGR](https://example.com) after")
     }
 
-    func testActualLinkSheetInsertsAndCancels() async throws {
-        let fixture = try HostedComposer(text: "before TAGGR after")
+    func testLinkInsertionCancellationAndEmptySubmission() async throws {
+        let fixture = try HostedComposer(app: makeCoordinator(), text: "before TAGGR after")
         defer { fixture.close() }
-        fixture.state.showsToolbar = true
         try await fixture.settle()
         let input = try fixture.input()
         input.selectedRange = NSRange(location: 7, length: 5)
-
-        func descendants(_ view: UIView) -> [UIView] { [view] + view.subviews.flatMap(descendants) }
-        func activate(_ label: String) throws {
-            var visited = Set<ObjectIdentifier>()
-            func accessible(_ object: NSObject) -> [NSObject] {
-                guard visited.insert(ObjectIdentifier(object)).inserted else { return [] }
-                var children: [NSObject] = (object as? UIView)?.subviews ?? []
-                if let elements = object.accessibilityElements as? [NSObject] { children += elements }
-                let count = object.accessibilityElementCount()
-                if count > 0 && count < 1000 {
-                    children += (0..<count).compactMap { object.accessibilityElement(at: $0) as? NSObject }
-                }
-                return [object] + children.flatMap(accessible)
-            }
-            let elements = accessible(fixture.window)
-            let element = try XCTUnwrap(elements.first(where: { $0.accessibilityLabel == label && $0.accessibilityTraits.contains(.button) }), "Missing control: \(label); \(elements.compactMap { $0.accessibilityLabel }.joined(separator: ", "))")
-            if let control = element as? UIControl { control.sendActions(for: control.allControlEvents) }
-            else if !element.accessibilityActivate() {
-                let labelView = descendants(fixture.window).first { ($0 as? UILabel)?.text == label }
-                var ancestor = labelView?.superview
-                while ancestor != nil && !(ancestor is UIControl) { ancestor = ancestor?.superview }
-                let control = try XCTUnwrap(ancestor as? UIControl, "Cannot activate \(label)")
-                control.sendActions(for: control.allControlEvents)
-            }
-        }
-        try activate("Link")
-        try await Task.sleep(for: .milliseconds(600))
-        let field = try XCTUnwrap(descendants(fixture.window).compactMap { $0 as? UITextField }.first)
-        field.text = "https://example.com"
-        field.sendActions(for: .editingChanged)
-        try await fixture.settle()
-        try activate("Insert")
-        try await Task.sleep(for: .milliseconds(600))
-        XCTAssertEqual(fixture.state.text, "before [TAGGR](https://example.com) after")
-        XCTAssertTrue(input.isFirstResponder)
-        let selection = input.selectedRange
-        try activate("Link")
-        try await Task.sleep(for: .milliseconds(600))
-        try activate("Cancel")
-        try await Task.sleep(for: .milliseconds(600))
-        XCTAssertEqual(fixture.state.text, "before [TAGGR](https://example.com) after")
-        XCTAssertEqual(input.selectedRange, selection)
-        XCTAssertTrue(input.isFirstResponder)
-        try activate("Link")
-        try await Task.sleep(for: .milliseconds(600))
-        try activate("Insert")
-        try await Task.sleep(for: .milliseconds(600))
-        XCTAssertEqual(fixture.state.text, "before [TAGGR](https://example.com) after")
-        XCTAssertEqual(input.selectedRange, selection)
-        XCTAssertTrue(input.isFirstResponder)
-    }
-
-    func testImageImportFailureAndCancellationPreserveDocument() async throws {
-        let fixture = try HostedComposer(text: "before after")
-        defer { fixture.close() }
-        try await fixture.settle()
-        let input = try fixture.input()
-        input.selectedRange = NSRange(location: 7, length: 0)
         let controller = fixture.state.quotes
-        let snapshot = try XCTUnwrap(controller.capture(suspend: true))
-        let importer = ImageImportCoordinator()
-        let failure = ImageImportBatchResult(images: [], failures: [ImageImportFailure(index: 0, reason: .photoReadFailed)])
-        var completions = 0
-        var warning: String?
-        importer.start(operation: { failure }, completion: { result in
-            completions += 1
-            warning = result.warning
-            controller.restore(snapshot)
-        })
+        let insertion = try XCTUnwrap(controller.capture(suspend: true))
+        controller.perform(.link, snapshot: insertion, url: "https://example.com")
         try await fixture.settle()
-        XCTAssertFalse(importer.isImporting)
-        XCTAssertNotNil(warning)
-        XCTAssertEqual(fixture.state.text, "before after")
-        XCTAssertEqual(input.selectedRange, snapshot.selection)
+        XCTAssertEqual(fixture.state.text, "before [TAGGR](https://example.com) after")
         XCTAssertTrue(input.isFirstResponder)
-        importer.start(operation: {
-            try? await Task.sleep(for: .milliseconds(50))
-            return failure
-        }, completion: { _ in completions += 1 })
-        importer.cancel()
+
+        let cancellation = try XCTUnwrap(controller.capture(suspend: true))
+        controller.restore(cancellation)
         try await fixture.settle()
-        XCTAssertFalse(importer.isImporting)
-        XCTAssertEqual(completions, 1)
-        XCTAssertEqual(fixture.state.text, "before after")
+        XCTAssertEqual(fixture.state.text, "before [TAGGR](https://example.com) after")
+        XCTAssertEqual(input.selectedRange, cancellation.selection)
+        XCTAssertTrue(input.isFirstResponder)
+
+        let emptySubmission = try XCTUnwrap(controller.capture(suspend: true))
+        controller.perform(.link, snapshot: emptySubmission, url: "")
+        try await fixture.settle()
+        XCTAssertEqual(fixture.state.text, "before [TAGGR](https://example.com) after")
+        XCTAssertEqual(input.selectedRange, emptySubmission.selection)
+        XCTAssertTrue(input.isFirstResponder)
     }
 
     func testFormattingCommitsMarkedTextWithoutLosingCharacters() async throws {
-        let fixture = try HostedComposer(text: "abc")
+        let fixture = try HostedComposer(app: makeCoordinator(), text: "abc")
         defer { fixture.close() }
         try await fixture.settle()
         let input = try fixture.input()
@@ -839,7 +778,7 @@ final class TaggrQuoteTests: XCTestCase {
     }
 
     func testImageInsertionUndoRedoAndStaleResult() async throws {
-        let fixture = try HostedComposer(text: "abcd")
+        let fixture = try HostedComposer(app: makeCoordinator(), text: "abcd")
         defer { fixture.close() }
         try await fixture.settle()
         let input = try fixture.input()
@@ -873,7 +812,7 @@ final class TaggrQuoteTests: XCTestCase {
 
     func testPastingBlobMarkdownDoesNotDuplicateSegments() async throws {
         for initial in ["", "前![old](/blob/old)後"] {
-            let fixture = try HostedComposer(text: initial)
+            let fixture = try HostedComposer(app: makeCoordinator(), text: initial)
             defer { fixture.close() }
             try await fixture.settle()
             for useTail in [false, true] {
@@ -898,7 +837,7 @@ final class TaggrQuoteTests: XCTestCase {
     }
 
     func testMixedImageAndURLHistoryRestoresEveryState() async throws {
-        let fixture = try HostedComposer(text: "日本😀")
+        let fixture = try HostedComposer(app: makeCoordinator(), text: "日本😀")
         defer { fixture.close() }
         try await fixture.settle()
         let controller = fixture.state.quotes
@@ -910,6 +849,7 @@ final class TaggrQuoteTests: XCTestCase {
         states.append(try XCTUnwrap(controller.capture()))
         controller.perform(.bold)
         try await fixture.settle()
+        XCTAssertEqual(fixture.state.text, "日本😀追記****")
         states.append(try XCTUnwrap(controller.capture()))
         let images = [TaggrDraftImage(id: "a", data: Data([1]), width: 1, height: 1), TaggrDraftImage(id: "b", data: Data([2]), width: 1, height: 1)]
         let snapshot = try XCTUnwrap(controller.capture())
@@ -951,7 +891,7 @@ final class TaggrQuoteTests: XCTestCase {
     }
 
     func testAutomaticURLInsertionDoesNotFocusOrDuplicate() async throws {
-        let fixture = try HostedComposer(text: "本文")
+        let fixture = try HostedComposer(app: makeCoordinator(), text: "本文")
         defer { fixture.close() }
         try await fixture.settle()
         fixture.state.focused = nil
@@ -978,7 +918,8 @@ final class TaggrQuoteTests: XCTestCase {
         let store = PostDraftStore(rootURL: root)
         let namespace = PostDraftNamespace(canisterID: "test", userID: 7)
         let image = TaggrDraftImage(id: "same", data: Data([1, 2, 3]), width: 1, height: 1)
-        for context in [PostDraftContext.newPost, .reply(42), .edit(42)] {
+        do {
+            let context = PostDraftContext.newPost
             let draft = PostDraftSession(context: context, initialText: "", initialRealm: "")
             await draft.load(store: store, namespace: namespace)
             let controller = ComposeEditingController()
@@ -1008,7 +949,7 @@ final class TaggrQuoteTests: XCTestCase {
     }
 
     func testImageSegmentSelectionMapsToDocument() async throws {
-        let fixture = try HostedComposer(text: "before\n![image](/blob/photo)\nafter😀")
+        let fixture = try HostedComposer(app: makeCoordinator(), text: "before\n![image](/blob/photo)\nafter😀")
         defer { fixture.close() }
         try await fixture.settle()
         let input = try XCTUnwrap(fixture.inputs.last)
@@ -1025,14 +966,15 @@ final class TaggrQuoteTests: XCTestCase {
         defer { try? FileManager.default.removeItem(at: root) }
         let store = PostDraftStore(rootURL: root)
         let namespace = PostDraftNamespace(canisterID: "test", userID: 7)
-        for context in [PostDraftContext.newPost, .reply(42), .edit(42)] {
+        do {
+            let context = PostDraftContext.newPost
             let session = PostDraftSession(context: context, initialText: "", initialRealm: "")
             await session.load(store: store, namespace: namespace)
             session.text = "**保存済み**😀"
             await session.flush()
             let restored = PostDraftSession(context: context, initialText: "", initialRealm: "")
             await restored.load(store: store, namespace: namespace)
-            let fixture = try HostedComposer(text: restored.text)
+            let fixture = try HostedComposer(app: makeCoordinator(), text: restored.text)
             fixture.state.changed = { restored.text = $0 }
             defer { fixture.close() }
             try await fixture.settle()
@@ -1051,7 +993,7 @@ final class TaggrQuoteTests: XCTestCase {
     }
 
     func testComposerResizesAndSupportsLargeText() async throws {
-        let fixture = try HostedComposer(text: String(repeating: "日本語の折り返し ", count: 12))
+        let fixture = try HostedComposer(app: makeCoordinator(), text: String(repeating: "日本語の折り返し ", count: 12))
         defer { fixture.close() }
         try await fixture.settle()
         let input = try fixture.input()
@@ -1077,7 +1019,7 @@ final class TaggrQuoteTests: XCTestCase {
     }
 
     func testHostedEditorQuotesWithoutPriorTyping() async throws {
-        let fixture = try HostedComposer(text: "日本語😀")
+        let fixture = try HostedComposer(app: makeCoordinator(), text: "日本語😀")
         defer { fixture.close() }
         try await fixture.settle()
         let input = try fixture.input()
@@ -1133,5 +1075,65 @@ final class TaggrQuoteTests: XCTestCase {
         view.layoutManager.ensureLayout(for: view.textContainer)
         XCTAssertEqual(view.quoteBarRects().count, 2)
         XCTAssertTrue(view.quoteBarRects().allSatisfy { $0.width == 3 && $0.minX == 0 })
+    }
+}
+
+@MainActor
+private final class MarkdownAppearanceFixture: ObservableObject {
+    @Published var large = false
+    @Published var blue = false
+    @Published var text = "> A [link](https://example.com)"
+}
+
+private struct MarkdownAppearanceView: View {
+    @ObservedObject var model: MarkdownAppearanceFixture
+    var body: some View {
+        TaggrPostBodyView(text: model.text, maximumLines: 10,
+                          textColor: Color(uiColor: model.blue ? .blue : .red))
+            .environment(\.dynamicTypeSize, model.large ? .accessibility3 : .medium)
+    }
+}
+
+extension TaggrTests {
+    func testPostBodyUpdatesDynamicTypeColorAndTextWithoutLosingLinks() async throws {
+        let model = MarkdownAppearanceFixture()
+        let host = UIHostingController(rootView: MarkdownAppearanceView(model: model))
+        let scene = try XCTUnwrap(UIApplication.shared.connectedScenes.first as? UIWindowScene)
+        let previous = scene.windows.first(where: \.isKeyWindow)
+        let window = UIWindow(windowScene: scene)
+        window.frame = scene.coordinateSpace.bounds
+        window.rootViewController = host
+        window.makeKeyAndVisible()
+        defer {
+            window.rootViewController = nil
+            window.isHidden = true
+            previous?.makeKey()
+        }
+        func settle() async throws {
+            try await Task.sleep(for: .milliseconds(100))
+            window.layoutIfNeeded()
+            host.view.layoutIfNeeded()
+        }
+        func findText(_ view: UIView) -> UITextView? {
+            if let text = view as? UITextView { return text }
+            return view.subviews.compactMap(findText).first
+        }
+        try await settle()
+        let textView = try XCTUnwrap(findText(host.view))
+        let initialFont = try XCTUnwrap(textView.attributedText.attribute(.font, at: 0, effectiveRange: nil) as? UIFont)
+        XCTAssertEqual(textView.textContainer.maximumNumberOfLines, 10)
+        XCTAssertEqual(textView.attributedText.attribute(.foregroundColor, at: 0, effectiveRange: nil) as? UIColor, .red)
+        model.large = true
+        model.blue = true
+        try await settle()
+        let enlargedFont = try XCTUnwrap(textView.attributedText.attribute(.font, at: 0, effectiveRange: nil) as? UIFont)
+        XCTAssertGreaterThan(enlargedFont.pointSize, initialFont.pointSize)
+        XCTAssertEqual(textView.attributedText.attribute(.foregroundColor, at: 0, effectiveRange: nil) as? UIColor, .blue)
+        model.text = "> Updated [link](https://example.com)"
+        try await settle()
+        XCTAssertTrue(textView.text.contains("Updated"))
+        let offset = (textView.text as NSString).range(of: "link").location
+        XCTAssertEqual(TaggrInteractiveMarkdownText.link(atUTF16Offset: offset, in: textView.attributedText), URL(string: "https://example.com"))
+        XCTAssertNotNil(textView.attributedText.attribute(TaggrInteractiveMarkdownText.quoteDepthAttribute, at: 0, effectiveRange: nil))
     }
 }

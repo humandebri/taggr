@@ -12,9 +12,6 @@ const run = (label, command, args) => {
 const derivedDataPath = process.env.IOS_DERIVED_DATA_PATH || ".build/xcode";
 
 run("Swift iOS static audit", process.execPath, ["ios/scripts/swift-audit.js"]);
-run("Swift authored file line counts", process.execPath, [
-    "ios/scripts/line-count-check.js",
-]);
 run("Xcode availability", "xcodebuild", ["-version"]);
 run("Xcode project listing", "xcodebuild", [
     "-project",

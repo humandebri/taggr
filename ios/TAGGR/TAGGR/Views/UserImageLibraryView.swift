@@ -19,6 +19,7 @@ struct UserImageLibraryView: View {
     private let columns = Array(repeating: GridItem(.flexible(minimum: 0), spacing: 3), count: 3)
 
     var body: some View {
+        let groups = displayGroups
         ZStack {
             TaggrTheme.background.ignoresSafeArea()
             ScrollView {
@@ -32,7 +33,7 @@ struct UserImageLibraryView: View {
                         .foregroundStyle(TaggrTheme.secondaryText)
                         .padding(.top, 80)
                     } else {
-                        ForEach(displayGroups) { group in
+                        ForEach(groups) { group in
                             UserImageYearSection(
                                 group: group,
                                 columns: columns,
@@ -68,7 +69,7 @@ struct UserImageLibraryView: View {
             await reloadImages()
         }
         .fullScreenCover(item: $selectedImage) { image in
-            AccountImagePagerView(images: displayImages, selectedImage: image)
+            AccountImagePagerView(images: groups.flatMap(\.images), selectedImage: image)
         }
     }
 
@@ -76,10 +77,6 @@ struct UserImageLibraryView: View {
         TaggrAccountImage.yearGroups(from: images.filter { image in
             sourcePosts[image.postId].map { state.canDisplayPost($0) && $0.contentRestriction(viewerID: state.currentUser?.id) == nil } ?? false
         })
-    }
-
-    private var displayImages: [TaggrAccountImage] {
-        displayGroups.flatMap(\.images)
     }
 
     private func reloadImages() async {

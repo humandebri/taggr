@@ -31,6 +31,7 @@ struct SettingsView: View {
             TaggrTheme.background.ignoresSafeArea()
             ScrollView {
                 VStack(alignment: .leading, spacing: 18) {
+                    AccountFeatureLinks()
                     SettingsPanel(title: "Identity") {
                         if let user = state.currentUser {
                             Button {

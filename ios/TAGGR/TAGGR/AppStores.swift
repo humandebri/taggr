@@ -55,6 +55,7 @@ final class NavigationStore {
     private(set) var hasStoredHomeFeedMode = false
     var postReturnRoutesByPostID: [Int: TaggrRoute] = [:]
     var profileReturnRoute: TaggrRoute = .feed(.hot)
+    var featureReturnRoutes: [TaggrRoute: TaggrRoute] = [:]
     var routeLoadRevision = 0
 
     init(defaults: UserDefaults = .standard) {
@@ -65,10 +66,6 @@ final class NavigationStore {
             route = .feed(storedMode)
             hasStoredHomeFeedMode = true
         }
-    }
-
-    func setReturnFeedMode(_ mode: TaggrFeedMode) {
-        returnFeedMode = mode
     }
 
     func rememberHomeFeedMode(_ mode: TaggrFeedMode) {
@@ -100,13 +97,6 @@ final class NavigationStore {
         }
     }
 
-    func setProfileReturnRoute(_ route: TaggrRoute) {
-        profileReturnRoute = route
-    }
-
-    func requestRouteReload() {
-        routeLoadRevision += 1
-    }
 }
 
 @MainActor

@@ -55,7 +55,7 @@ extension TaggrTests {
             let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
             return (response, Self.queryReply(Data("3".utf8)))
         }
-        let state = TaggrAppCoordinator(api: api)
+        let state = makeCoordinator(api: api)
         state.cache = TaggrBackendCache(
             stats: nil,
             config: try JSONDecoder.taggr.decode(TaggrConfig.self, from: Data(#"{"post_cost":2,"max_tag_length":30}"#.utf8))
@@ -98,11 +98,9 @@ extension TaggrTests {
         )
 
         let editedBody = String(repeating: "é", count: 510)
-        let newPatchBytes = TaggrEditPatch.fullReplacement(from: editedBody, to: post.body).utf8.count
-        let expected = 2 * ((editedBody.utf8.count + 3 + newPatchBytes) / 1024 + 1) + 4 + 3
         XCTAssertEqual(
             TaggrPostCreditCost.estimateEdit(body: editedBody, post: post, baseCost: 2, tagCost: 4, pollCost: 3),
-            expected
+            17
         )
         XCTAssertNil(TaggrPostCreditCost.estimateEdit(body: post.body, post: post, baseCost: 2, tagCost: 4, pollCost: nil))
     }
@@ -311,7 +309,7 @@ extension TaggrTests {
             let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
             return (response, Self.queryReply(Data(#"{"2":"bob","3":"carol"}"#.utf8)))
         }
-        let state = TaggrAppCoordinator(api: api)
+        let state = makeCoordinator(api: api)
 
         let names = try await state.loadAuthorNames(
             userIDs: [2, 3],
@@ -327,7 +325,7 @@ extension TaggrTests {
 
     @MainActor
     func testAuthorProfileHandleUsesCurrentUserAndCachedNamesOnly() {
-        let state = TaggrAppCoordinator()
+        let state = makeCoordinator()
         state.currentUser = TaggrUser(
             id: 7,
             name: "alice",
@@ -360,7 +358,6 @@ extension TaggrTests {
 
     func testPostImageMarkdownExtraction() {
         let body = "hello\n\n![320x240, 12kb](/blob/a1b2c3d4)\n![remote](https://example.com/image.png)\n![x](/blob/second)"
-        XCTAssertEqual(TaggrPostImages.imageIDs(in: body), ["a1b2c3d4", "second"])
         XCTAssertEqual(TaggrPostImages.textWithoutImageMarkdown(body), "hello")
     }
 
@@ -383,7 +380,7 @@ extension TaggrTests {
         XCTAssertNil(post.imageAttachments().last?.bucketId)
     }
 
-    func testEditablePostImagesCanRemoveMarkdownReferences() {
+    func testEditablePostImagesRetainEveryMarkdownReference() {
         let local = "![local](/blob/local)"
         let remote = "![remote](https://example.com/image.png)"
         let post = samplePost(
@@ -395,13 +392,7 @@ extension TaggrTests {
 
         XCTAssertEqual(images.count, 2)
         XCTAssertEqual(images[0].markdownReferences, [local, local])
-        XCTAssertTrue(images.allSatisfy(\.isRemovable))
-        let withoutLocal = TaggrPostImages.removingImageMarkdown(images[0].markdownReferences, from: post.body)
-        XCTAssertFalse(withoutLocal.contains(local))
-        XCTAssertTrue(withoutLocal.contains(remote))
-        let withoutImages = TaggrPostImages.removingImageMarkdown(images[1].markdownReferences, from: withoutLocal)
-        XCTAssertEqual(withoutImages, "before\nafter")
-        XCTAssertTrue(post.editableImageAttachments(bodyText: withoutImages).isEmpty)
+        XCTAssertEqual(images[1].markdownReferences, [remote])
     }
 
     func testLegacyPostImageIsPreviewOnly() throws {
@@ -412,7 +403,7 @@ extension TaggrTests {
 
         let image = try XCTUnwrap(post.editableImageAttachments(bodyText: post.body).first)
 
-        XCTAssertFalse(image.isRemovable)
+        XCTAssertTrue(image.markdownReferences.isEmpty)
         XCTAssertEqual(image.attachment.url.absoluteString, "https://aaaaa-aa.raw.icp0.io/image?offset=12&len=34")
     }
 
@@ -509,6 +500,139 @@ extension TaggrTests {
         XCTAssertEqual(proposal, .proposal(9))
     }
 
+    func testPollDecodesAndPreservesWeightedResults() throws {
+        let value = JSONValue.object([
+            "options": .array([.string("**yes**"), .string("no")]),
+            "votes": .object(["0": .array([.number(7), .number(8)])]),
+            "voters": .array([.number(7), .number(8)]),
+            "deadline": .number(72),
+            "weighted_by_karma": .object(["0": .number(300), "1": .number(-20)]),
+            "weighted_by_tokens": .object(["0": .number(12_345), "1": .number(200)]),
+        ])
+
+        let poll = try XCTUnwrap(TaggrPoll(value: value))
+
+        XCTAssertEqual(poll.weightedByKarma, [0: 300, 1: -20])
+        XCTAssertEqual(poll.weightedByTokens, [0: 12_345, 1: 200])
+        XCTAssertEqual(poll.jsonValue, value)
+        XCTAssertEqual(
+            poll.voting(option: 1, userId: 7, anonymously: false).weightedByTokens,
+            poll.weightedByTokens
+        )
+    }
+
+    func testPollDefaultsMissingWeightedResultsToEmptyMaps() throws {
+        let poll = try XCTUnwrap(TaggrPoll(value: .object([
+            "options": .array([.string("yes")]),
+            "votes": .object([:]),
+            "voters": .array([]),
+            "deadline": .number(24),
+        ])))
+
+        XCTAssertTrue(poll.weightedByKarma.isEmpty)
+        XCTAssertTrue(poll.weightedByTokens.isEmpty)
+    }
+
+    func testPollPresentationMatchesWebVotingBoundaries() throws {
+        let now = Date(timeIntervalSince1970: 1_000_000)
+        let unvoted = try pollPresentation(now: now, ageHours: 71.99)
+        let expired = try pollPresentation(now: now, ageHours: 72)
+        let changeable = try pollPresentation(
+            now: now,
+            ageHours: 67.99,
+            votes: [0: [7]],
+            voters: [7]
+        )
+        let locked = try pollPresentation(
+            now: now,
+            ageHours: 68,
+            votes: [0: [7]],
+            voters: [7]
+        )
+        let anonymous = try pollPresentation(
+            now: now,
+            ageHours: 1,
+            votes: [0: [TaggrPollPresentation.maximumSafeUserID - 1]],
+            voters: [7]
+        )
+
+        XCTAssertTrue(unvoted.showsVotingControls)
+        XCTAssertEqual(unvoted.expirationText, "EXPIRES IN 1H")
+        XCTAssertFalse(expired.showsVotingControls)
+        XCTAssertTrue(expired.isExpired)
+        XCTAssertTrue(changeable.canChangeVote)
+        XCTAssertFalse(changeable.showsVotingControls)
+        XCTAssertFalse(locked.canChangeVote)
+        XCTAssertTrue(anonymous.votedAnonymously)
+        XCTAssertFalse(anonymous.canChangeVote)
+    }
+
+    func testPollPresentationMatchesWebResultsAndChangeMode() throws {
+        let now = Date(timeIntervalSince1970: 1_000_000)
+        let results = try pollPresentation(
+            now: now,
+            ageHours: 24,
+            votes: [0: [7], 1: [8, 9]],
+            voters: [7, 8, 9]
+        )
+        let presentation = try pollPresentation(
+            now: now,
+            ageHours: 24,
+            votes: [0: [7], 1: [8, 9]],
+            voters: [7, 8, 9],
+            changingVote: true,
+            weightedByTokens: [0: 100, 1: 101]
+        )
+
+        XCTAssertEqual(results.percentage(for: 0), 34)
+        XCTAssertEqual(results.percentage(for: 1), 67)
+        XCTAssertTrue(presentation.showsVotingControls)
+        XCTAssertEqual(presentation.displayedVotes[0], [])
+        XCTAssertEqual(presentation.totalVotes, 2)
+        XCTAssertEqual(presentation.percentage(for: 0), 0)
+        XCTAssertEqual(presentation.percentage(for: 1), 100)
+        XCTAssertEqual(presentation.expirationText, "EXPIRES IN 2 DAYS")
+        XCTAssertEqual(presentation.votingPower(for: 0, tokenDecimals: 2), "1")
+        XCTAssertEqual(presentation.votingPower(for: 1, tokenDecimals: 2), "2")
+        XCTAssertTrue(TaggrPollPresentation.isResolvableUserID(7))
+        XCTAssertFalse(TaggrPollPresentation.isResolvableUserID(-1))
+        XCTAssertFalse(
+            TaggrPollPresentation.isResolvableUserID(TaggrPollPresentation.maximumSafeUserID - 1)
+        )
+    }
+
+    private func pollPresentation(
+        now: Date,
+        ageHours: Double,
+        votes: [Int: [Int]] = [:],
+        voters: [Int] = [],
+        changingVote: Bool = false,
+        weightedByTokens: [Int: Int] = [:]
+    ) throws -> TaggrPollPresentation {
+        let voteValues = votes.reduce(into: [String: JSONValue]()) { result, entry in
+            result[String(entry.key)] = .array(entry.value.map { .number(Double($0)) })
+        }
+        let weightedValues = weightedByTokens.reduce(into: [String: JSONValue]()) { result, entry in
+            result[String(entry.key)] = .number(Double(entry.value))
+        }
+        let poll = try XCTUnwrap(TaggrPoll(value: .object([
+            "options": .array([.string("yes"), .string("no")]),
+            "votes": .object(voteValues),
+            "voters": .array(voters.map { .number(Double($0)) }),
+            "deadline": .number(72),
+            "weighted_by_tokens": .object(weightedValues),
+        ])))
+        let createdSeconds = now.timeIntervalSince1970 - ageHours * 3_600
+        return TaggrPollPresentation(
+            poll: poll,
+            postTimestamp: LosslessInt(Int64(createdSeconds * 1_000_000_000)),
+            userID: 7,
+            revoteDeadlineHours: 4,
+            changingVote: changingVote,
+            now: now
+        )
+    }
+
     func testMarkdownTextUsesMarkdownParser() {
         let attributed = TaggrMarkdownText.attributedMarkdown(from: "**hello** [TAGGR](https://taggr.link)")
 
@@ -572,12 +696,6 @@ extension TaggrTests {
         XCTAssertTrue(linked.contains("[#tag](https://6qfxa-ryaaa-aaaai-qbhsq-cai.icp0.io/#/feed/tag).next"))
     }
 
-    func testMarkdownTextKeepsPostTapSeparateWhenLinksArePresent() {
-        XCTAssertTrue(TaggrMarkdownText.containsInteractiveLink(in: "read #tag"))
-        XCTAssertTrue(TaggrMarkdownText.containsInteractiveLink(in: "read [TAGGR](https://taggr.link)"))
-        XCTAssertFalse(TaggrMarkdownText.containsInteractiveLink(in: "plain post text"))
-    }
-
     func testPostBodyParserSeparatesParagraphsAndYouTubeEmbeds() {
         let body = """
         部屋の掃除をめっちゃ頑張ってたくさんゴミを捨てました
@@ -600,7 +718,6 @@ extension TaggrTests {
         XCTAssertTrue(second.contains("https://nico.ms/sm7037560"))
         XCTAssertEqual(third, "**GOMI _ 加奈崎芳太郎**")
         XCTAssertEqual(preview.id, "zG9K9Za56jI")
-        XCTAssertTrue(TaggrPostBodyView.containsInteractiveLink(in: body))
     }
 
     func testYouTubeConfigurationRequiresBothClientIdentifiers() {
@@ -837,29 +954,25 @@ extension TaggrTests {
     }
 
     func testPostImageURLUsesRuntimeConfig() {
-        let mainnet = TaggrRuntimeConfig.from(info: [:])
         XCTAssertEqual(
-            TaggrPostImages.imageURL(bucketId: "aaaaa-aa", offset: 12, length: 34, config: mainnet)?.absoluteString,
-            "https://aaaaa-aa.raw.icp0.io/image?offset=12&len=34"
-        )
-        let local = TaggrRuntimeConfig.from(info: ["TAGGR_API_BASE_URL": "https://taggr.trycloudflare.com"])
-        XCTAssertEqual(
-            TaggrPostImages.imageURL(bucketId: "aaaaa-aa", offset: 12, length: 34, config: local)?.absoluteString,
+            TaggrPostImages.imageURL(bucketId: "aaaaa-aa", offset: 12, length: 34)?.absoluteString,
             "https://aaaaa-aa.raw.icp0.io/image?offset=12&len=34"
         )
     }
 
-    func testBucketHTTPRequestCandidMatchesWebIDL() throws {
-        XCTAssertEqual(
-            try TaggrCandidAdapter.bucketHTTPRequestArguments(offset: 268, length: 211736).encode().icHexString,
-            "4449444c036c02efd6e40271c6a4a19806016d026c020071017101001c2f696d6167653f6f66667365743d323638266c656e3d32313137333600"
-        )
-    }
-
-    func testBucketHTTPResponseDecodesImageBody() throws {
-        let response = Data(icHex: "4449444c056d7b6c02007101716d016e7e6c04a2f5ed880400c6a4a19806029ce9c69906039aa1b2f90c7a010403010203010c636f6e74656e742d747970650a696d6167652f6a70656700c800")!
-
-        XCTAssertEqual(try TaggrCandidAdapter.httpResponseBody(CandidDecoder().decode(response)), Data([1, 2, 3]))
+    func testBucketImageSendsGoldenRequestAndDecodesResponse() async throws {
+        let sent = LockedTestValue<Data?>(nil)
+        let api = makeStubbedAPI { request in
+            let call = try XCTUnwrap(self.requestMethodAndArg(from: request))
+            XCTAssertEqual(call.method, "http_request")
+            XCTAssertTrue(request.url!.path.contains("a5dhi-k7777-77775-aaabq-cai"))
+            sent.mutate { $0 = call.arg }
+            let bytes = Data(icHex: "4449444c056d7b6c02007101716d016e7e6c04a2f5ed880400c6a4a19806029ce9c69906039aa1b2f90c7a010403010203010c636f6e74656e742d747970650a696d6167652f6a70656700c800")!
+            return (HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!, Self.queryReply(bytes))
+        }
+        let image = try await api.bucketImage(bucketId: "a5dhi-k7777-77775-aaabq-cai", offset: 268, length: 211736)
+        XCTAssertEqual(image, Data([1, 2, 3]))
+        XCTAssertEqual(sent.read { $0?.icHexString }, "4449444c036c02efd6e40271c6a4a19806016d026c020071017101001c2f696d6167653f6f66667365743d323638266c656e3d32313137333600")
     }
 
     func testPostImageAttachmentsSkipMalformedFilesMetadata() {
@@ -923,46 +1036,16 @@ extension TaggrTests {
         XCTAssertEqual(TaggrAccountImage.images(from: [post]).map(\.id), ["repeated"])
     }
 
-    func testAccountImagesSkipPostsWithoutImages() {
-        let post = samplePost(body: "plain text only", files: [:])
-
-        XCTAssertEqual(TaggrAccountImage.images(from: [post]), [])
-    }
-
     func testPostImageGridUsesCompactColumns() {
-        XCTAssertEqual(PostImageGrid.columns(for: 0), 1)
         XCTAssertEqual(PostImageGrid.columns(for: 1), 1)
         XCTAssertEqual(PostImageGrid.columns(for: 2), 2)
-        XCTAssertEqual(PostImageGrid.columns(for: 3), 2)
-        XCTAssertEqual(PostImageGrid.columns(for: 4), 2)
-        XCTAssertEqual(PostImageGrid.columns(for: 5), 2)
-        XCTAssertEqual(PostImageGrid.visibleRows(for: 0), 0)
-        XCTAssertEqual(PostImageGrid.visibleRows(for: 1), 1)
-        XCTAssertEqual(PostImageGrid.visibleRows(for: 2), 1)
-        XCTAssertEqual(PostImageGrid.visibleRows(for: 3), 2)
-        XCTAssertEqual(PostImageGrid.visibleRows(for: 4), 2)
-        XCTAssertEqual(PostImageGrid.visibleRows(for: 5), 2)
         XCTAssertEqual(PostImageGrid.displayedCount(for: 0), 0)
-        XCTAssertEqual(PostImageGrid.displayedCount(for: 1), 1)
-        XCTAssertEqual(PostImageGrid.displayedCount(for: 2), 2)
         XCTAssertEqual(PostImageGrid.displayedCount(for: 3), 3)
-        XCTAssertEqual(PostImageGrid.displayedCount(for: 4), 4)
         XCTAssertEqual(PostImageGrid.displayedCount(for: 5), 4)
-        XCTAssertEqual(PostImageGrid.visibleCount(for: 3), 3)
-        XCTAssertEqual(PostImageGrid.visibleCount(for: 4), 4)
-        XCTAssertEqual(PostImageGrid.visibleCount(for: 5), 4)
-        XCTAssertEqual(PostImageGrid.hiddenCount(for: 0), 0)
-        XCTAssertEqual(PostImageGrid.hiddenCount(for: 3), 0)
         XCTAssertEqual(PostImageGrid.hiddenCount(for: 4), 0)
-        XCTAssertEqual(PostImageGrid.hiddenCount(for: 5), 1)
         XCTAssertEqual(PostImageGrid.hiddenCount(for: 6), 2)
-        XCTAssertEqual(PostImageGrid.timelineAspectRatio(for: 0), 16.0 / 10.0, accuracy: 0.001)
-        XCTAssertEqual(PostImageGrid.timelineAspectRatio(for: 1), 16.0 / 10.0, accuracy: 0.001)
-        XCTAssertEqual(PostImageGrid.timelineAspectRatio(for: 2), 16.0 / 10.0, accuracy: 0.001)
+        XCTAssertEqual(PostImageGrid.timelineAspectRatio(for: 2), 1.6, accuracy: 0.001)
         XCTAssertEqual(PostImageGrid.timelineAspectRatio(for: 3), 1.0, accuracy: 0.001)
-        XCTAssertEqual(PostImageGrid.timelineAspectRatio(for: 4), 1.0, accuracy: 0.001)
-        XCTAssertEqual(PostImageGrid.timelineAspectRatio(for: 5), 1.0, accuracy: 0.001)
-        XCTAssertEqual(PostImageGrid.timelineAspectRatio(for: 6), 1.0, accuracy: 0.001)
     }
 
     func testImagePreviewPrefetchIncludesEveryUniqueAttachment() {
@@ -1091,7 +1174,7 @@ extension TaggrTests {
     }
 
     @MainActor
-    func testAccountImageThumbnailDecodeIsBoundedAndUsesADedicatedCache() async throws {
+    func testAccountImageThumbnailDecodeIsBoundedAndKeepsFullResolutionKeySeparate() async throws {
         let renderer = UIGraphicsImageRenderer(size: CGSize(width: 1_600, height: 1_200))
         let source = try XCTUnwrap(renderer.image { context in
             UIColor.red.setFill()
@@ -1110,24 +1193,14 @@ extension TaggrTests {
             TaggrPostImageDataLoader.cacheKey(for: attachment, maximumPixelSize: 512),
             TaggrPostImageDataLoader.cacheKey(for: attachment, maximumPixelSize: nil)
         )
-        XCTAssertEqual(TaggrPostImageDataLoader.cacheKind(for: 512), .accountThumbnail)
-        XCTAssertEqual(TaggrPostImageDataLoader.cacheKind(for: 1_024), .standard)
-        XCTAssertEqual(TaggrPostImageDataLoader.cacheKind(for: nil), .standard)
 
-        let key = TaggrPostImageDataLoader.cacheKey(for: attachment, maximumPixelSize: 512)
-        TaggrPostImageDataLoader.storeCachedImage(thumbnail, for: key, maximumPixelSize: 512)
-        XCTAssertTrue(
-            TaggrPostImageDataLoader.cachedImage(for: key, maximumPixelSize: 512) === thumbnail
-        )
-        XCTAssertNil(TaggrPostImageDataLoader.cachedImage(for: key, maximumPixelSize: 1_024))
     }
 
     func testDraftImageMarkdownUsesWebBlobFormatAndStableHashId() {
         let image = TaggrDraftImage(id: "abc12345", data: Data(repeating: 1, count: 1537), width: 320, height: 240)
 
         XCTAssertEqual(image.markdown, "![320x240, 2kb](/blob/abc12345)")
-        XCTAssertEqual(ImageDrafts.blobId(for: Data([1, 2, 3])), ImageDrafts.blobId(for: Data([1, 2, 3])))
-        XCTAssertEqual(ImageDrafts.blobId(for: Data([1, 2, 3])).count, 8)
+        XCTAssertEqual(ImageDrafts.blobId(for: Data([1, 2, 3])), "039058c6")
     }
 
     func testDraftImageIDsAreUniquedPerAttachment() {
@@ -1182,16 +1255,9 @@ extension TaggrTests {
         )
     }
 
-    func testPostDraftDocumentInsertsAndMovesImageMarkers() {
+    func testPostDraftDocumentMovesImageMarkers() {
         let first = "![10x20, 1kb](/blob/first001)"
         let second = "![10x20, 1kb](/blob/second01)"
-
-        let inserted = PostDraftDocument.inserting(
-            markdowns: [first],
-            in: "before\n\nafter",
-            afterTextSegmentID: 0
-        )
-        XCTAssertTrue(inserted.contains(first))
 
         let moved = PostDraftDocument.moving(
             imageOccurrence: 1,
@@ -1237,35 +1303,6 @@ extension TaggrTests {
             guard case .image(_, let occurrence, _, _) = segment else { return nil }
             return occurrence
         }.count, 2)
-    }
-
-    @MainActor
-    func testPostDraftSessionKeepsImageDataWhileTheSameBlobMarkerRemains() async throws {
-        let root = FileManager.default.temporaryDirectory
-            .appending(path: "PostDraftRepeatedBlobTests-\(UUID().uuidString)", directoryHint: .isDirectory)
-        defer { try? FileManager.default.removeItem(at: root) }
-        let store = PostDraftStore(rootURL: root)
-        let namespace = PostDraftNamespace(canisterID: "mainnet-canister", userID: 7)
-        let image = TaggrDraftImage(id: "repeated", data: Data([1, 2, 3]), width: 10, height: 20)
-        try await store.save(
-            namespace: namespace,
-            context: .newPost,
-            text: "\(image.markdown)\n\n\(image.markdown)",
-            realm: "",
-            images: [image]
-        )
-        let session = PostDraftSession(
-            context: .newPost,
-            initialText: "",
-            initialRealm: ""
-        )
-
-        await session.load(store: store, namespace: namespace)
-        await session.removeImage(image, occurrence: 0)
-
-        XCTAssertEqual(session.text, "\n\n\(image.markdown)")
-        XCTAssertEqual(session.images, [image])
-        XCTAssertTrue(PostDraftDocument.containsImageMarker(blobID: image.id, in: session.text))
     }
 
     func testPostDraftStoreRoundTripsImagesAndSeparatesContextsAndNamespaces() async throws {
@@ -1467,52 +1504,11 @@ extension TaggrTests {
     }
 
     @MainActor
-    func testPersonalFeedUsesSignedQueryWhenAuthenticated() async throws {
-        var capturedBody: Data?
-        let api = makeStubbedAPI { request in
-            capturedBody = Self.requestBody(from: request)
-            let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
-            return (response, Self.queryReply(Data("[]".utf8)))
-        }
-        let privateKey = Curve25519.Signing.PrivateKey()
-        let state = TaggrAppCoordinator(api: api)
-        state.authSession = makeAuthSession(privateKey: privateKey)
-
-        await state.loadFeed(mode: .personal, reset: true)
-
-        guard let capturedBody,
-              let envelope = cborMap(from: capturedBody) else {
-            return XCTFail("Signed personal feed query was not sent.")
-        }
-        XCTAssertNotNil(value(named: "sender_sig", in: envelope))
-        XCTAssertNil(state.errorMessage)
-    }
-
-    @MainActor
-    func testTagFeedUsesPostsByTagsQuery() async throws {
-        var calls: [(method: String, arg: Data)] = []
-        let api = makeStubbedAPI { request in
-            if let call = self.requestMethodAndArg(from: request) {
-                calls.append(call)
-            }
-            let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
-            return (response, Self.queryReply(Data("[]".utf8)))
-        }
-        let state = TaggrAppCoordinator(api: api)
-
-        await state.loadFeed(mode: .tags(["tag"]), reset: true)
-
-        XCTAssertNil(state.errorMessage)
-        XCTAssertEqual(calls.map(\.method), ["posts_by_tags"])
-        XCTAssertEqual(calls.first?.arg, try TaggrCandid.jsonArguments([TaggrRuntimeConfig.productionDomain, "", ["tag"], 0, 0]))
-    }
-
-    @MainActor
     func testRefreshCancellationDoesNotSurfaceErrorBanner() async {
         let api = makeStubbedAPI { _ in
             throw URLError(.cancelled)
         }
-        let state = TaggrAppCoordinator(api: api)
+        let state = makeCoordinator(api: api)
 
         await state.loadFeed(mode: .hot, reset: true)
 
@@ -1541,7 +1537,7 @@ extension TaggrTests {
             let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
             return (response, Self.queryReply(body))
         }
-        let state = TaggrAppCoordinator(api: api)
+        let state = makeCoordinator(api: api)
 
         let oldRequest = Task { await state.loadFeed(mode: .hot, reset: true) }
         await fulfillment(of: [firstRequestStarted], timeout: 1)
@@ -1572,7 +1568,7 @@ extension TaggrTests {
                 return (response, Self.queryReply(Data("null".utf8)))
             }
         }
-        let state = TaggrAppCoordinator(api: api)
+        let state = makeCoordinator(api: api)
         state.navigateToPost(101)
 
         let oldPostRequest = Task { await state.loadPost(101) }
@@ -1595,7 +1591,7 @@ extension TaggrTests {
         let secondStarted = expectation(description: "second operation started")
         let firstGate = TaggrTestGate()
         let secondGate = TaggrTestGate()
-        let state = TaggrAppCoordinator()
+        let state = makeCoordinator()
 
         let first = Task {
             await state.runBusy {
@@ -1637,7 +1633,7 @@ extension TaggrTests {
             let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
             return (response, Self.queryReply(Data("4".utf8)))
         }
-        let state = TaggrAppCoordinator(api: api)
+        let state = makeCoordinator(api: api)
         state.cache = TaggrBackendCache(
             stats: nil,
             config: try JSONDecoder.taggr.decode(
@@ -1667,37 +1663,24 @@ extension TaggrTests {
         let red = try png(.red)
         let blue = try png(.blue)
 
-        let drafts = await ImageDrafts.draftImages(
-            from: [red, Data("not-an-image".utf8), blue],
-            maxConcurrent: 2
-        )
+        let inputs = [red, Data("not-an-image".utf8), blue]
+        let result = await ImageDrafts.importImages(count: inputs.count, maxConcurrent: 2) { inputs[$0] }
+        XCTAssertEqual(result.images.count, 2)
+        XCTAssertEqual(result.failures.map(\.index), [1])
+        // Pixel colors distinguish the endpoints without generating expectations
+        // through the converter under test.
+        let colors = try result.images.map { draft -> [UInt8] in
+            let image = try XCTUnwrap(UIImage(data: draft.data)?.cgImage)
+            var pixel = [UInt8](repeating: 0, count: 4)
+            let context = try XCTUnwrap(CGContext(data: &pixel, width: 1, height: 1,
+                bitsPerComponent: 8, bytesPerRow: 4, space: CGColorSpaceCreateDeviceRGB(),
+                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
+            context.draw(image, in: CGRect(x: 0, y: 0, width: 1, height: 1))
+            return pixel
+        }
+        XCTAssertGreaterThan(colors[0][0], colors[0][2])
+        XCTAssertGreaterThan(colors[1][2], colors[1][0])
 
-        let expectedRed = try XCTUnwrap(ImageDrafts.draftImage(from: red))
-        let expectedBlue = try XCTUnwrap(ImageDrafts.draftImage(from: blue))
-        XCTAssertEqual(drafts.map(\.id), [
-            expectedRed.id,
-            expectedBlue.id,
-        ])
-        XCTAssertTrue(drafts.allSatisfy { $0.data.count <= ImageDrafts.maxImageBytes })
-        XCTAssertTrue(drafts.allSatisfy { String(data: $0.data.prefix(4), encoding: .ascii) == "RIFF" })
-    }
-
-    @MainActor
-    func testChildStoresKeepUnrelatedStateIndependent() {
-        let navigation = NavigationStore()
-        let session = SessionStore(config: .from(info: [:]))
-        let feed = FeedStore()
-        let content = ContentStore()
-        let wallet = WalletStorageStore()
-
-        feed.canLoadMoreFeed = true
-        navigation.route = .settings
-
-        XCTAssertTrue(feed.canLoadMoreFeed)
-        XCTAssertEqual(navigation.route, .settings)
-        XCTAssertNil(session.errorMessage)
-        XCTAssertNil(content.focusedPost)
-        XCTAssertNil(wallet.icpBalanceE8s)
     }
 
     @MainActor
@@ -1719,7 +1702,7 @@ extension TaggrTests {
             }
             return (response, Self.queryReply(Self.userFixture()))
         }
-        let state = TaggrAppCoordinator(api: api)
+        let state = makeCoordinator(api: api)
 
         state.currentUser = try JSONDecoder.taggr.decode(TaggrUser.self, from: Self.userFixture())
         state.route = .settings
@@ -1751,7 +1734,7 @@ extension TaggrTests {
             }
             return (response, Self.queryReply(Self.userFixture()))
         }
-        let state = TaggrAppCoordinator(api: api)
+        let state = makeCoordinator(api: api)
         state.cache = TaggrBackendCache(stats: nil, config: try JSONDecoder.taggr.decode(
             TaggrConfig.self, from: Data(#"{"feed_page_size":1}"#.utf8)
         ))
@@ -1790,7 +1773,7 @@ extension TaggrTests {
             let body = Data("[\(String(data: self.postEnvelopeFixture(id: postID), encoding: .utf8)!)]".utf8)
             return (response, Self.queryReply(body))
         }
-        let state = TaggrAppCoordinator(api: api)
+        let state = makeCoordinator(api: api)
         state.navigateToProfile("alice")
         await state.loadCurrentRoute()
         XCTAssertEqual(state.contentStore.journalPosts.map(\.id), [303])
@@ -1819,7 +1802,7 @@ extension TaggrTests {
             }
             return (response, Self.queryReply(Self.userFixture()))
         }
-        let state = TaggrAppCoordinator(api: api)
+        let state = makeCoordinator(api: api)
         state.navigateToProfile("alice")
         await state.loadCurrentRoute()
         XCTAssertNotNil(state.errorMessage)

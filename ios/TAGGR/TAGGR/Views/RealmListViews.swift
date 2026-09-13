@@ -4,12 +4,15 @@ struct RealmsView: View {
     @Environment(TaggrAppCoordinator.self) private var state
     @State private var realmName = ""
     @State private var showingAllRealms = false
+    @State private var creatingRealm = false
 
     var body: some View {
         ZStack {
             TaggrTheme.background.ignoresSafeArea()
+                .sheet(isPresented: $creatingRealm) { RealmCreateView() }
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
+                    if state.currentUser != nil { Button("Create Realm", systemImage: "plus") { creatingRealm = true } }
                     HStack(spacing: 10) {
                         TextField("REALM", text: $realmName)
                             .textInputAutocapitalization(.characters)

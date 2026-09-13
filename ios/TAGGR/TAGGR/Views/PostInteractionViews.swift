@@ -712,7 +712,7 @@ struct InlineReplyComposer: View {
                 parent: post.id,
                 realm: post.realm,
                 images: images,
-                reloadMode: selectedMode,
+
                 draft: draft
             )
             isSubmitting = false

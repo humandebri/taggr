@@ -12,48 +12,25 @@ function run(command, args, options = {}) {
 }
 
 function availableSimulatorDestination() {
-    const result = run(
-        "xcrun",
-        ["simctl", "list", "devices", "available", "-j"],
-        {
-            capture: true,
-        },
+    const result = run("idb", ["list-targets", "--json"], { capture: true });
+    if (result.status !== 0)
+        throw new Error(`idb target discovery failed: ${result.stderr}`);
+    const targets = result.stdout
+        .trim()
+        .split("\n")
+        .filter(Boolean)
+        .flatMap((line) => JSON.parse(line));
+    const simulators = targets.filter(
+        (target) =>
+            target.type === "simulator" && /^iPhone\b/.test(target.name),
     );
-    if (result.status === 0) {
-        try {
-            const devices = Object.values(
-                JSON.parse(result.stdout).devices || {},
-            )
-                .flat()
-                .filter(
-                    (device) =>
-                        device.isAvailable && /^iPhone\b/.test(device.name),
-                );
-            const selected =
-                devices.find((device) => device.state === "Booted") ||
-                devices[0];
-            if (selected) return `platform=iOS Simulator,id=${selected.udid}`;
-        } catch {
-            // Fall through to Xcode's destination listing.
-        }
-    }
-
-    const destinations = run(
-        "xcodebuild",
-        [
-            "-showdestinations",
-            "-project",
-            "ios/TAGGR/TAGGR.xcodeproj",
-            "-scheme",
-            "TAGGR",
-        ],
-        { capture: true },
-    );
-    if (destinations.status !== 0) return null;
-    const match = destinations.stdout.match(
-        /\{\s*platform:iOS Simulator,[^}]*id:([0-9A-F-]+),[^}]*name:[^}]*iPhone[^}]*\}/,
-    );
-    return match ? `platform=iOS Simulator,id=${match[1]}` : null;
+    const booted = simulators.filter((target) => target.state === "Booted");
+    const candidates = booted.length ? booted : simulators;
+    if (candidates.length !== 1)
+        throw new Error(
+            "Specify IOS_SIM_DESTINATION with the intended Simulator UDID.",
+        );
+    return `platform=iOS Simulator,id=${candidates[0].udid}`;
 }
 
 function testDestination() {
@@ -65,9 +42,7 @@ function testDestination() {
     }
     return {
         value:
-            process.env.IOS_SIM_DESTINATION ||
-            availableSimulatorDestination() ||
-            "platform=iOS Simulator,name=iPhone 17",
+            process.env.IOS_SIM_DESTINATION || availableSimulatorDestination(),
         simulator: true,
     };
 }

@@ -174,10 +174,11 @@ extension TaggrTests {
             }
             let state = try profileTestState(api: api)
             if !authenticated { state.authSession = nil }
-            for mode: TaggrFeedMode in [.hot, .latest, .realm("DEV")] {
+            let modes: [TaggrFeedMode] = authenticated ? [.hot, .latest, .realm("DEV"), .personal] : [.hot, .latest, .realm("DEV")]
+            for mode in modes {
                 await state.loadFeed(mode: mode, reset: true)
             }
-            XCTAssertEqual(requestBodies.count, 3)
+            XCTAssertEqual(requestBodies.count, modes.count)
             for body in requestBodies {
                 let envelope = try XCTUnwrap(cborMap(from: body))
                 XCTAssertEqual(value(named: "sender_sig", in: envelope) != nil, authenticated)
@@ -216,7 +217,7 @@ extension TaggrTests {
     }
 
     private func profileTestState(api: TaggrAPI, follows: [Int] = [7]) throws -> TaggrAppCoordinator {
-        let state = TaggrAppCoordinator(api: api)
+        let state = makeCoordinator(api: api)
         state.authSession = makeAuthSession(privateKey: Curve25519.Signing.PrivateKey())
         state.currentUser = try JSONDecoder.taggr.decode(TaggrUser.self, from: Self.profileUserFixture(follows: follows))
         state.cache = TaggrBackendCache(stats: nil, config: try JSONDecoder.taggr.decode(TaggrConfig.self, from: Data(#"{"credit_transaction_fee":1}"#.utf8)))

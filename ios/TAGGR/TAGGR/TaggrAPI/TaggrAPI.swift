@@ -186,6 +186,26 @@ actor TaggrAPI {
         }
     }
 
+    func featureTokenBalance(owner: String, subaccount: String) async throws -> UInt64 {
+        guard subaccount.utf8.count == 64, subaccount.allSatisfy({ $0.isASCII && $0.isHexDigit }) else {
+            throw TaggrAPIError.rejected("Invalid subaccount.")
+        }
+        let bytes = stride(from: 0, to: subaccount.count, by: 2).compactMap { offset -> UInt8? in
+            let start = subaccount.index(subaccount.startIndex, offsetBy: offset)
+            return UInt8(subaccount[start..<subaccount.index(start, offsetBy: 2)], radix: 16)
+        }
+        guard bytes.count == 32 else { throw TaggrAPIError.rejected("Invalid subaccount.") }
+        let fields = [CandidField("owner", type: .principal), CandidField("subaccount", type: .optional(.vector(.nat8)))]
+        let account = CandidValue.record(fields, [
+            Candid.fieldID("owner"): .principal(try CandidPrincipal(owner)),
+            Candid.fieldID("subaccount"): .optional(.vector(.nat8), .blob(Data(bytes))),
+        ])
+        let arguments = CandidArguments([try CandidTypedValue(type: .record(fields), value: account)])
+        let balance = try await icClient.query(method: "icrc1_balance_of", arguments: arguments, as: CandidNat.self)
+        guard let value = UInt64(balance.decimal) else { throw TaggrAPIError.invalidResponse("balance exceeds UInt64") }
+        return value
+    }
+
     func tagsCost(_ tags: [String]) async throws -> Int {
         try await query("tags_cost", args: [tags], as: Int.self) ?? 0
     }

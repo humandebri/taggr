@@ -49,6 +49,19 @@
 	<string>$(TAGGR_DOMAIN)</string>
 	<key>TAGGR_II_URL</key>
 	<string>$(TAGGR_II_URL)</string>
+	<key>UTExportedTypeDeclarations</key>
+	<array>
+		<dict>
+			<key>UTTypeConformsTo</key>
+			<array>
+				<string>public.data</string>
+			</array>
+			<key>UTTypeDescription</key>
+			<string>TAGGR Post Draft Image</string>
+			<key>UTTypeIdentifier</key>
+			<string>network.taggr.ios.post-draft-image</string>
+		</dict>
+	</array>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

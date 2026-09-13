@@ -61,9 +61,10 @@ struct TaggrStorageCreationState: Codable, Equatable, Sendable {
 final class TaggrAppCoordinator {
     static let identityStoreService = ["network", "taggr", "ios", "identity"].joined(separator: ".")
 
-    let navigationStore = NavigationStore()
+    let navigationStore: NavigationStore
     let feedStore = FeedStore()
     let contentStore = ContentStore()
+    let featurePosts = TaggrFeaturePostStore()
     let walletStorageStore = WalletStorageStore()
     let sessionStore: SessionStore
     let safety: TaggrSafetyStore
@@ -72,6 +73,7 @@ final class TaggrAppCoordinator {
         get { navigationStore.route }
         set {
             guard navigationStore.route != newValue else { return }
+            featurePosts.clearPosts()
             requestTasks.values.forEach { $0.cancel() }
             requestTasks.removeAll()
             navigationStore.route = newValue
@@ -104,11 +106,17 @@ final class TaggrAppCoordinator {
     }
     var authSession: ICAuthSession? {
         get { sessionStore.authSession }
-        set { sessionStore.authSession = newValue }
+        set {
+            if sessionStore.authSession?.principal != newValue?.principal { featurePosts.reset() }
+            sessionStore.authSession = newValue
+        }
     }
     var currentUser: TaggrUser? {
         get { sessionStore.currentUser }
-        set { sessionStore.currentUser = newValue }
+        set {
+            if sessionStore.currentUser?.id != newValue?.id { featurePosts.reset() }
+            sessionStore.currentUser = newValue
+        }
     }
     var cache: TaggrBackendCache? {
         get { sessionStore.cache }
@@ -243,7 +251,7 @@ final class TaggrAppCoordinator {
     @ObservationIgnored var userRefreshTask: Task<TaggrUser?, Error>?
     @ObservationIgnored var userRefreshKey: String?
     @ObservationIgnored var userRefreshID: UUID?
-    var runtimeGeneration = 0
+    var runtimeGeneration = 0 { didSet { featurePosts.reset() } }
     var requestSequences: [RequestScope: Int] = [:]
     var requestTasks: [RequestScope: Task<Void, Never>] = [:]
     var activeOperationIDs: Set<UUID> = []
@@ -253,9 +261,11 @@ final class TaggrAppCoordinator {
     var tagCostRequestSequence = 0
     var tagCostTask: Task<Int, Error>?
     var postSubmissionTasks: [TaggrPostSubmissionKey: Task<Void, Never>] = [:]
+    var postReconciliationTasks: [UUID: Task<Void, Never>] = [:]
     var postSubmissionNoticeDismissTask: Task<Void, Never>?
 
     init(
+        navigationStore: NavigationStore = NavigationStore(),
         safety: TaggrSafetyStore = TaggrSafetyStore(),
         api: TaggrAPI? = nil,
         identityStore: ICIdentityStore? = nil,
@@ -283,6 +293,7 @@ final class TaggrAppCoordinator {
             }
         }
     ) {
+        self.navigationStore = navigationStore
         self.sessionStore = SessionStore(config: buildConfig)
         self.safety = safety
         self.apiFactory = apiFactory
@@ -382,6 +393,11 @@ final class TaggrAppCoordinator {
         if case .post(let id) = destination {
             navigateToPost(id)
         } else {
+            switch destination {
+            case .bookmarks, .invites, .proposals, .proposal, .search, .transactions:
+                if destination != route { navigationStore.featureReturnRoutes[destination] = route }
+            default: break
+            }
             route = destination
         }
     }
@@ -394,7 +410,7 @@ final class TaggrAppCoordinator {
             await loadPost(id)
         case .profile(let handle):
             await loadProfile(handle)
-        case .userPhotos:
+        case .userPhotos, .search, .transactions, .bookmarks, .invites, .proposals, .proposal:
             break
         case .realm(let name) where name.isEmpty:
             await loadRealmsList()
@@ -411,8 +427,7 @@ final class TaggrAppCoordinator {
         if case .settings = route {
             await reloadCache()
             if authSession != nil {
-                await refreshWallet()
-                await loadStorageStatus()
+                await refreshSettingsAccount()
             }
             return
         }
@@ -553,6 +568,11 @@ final class TaggrAppCoordinator {
             return "Inbox"
         case .settings:
             return "Account"
+        case .bookmarks: return "Bookmarks"
+        case .search: return "Search"
+        case .transactions: return "Transactions"
+        case .invites: return "Invites"
+        case .proposals, .proposal: return "Proposals"
         case .post:
             return "Timeline"
         }
@@ -586,7 +606,10 @@ final class TaggrAppCoordinator {
     }
 
     func navigateToHomeFeed() {
-        navigateToFeed(effectiveHomeFeedMode)
+        let mode = effectiveHomeFeedMode
+        returnFeedMode = mode
+        focusedPost = nil
+        route = .feed(mode)
     }
 
     func navigateToRealm(_ name: String) {
@@ -694,25 +717,6 @@ final class TaggrAppCoordinator {
             guard !isCancellation(error) else { return }
             NSLog("TAGGR replies load failed: %@", error.localizedDescription)
             errorMessage = error.localizedDescription
-        }
-    }
-
-    func refreshReplies(postID: Int, reportsErrors: Bool = true) async {
-        let generation = runtimeGeneration
-        let activeAPI = api
-        loadingReplyPostIDs.insert(postID)
-        defer { loadingReplyPostIDs.remove(postID) }
-        do {
-            let snapshot = try await loadReplySnapshot(postID: postID, api: activeAPI)
-            guard isCurrentRuntimeGeneration(generation) else { return }
-            applyReplySnapshot(snapshot)
-        } catch {
-            guard isCurrentRuntimeGeneration(generation) else { return }
-            guard !isCancellation(error) else { return }
-            NSLog("TAGGR replies refresh failed: %@", error.localizedDescription)
-            if reportsErrors {
-                errorMessage = error.localizedDescription
-            }
         }
     }
 

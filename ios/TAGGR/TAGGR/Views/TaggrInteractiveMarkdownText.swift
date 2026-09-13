@@ -12,8 +12,11 @@ struct TaggrInteractiveMarkdownText: UIViewRepresentable {
     let accessibilityIdentifier: String?
     let openPost: (() -> Void)?
     let onTruncationChange: (Bool) -> Void
+    var parsedMarkdownBlocks: [String]? = nil
 
     @Environment(\.openURL) private var openURL
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.colorScheme) private var colorScheme
 
     func makeCoordinator() -> Coordinator {
         Coordinator(parent: self)
@@ -52,18 +55,28 @@ struct TaggrInteractiveMarkdownText: UIViewRepresentable {
 
     func updateUIView(_ textView: TextView, context: Context) {
         context.coordinator.parent = self
-        let attributedText = Self.attributedText(
-            for: text,
-            textStyle: textStyle,
-            textColor: textColor,
-            lineSpacing: lineSpacing
-        )
-        if !textView.attributedText.isEqual(to: attributedText) {
-            textView.attributedText = attributedText
+        // Resolve dynamic inputs before comparing: the same UIColor or text style
+        // can produce a different rendering after an appearance or size change.
+        _ = dynamicTypeSize
+        _ = colorScheme
+        let traits = textView.traitCollection
+        let font = UIFont.preferredFont(forTextStyle: textStyle, compatibleWith: traits)
+        let color = textColor.resolvedColor(with: traits)
+        let key = RenderKey(text: text, blocks: parsedMarkdownBlocks, style: textStyle,
+                            font: font, color: color, spacing: lineSpacing,
+                            category: traits.preferredContentSizeCategory)
+        if context.coordinator.renderKey != key {
+            traits.performAsCurrent {
+                textView.attributedText = Self.attributedText(
+                    for: text, textStyle: textStyle, textColor: color,
+                    lineSpacing: lineSpacing, parsedMarkdownBlocks: parsedMarkdownBlocks
+                )
+            }
+            context.coordinator.renderKey = key
         }
         textView.textContainer.maximumNumberOfLines = maximumLines ?? 0
         textView.textContainer.lineBreakMode = maximumLines == nil ? .byWordWrapping : .byTruncatingTail
-        textView.minimumHeight = UIFont.preferredFont(forTextStyle: textStyle).lineHeight
+        textView.minimumHeight = font.lineHeight
         textView.accessibilityOpenPost = openPost
         textView.accessibilityIdentifier = accessibilityIdentifier
         textView.accessibilityTraits = openPost == nil ? [.staticText] : [.staticText, .button]
@@ -88,10 +101,11 @@ struct TaggrInteractiveMarkdownText: UIViewRepresentable {
         for text: String,
         textStyle: UIFont.TextStyle = .body,
         textColor: UIColor = .label,
-        lineSpacing: CGFloat = 3
+        lineSpacing: CGFloat = 3,
+        parsedMarkdownBlocks: [String]? = nil
     ) -> NSAttributedString {
         let result = NSMutableAttributedString()
-        let markdownBlocks = TaggrPostBodyParser.blocks(in: text).compactMap { block -> String? in
+        let markdownBlocks = parsedMarkdownBlocks ?? TaggrPostBodyParser.blocks(in: text).compactMap { block -> String? in
             guard case .markdown(let markdown) = block else { return nil }
             return markdown
         }
@@ -216,7 +230,7 @@ struct TaggrInteractiveMarkdownText: UIViewRepresentable {
         return NSAttributedString(
             string: prefix,
             attributes: [
-                .font: UIFont.preferredFont(forTextStyle: textStyle),
+                .font: UIFont.preferredFont(forTextStyle: textStyle, compatibleWith: .current),
                 .foregroundColor: textColor,
                 .paragraphStyle: paragraphStyle(
                     lineSpacing: lineSpacing,
@@ -235,7 +249,7 @@ struct TaggrInteractiveMarkdownText: UIViewRepresentable {
         NSAttributedString(
             string: string,
             attributes: [
-                .font: UIFont.preferredFont(forTextStyle: textStyle),
+                .font: UIFont.preferredFont(forTextStyle: textStyle, compatibleWith: .current),
                 .foregroundColor: textColor,
                 .paragraphStyle: paragraphStyle(
                     lineSpacing: lineSpacing,
@@ -250,12 +264,12 @@ struct TaggrInteractiveMarkdownText: UIViewRepresentable {
         inlineIntent: InlinePresentationIntent?,
         presentationComponents: [PresentationIntent.IntentType]
     ) -> UIFont {
-        var font = UIFont.preferredFont(forTextStyle: textStyle)
+        var font = UIFont.preferredFont(forTextStyle: textStyle, compatibleWith: .current)
         if let headingLevel = presentationComponents.compactMap({ component -> Int? in
             if case .header(let level) = component.kind { level } else { nil }
         }).first {
             let headingStyle: UIFont.TextStyle = headingLevel <= 2 ? .title3 : .headline
-            font = UIFont.preferredFont(forTextStyle: headingStyle)
+            font = UIFont.preferredFont(forTextStyle: headingStyle, compatibleWith: .current)
         }
         if presentationComponents.contains(where: {
             if case .codeBlock = $0.kind { true } else { false }
@@ -291,9 +305,20 @@ struct TaggrInteractiveMarkdownText: UIViewRepresentable {
     }
 
     @MainActor
+    struct RenderKey: Equatable {
+        let text: String
+        let blocks: [String]?
+        let style: UIFont.TextStyle
+        let font: UIFont
+        let color: UIColor
+        let spacing: CGFloat
+        let category: UIContentSizeCategory
+    }
+
     final class Coordinator: NSObject, UITextViewDelegate, UIGestureRecognizerDelegate {
         var parent: TaggrInteractiveMarkdownText
         weak var textView: TextView?
+        var renderKey: RenderKey?
         private var lastReportedTruncation: Bool?
 
         init(parent: TaggrInteractiveMarkdownText) {

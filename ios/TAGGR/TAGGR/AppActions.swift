@@ -53,33 +53,12 @@ private final class TaggrPostBackgroundTask {
 }
 
 extension TaggrAppCoordinator {
-    func submitPost(text: String, parent: Int? = nil, realm: String? = nil, images: [TaggrDraftImage] = [], reloadMode _: TaggrFeedMode? = nil) async -> TaggrPostSubmissionOutcome {
-        errorMessage = nil
-        let context = postSubmissionContext()
-        let result = await performPostSubmission(
-            text: text,
-            parent: parent,
-            realm: realm,
-            images: images,
-            context: context
-        )
-        if result.outcome == .submitted {
-            await reconcilePostSubmission(
-                parent.map(TaggrPostReconciliation.reply) ?? .rootPost,
-                context: context
-            )
-        }
-        errorMessage = result.errorMessage
-        return result.outcome
-    }
-
     @discardableResult
     func enqueuePostSubmission(
         text: String,
         parent: Int? = nil,
         realm: String? = nil,
         images: [TaggrDraftImage] = [],
-        reloadMode _: TaggrFeedMode? = nil,
         draft: PostDraftSession
     ) -> Bool {
         let key = parent.map(TaggrPostSubmissionKey.reply) ?? .newPost
@@ -257,7 +236,10 @@ extension TaggrAppCoordinator {
             await self.finishPostSubmission(key: key, noticeID: noticeID, result: result, draft: draft)
             backgroundTask.end()
             if result.outcome == .submitted {
-                Task { await reconciliation() }
+                self.postReconciliationTasks[noticeID] = Task {
+                    defer { self.postReconciliationTasks[noticeID] = nil }
+                    await reconciliation()
+                }
             }
         }
         return true
@@ -435,23 +417,12 @@ extension TaggrAppCoordinator {
         }
     }
 
-    func editPost(post: TaggrPost, text: String, realm: String?, images: [TaggrDraftImage] = [], reloadMode _: TaggrFeedMode? = nil) async {
-        errorMessage = nil
-        let context = postSubmissionContext()
-        let result = await performEditPost(post: post, text: text, realm: realm, images: images, context: context)
-        if result.outcome == .submitted {
-            await reconcilePostSubmission(.mutation, context: context)
-        }
-        errorMessage = result.errorMessage
-    }
-
     @discardableResult
     func enqueueEditPost(
         post: TaggrPost,
         text: String,
         realm: String?,
         images: [TaggrDraftImage] = [],
-        reloadMode _: TaggrFeedMode? = nil,
         draft: PostDraftSession
     ) -> Bool {
         let context = postSubmissionContext()
@@ -510,16 +481,6 @@ extension TaggrAppCoordinator {
         }
     }
 
-    func repost(postId: Int, text: String, realm: String?) async {
-        errorMessage = nil
-        let context = postSubmissionContext()
-        let result = await performRepost(postId: postId, text: text, realm: realm, context: context)
-        if result.outcome == .submitted {
-            await reconcilePostSubmission(.mutation, context: context)
-        }
-        errorMessage = result.errorMessage
-    }
-
     @discardableResult
     func enqueueRepost(postId: Int, text: String, realm: String?, draft: PostDraftSession) -> Bool {
         let context = postSubmissionContext()
@@ -566,6 +527,13 @@ extension TaggrAppCoordinator {
     }
 
     func react(postId: Int, reaction: Int) async {
+        if featurePosts.posts[postId] != nil || featurePosts.operations[postId] != nil {
+            guard let userID = currentUser?.id else { return }
+            await performFeaturePostMutation(id: postId, method: "react", arguments: [postId, reaction]) {
+                $0.addingReaction(reaction, by: userID)
+            }
+            return
+        }
         let previousFeed = feed
         let previousFocusedPost = focusedPost
         let previousReplies = repliesByPostID
@@ -583,6 +551,14 @@ extension TaggrAppCoordinator {
     }
 
     func voteOnPoll(postId: Int, option: Int, anonymously: Bool) async {
+        if featurePosts.posts[postId] != nil || featurePosts.operations[postId] != nil {
+            guard let userID = currentUser?.id else { return }
+            await performFeaturePostMutation(id: postId, method: "vote_on_poll", arguments: [postId, option, anonymously]) { post in
+                guard case .poll(let poll) = post.extensionKind else { return post }
+                return post.replacingExtension(.poll(poll.voting(option: option, userId: userID, anonymously: anonymously)))
+            }
+            return
+        }
         let previousFeed = feed
         let previousFocusedPost = focusedPost
         let previousReplies = repliesByPostID
@@ -604,6 +580,15 @@ extension TaggrAppCoordinator {
     }
 
     func toggleHide(postId: Int) async {
+        if featurePosts.posts[postId] != nil || featurePosts.operations[postId] != nil {
+            guard let userID = currentUser?.id else { return }
+            await performFeaturePostMutation(id: postId, method: "toggle_hide_post", arguments: [postId]) { post in
+                var hidden = post.hiddenFor
+                if hidden.contains(userID) { hidden.removeAll { $0 == userID } } else { hidden.append(userID) }
+                return post.updatingHiddenFor(hidden)
+            }
+            return
+        }
         guard let userId = currentUser?.id else { return }
         let previousFeed = feed
         let previousFocusedPost = focusedPost
@@ -704,12 +689,53 @@ extension TaggrAppCoordinator {
     }
 
     func refreshWallet() async {
+        await refreshAccountInformation(includeWallet: true, includeStorage: false)
+    }
+
+    func refreshSettingsAccount() async {
+        await refreshAccountInformation(includeWallet: true, includeStorage: true)
+    }
+
+    private func refreshAccountInformation(includeWallet: Bool, includeStorage: Bool) async {
+        let generation = runtimeGeneration
+        let activeAPI = api
+        let session = authSession
+        let isCurrent = { [self] in
+            runtimeGeneration == generation && api === activeAPI && authSession?.principal == session?.principal
+        }
         await runBusy {
-            try await loadCurrentUserIfNeeded()
-            if let principal = currentUser?.principal ?? authSession?.principal {
-                icpBalanceE8s = try await api.icpAccountBalance(ownerPrincipal: principal)
-            } else {
-                icpBalanceE8s = nil
+            do {
+                if includeStorage && session == nil { throw TaggrAPIError.missingIdentity }
+                try await loadCurrentUserIfNeeded()
+                guard isCurrent() else { return }
+                let user = currentUser
+                if includeWallet {
+                    let balance: UInt64?
+                    if let principal = user?.principal ?? session?.principal {
+                        balance = try await activeAPI.icpAccountBalance(ownerPrincipal: principal)
+                    } else {
+                        balance = nil
+                    }
+                    guard isCurrent() else { return }
+                    icpBalanceE8s = balance
+                }
+                if includeStorage, let session {
+                    let hash = try await activeAPI.bucketWasmHash()
+                    guard isCurrent() else { return }
+                    let status: TaggrStorageCanisterStatus?
+                    if let bucket = user?.bucket, !bucket.isEmpty {
+                        status = try await activeAPI.storageCanisterStatus(bucket, identity: session)
+                    } else {
+                        status = nil
+                    }
+                    guard isCurrent() else { return }
+                    storageCreationState = Self.storageCreationState(from: user?.settings)
+                    storageExpectedWasmHash = hash
+                    storageStatus = status
+                }
+            } catch {
+                guard isCurrent() else { return }
+                throw error
             }
         }
     }
@@ -802,17 +828,7 @@ extension TaggrAppCoordinator {
     }
 
     func loadStorageStatus() async {
-        await runBusy {
-            guard let authSession else { throw TaggrAPIError.missingIdentity }
-            try await loadCurrentUserIfNeeded()
-            storageCreationState = Self.storageCreationState(from: currentUser?.settings)
-            storageExpectedWasmHash = try await api.bucketWasmHash()
-            guard let bucket = currentUser?.bucket, !bucket.isEmpty else {
-                storageStatus = nil
-                return
-            }
-            storageStatus = try await api.storageCanisterStatus(bucket, identity: authSession)
-        }
+        await refreshAccountInformation(includeWallet: false, includeStorage: true)
     }
 
     func createStorageCanister() async {
@@ -1432,6 +1448,7 @@ extension TaggrAppCoordinator {
     }
 
     func updatePost(_ postId: Int, transform: (TaggrPost) -> TaggrPost) {
+        if let post = featurePosts.posts[postId] { featurePosts.posts[postId] = transform(post) }
         feed = feed.map { post in
             post.id == postId ? transform(post) : post
         }

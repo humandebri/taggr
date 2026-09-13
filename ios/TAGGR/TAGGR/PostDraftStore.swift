@@ -165,28 +165,6 @@ enum PostDraftDocument {
         return (before + insertion + source.substring(from: cursor), cursor + insertion.utf16.count)
     }
 
-    static func inserting(markdowns: [String], in text: String, afterTextSegmentID: Int?) -> String {
-        guard !markdowns.isEmpty else { return text }
-        let insertion = markdowns.joined(separator: "\n")
-        guard let afterTextSegmentID else {
-            return text.isEmpty ? insertion : text + "\n\n" + insertion
-        }
-        var inserted = false
-        let result = segments(in: text).map { segment -> String in
-            switch segment {
-            case .text(let id, let value) where id == afterTextSegmentID:
-                inserted = true
-                return value + (value.isEmpty ? "" : "\n\n") + insertion + "\n\n"
-            case .text(_, let value):
-                return value
-            case .image(_, _, let markdown, _):
-                return markdown
-            }
-        }
-        .joined()
-        return inserted ? result : (text.isEmpty ? insertion : text + "\n\n" + insertion)
-    }
-
     static func appendingExternalURL(_ url: URL, to text: String) -> String {
         let value = url.absoluteString
         guard !text.split(whereSeparator: \Character.isWhitespace).contains(Substring(value)) else {
@@ -288,7 +266,13 @@ enum PostDraftDocument {
                     guard !content.isEmpty else { continue }
                     result += "\n\n" + content
                 } else {
-                    result += value
+                    let joinsTextAcrossRemovedImage = result.last?.isNewline == true && value.first?.isNewline == true
+                    if joinsTextAcrossRemovedImage {
+                        result = result.trimmingTrailingNewlines
+                        result += "\n\n" + value.drop(while: \.isNewline)
+                    } else {
+                        result += value
+                    }
                 }
                 previousNonemptySegmentWasImage = false
             }
@@ -603,53 +587,6 @@ final class PostDraftSession: ObservableObject {
         self.images = images
         contentDidChange()
         scheduleSave()
-    }
-
-    func addImages(_ addedImages: [TaggrDraftImage], afterTextSegmentID: Int? = nil) async {
-        guard !addedImages.isEmpty else { return }
-        submissionNeedsVerification = false
-        images.append(contentsOf: addedImages)
-        text = PostDraftDocument.inserting(
-            markdowns: addedImages.map(\.markdown),
-            in: text.trimmingCharacters(in: .whitespacesAndNewlines),
-            afterTextSegmentID: afterTextSegmentID
-        )
-        await flush()
-    }
-
-    @discardableResult
-    func addExternalURL(_ url: URL) async -> Bool {
-        submissionNeedsVerification = false
-        text = PostDraftDocument.appendingExternalURL(url, to: text)
-        await flush()
-        return restorationWarning != Self.saveFailureWarning
-    }
-
-    func removeImage(_ image: TaggrDraftImage, occurrence: Int) async {
-        submissionNeedsVerification = false
-        text = PostDraftDocument.removing(imageOccurrence: occurrence, from: text)
-        if !PostDraftDocument.containsImageMarker(blobID: image.id, in: text) {
-            images.removeAll { $0.id == image.id }
-        }
-        await flush()
-    }
-
-    func removeImageMarker(occurrence: Int) async {
-        submissionNeedsVerification = false
-        text = PostDraftDocument.removing(imageOccurrence: occurrence, from: text)
-        await flush()
-    }
-
-    func moveImageMarker(occurrence: Int, before targetOccurrence: Int?) async {
-        submissionNeedsVerification = false
-        text = PostDraftDocument.moving(imageOccurrence: occurrence, before: targetOccurrence, in: text)
-        await flush()
-    }
-
-    func moveImageMarker(occurrence: Int, afterTextSegmentID: Int) async {
-        submissionNeedsVerification = false
-        text = PostDraftDocument.moving(imageOccurrence: occurrence, afterTextSegmentID: afterTextSegmentID, in: text)
-        await flush()
     }
 
     func flush() async {

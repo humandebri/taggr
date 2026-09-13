@@ -26,7 +26,7 @@ extension TaggrTests {
 
     @MainActor
     func testFeedTabRestoresLastHomeMode() {
-        let state = TaggrAppCoordinator()
+        let state = makeCoordinator()
 
         state.navigateToFeed(.personal)
         XCTAssertEqual(state.lastHomeFeedMode, .personal)
@@ -46,7 +46,7 @@ extension TaggrTests {
 
     @MainActor
     func testPersonalHomeModeFallsBackToHotWithoutAuthentication() {
-        let state = TaggrAppCoordinator()
+        let state = makeCoordinator()
         state.navigateToFeed(.personal)
 
         XCTAssertEqual(state.lastHomeFeedMode, .personal)
@@ -72,7 +72,7 @@ extension TaggrTests {
 
     @MainActor
     func testPostNavigationReturnsToOriginalRoute() {
-        let state = TaggrAppCoordinator()
+        let state = makeCoordinator()
         let origins: [(route: TaggrRoute, title: String)] = [
             (.feed(.latest), "Timeline"),
             (.realm("DEV"), "Realm"),
@@ -97,7 +97,7 @@ extension TaggrTests {
 
     @MainActor
     func testPostNavigationKeepsOriginalListWhileTraversingPosts() {
-        let state = TaggrAppCoordinator()
+        let state = makeCoordinator()
         state.route = .inbox
 
         state.navigateToPost(42)
@@ -113,7 +113,7 @@ extension TaggrTests {
 
     @MainActor
     func testPostNavigationKeepsParentReturnRouteAcrossProfile() {
-        let state = TaggrAppCoordinator()
+        let state = makeCoordinator()
         state.route = .inbox
 
         state.navigateToPost(42)
@@ -135,19 +135,19 @@ extension TaggrTests {
     }
 
     @MainActor
-    func testPostNavigationWithoutRecordedReturnUsesCurrentHomeFeed() {
-        let state = TaggrAppCoordinator()
+    func testPostNavigationWithoutRecordedReturnUsesEffectiveHomeFeed() {
+        let state = makeCoordinator()
         state.navigateToFeed(.personal)
         state.route = .post(42)
 
         state.navigateBackFromPost()
 
-        XCTAssertEqual(state.route, .feed(.personal))
+        XCTAssertEqual(state.route, .feed(.hot))
     }
 
     @MainActor
     func testPostURLUsesCurrentRouteAsReturnDestination() {
-        let state = TaggrAppCoordinator()
+        let state = makeCoordinator()
         state.navigateToFeed(.personal)
 
         state.open(URL(string: "https://6qfxa-ryaaa-aaaai-qbhsq-cai.icp0.io/post/42")!)
@@ -182,15 +182,15 @@ extension TaggrTests {
         XCTAssertEqual(realmEntry.namedRealm.labelColor, "#123456")
     }
 
-    func testRealmFeedDoesNotReplaceLastHomeMode() {
-        let state = TaggrAppCoordinator()
+    func testRealmFeedKeepsPreferenceWhileSignedOutUsesHot() {
+        let state = makeCoordinator()
 
         state.navigateToFeed(.personal)
         state.navigateToRealm("DEV")
         state.navigateToHomeFeed()
 
         XCTAssertEqual(state.lastHomeFeedMode, .personal)
-        XCTAssertEqual(state.route, .feed(.personal))
+        XCTAssertEqual(state.route, .feed(.hot))
     }
 
     func testRealmSettingsDecodeAndEditPayloadPreserveUneditedFields() throws {
@@ -274,7 +274,7 @@ extension TaggrTests {
             let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
             return (response, Self.queryReply(Data("true".utf8)))
         }
-        let state = TaggrAppCoordinator(api: api)
+        let state = makeCoordinator(api: api)
 
         let result = await state.setRealmMembership(name: "DEV", joined: true)
 
@@ -396,7 +396,7 @@ extension TaggrTests {
         realms: [String],
         controlledRealms: [String]
     ) -> TaggrAppCoordinator {
-        let state = TaggrAppCoordinator(api: api)
+        let state = makeCoordinator(api: api)
         state.authSession = makeAuthSession(privateKey: Curve25519.Signing.PrivateKey())
         state.currentUser = TaggrUser(
             id: 7,

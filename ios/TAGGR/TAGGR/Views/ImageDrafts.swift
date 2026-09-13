@@ -56,15 +56,16 @@ final class ImageImportCoordinator: ObservableObject {
     private var generation = 0
     private var task: Task<Void, Never>?
 
+    @discardableResult
     func start(
         operation: @escaping @Sendable () async -> ImageImportBatchResult,
         completion: @escaping @MainActor (ImageImportBatchResult) async -> Void
-    ) {
+    ) -> Task<Void, Never> {
         cancel()
         generation += 1
         let currentGeneration = generation
         isImporting = true
-        task = Task { [weak self] in
+        let operationTask = Task { [weak self] in
             let result = await operation()
             guard let self,
                   !Task.isCancelled,
@@ -79,6 +80,8 @@ final class ImageImportCoordinator: ObservableObject {
             self.isImporting = false
             self.task = nil
         }
+        task = operationTask
+        return operationTask
     }
 
     func cancel() {
@@ -133,35 +136,38 @@ enum ImageDrafts {
         }
     }
 
-    static func draftImage(from data: Data, maxBytes: Int = maxPostImageBytes) -> TaggrDraftImage? {
-        guard case .success(let image) = postImageResult(from: data, maxBytes: maxBytes) else {
-            return nil
-        }
-        return image
-    }
-
     static func importPhotos(
         _ items: [PhotosPickerItem],
         maxBytes: Int = maxPostImageBytes,
         maxConcurrent: Int = 2
     ) async -> ImageImportBatchResult {
-        guard !items.isEmpty else {
+        await importImages(count: items.count, maxBytes: maxBytes, maxConcurrent: maxConcurrent) { index in
+            try await items[index].loadTransferable(type: Data.self)
+        }
+    }
+
+    static func importImages(
+        count: Int,
+        maxBytes: Int = maxPostImageBytes,
+        maxConcurrent: Int = 2,
+        loadData: @escaping @Sendable (Int) async throws -> Data?
+    ) async -> ImageImportBatchResult {
+        guard count > 0 else {
             return ImageImportBatchResult(images: [], failures: [])
         }
-        let limit = max(1, min(maxConcurrent, items.count))
+        let limit = max(1, min(maxConcurrent, count))
         let unordered = await withTaskGroup(
             of: IndexedImageImportResult.self,
             returning: [IndexedImageImportResult].self
         ) { group in
             var nextIndex = 0
             var results: [IndexedImageImportResult] = []
-            results.reserveCapacity(items.count)
+            results.reserveCapacity(count)
 
             func submit(_ index: Int) {
-                let item = items[index]
                 group.addTask {
                     do {
-                        guard let data = try await item.loadTransferable(type: Data.self),
+                        guard let data = try await loadData(index),
                               !data.isEmpty else {
                             return .failure(
                                 ImageImportFailure(index: index, reason: .photoReadFailed)
@@ -187,7 +193,7 @@ enum ImageDrafts {
             }
             while let result = await group.next() {
                 results.append(result)
-                if nextIndex < items.count {
+                if nextIndex < count {
                     submit(nextIndex)
                     nextIndex += 1
                 }
@@ -206,43 +212,6 @@ enum ImageDrafts {
                 return failure
             }
         )
-    }
-
-    static func draftImages(
-        from sourceData: [Data],
-        maxBytes: Int = maxPostImageBytes,
-        maxConcurrent: Int = 2
-    ) async -> [TaggrDraftImage] {
-        guard !sourceData.isEmpty else { return [] }
-        let limit = max(1, min(maxConcurrent, sourceData.count))
-        return await withTaskGroup(of: (Int, TaggrDraftImage?).self) { group in
-            var nextIndex = 0
-            var results: [Int: TaggrDraftImage] = [:]
-
-            func submit(_ index: Int) {
-                let data = sourceData[index]
-                group.addTask {
-                    (index, draftImage(from: data, maxBytes: maxBytes))
-                }
-            }
-
-            for _ in 0..<limit {
-                submit(nextIndex)
-                nextIndex += 1
-            }
-
-            while let (index, draft) = await group.next() {
-                if let draft {
-                    results[index] = draft
-                }
-                if nextIndex < sourceData.count {
-                    submit(nextIndex)
-                    nextIndex += 1
-                }
-            }
-
-            return sourceData.indices.compactMap { results[$0] }
-        }
     }
 
     enum WebPEncodingAttempt {

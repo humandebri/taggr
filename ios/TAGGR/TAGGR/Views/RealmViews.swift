@@ -13,7 +13,7 @@ struct RealmDetailView: View {
             TaggrTheme.background.ignoresSafeArea()
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 16) {
-                    Button("Realms", action: showRealmList)
+                    Button(state.navigationStore.featureReturnRoutes[state.route] == nil ? "Realms" : "Back", action: showRealmList)
                         .font(.caption.weight(.bold))
                         .foregroundStyle(TaggrTheme.clickable)
                         .padding(.horizontal, 16)
@@ -104,7 +104,7 @@ struct RealmDetailView: View {
     }
 
     private func showRealmList() {
-        state.route = .realm("")
+        state.returnFromFeature(fallback: .realm(""))
     }
 
     private var isJoined: Bool {

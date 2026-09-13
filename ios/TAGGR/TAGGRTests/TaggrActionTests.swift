@@ -7,6 +7,74 @@ import SwiftUI
 @testable import ICNativeClient
 @testable import TAGGR
 
+final class LockedTestValue<Value>: @unchecked Sendable {
+    private let lock = NSLock()
+    private var value: Value
+
+    init(_ value: Value) {
+        self.value = value
+    }
+
+    func mutate(_ body: (inout Value) -> Void) {
+        lock.withLock { body(&value) }
+    }
+
+    func read<Result>(_ body: (Value) -> Result) -> Result {
+        lock.withLock { body(value) }
+    }
+}
+
+extension XCTestCase {
+    @MainActor
+    func makeCoordinator(
+        safety: TaggrSafetyStore? = nil,
+        api: TaggrAPI? = nil,
+        identityStore: ICIdentityStore? = nil,
+        identityAuthenticator: ICInternetIdentityAuthenticator? = nil,
+        postDraftStore: PostDraftStore? = nil,
+        realmPostingPreferences: RealmPostingPreferences? = nil,
+        youtubeUpload: YouTubeUploadCoordinator? = nil,
+        buildConfig: TaggrRuntimeConfig = .current,
+        apiFactory: @escaping @MainActor (TaggrRuntimeConfig) -> TaggrAPI = { TaggrAPI(config: $0) },
+        identityStoreFactory: (@MainActor (TaggrRuntimeConfig) -> ICIdentityStore)? = nil,
+        identityAuthenticatorFactory: @escaping @MainActor (TaggrRuntimeConfig) -> ICInternetIdentityAuthenticator = {
+            try! ICInternetIdentityAuthenticator(configuration: $0.icClientConfiguration,
+                callbackDomain: $0.callbackDomain, callbackPath: ICInternetIdentityAuthenticator.callbackPath)
+        }
+    ) -> TaggrAppCoordinator {
+        let suite = "TaggrCoordinatorTests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        let root = URL.temporaryDirectory.appending(path: suite, directoryHint: .isDirectory)
+        addTeardownBlock {
+            defaults.removePersistentDomain(forName: suite)
+            try? FileManager.default.removeItem(at: root)
+        }
+        let state = TaggrAppCoordinator(
+            navigationStore: NavigationStore(defaults: defaults),
+            safety: safety ?? TaggrSafetyStore(defaults: defaults), api: api,
+            identityStore: identityStore, identityAuthenticator: identityAuthenticator,
+            postDraftStore: postDraftStore ?? PostDraftStore(rootURL: root),
+            realmPostingPreferences: realmPostingPreferences ?? RealmPostingPreferences(defaults: defaults),
+            youtubeUpload: youtubeUpload, buildConfig: buildConfig, apiFactory: apiFactory,
+            identityStoreFactory: identityStoreFactory ?? { config in
+                ICIdentityStore(configuration: config.icClientConfiguration, service: suite, account: "session", keychain: TaggrTestKeychain())
+            }, identityAuthenticatorFactory: identityAuthenticatorFactory
+        )
+        addTeardownBlock { @MainActor in
+            state.postSubmissionNoticeDismissTask?.cancel()
+            let submissions = Array(state.postSubmissionTasks.values)
+            for task in submissions { task.cancel() }
+            for task in submissions { await task.value }
+            for task in Array(state.postReconciliationTasks.values) { await task.value }
+            let requests = Array(state.requestTasks.values)
+            for task in requests { task.cancel() }
+            for task in requests { await task.value }
+        }
+        return state
+    }
+
+}
+
 extension TaggrTests {
     func testPollHidePinAndDeleteUsePostUpdateMethods() async throws {
         var calls: [(method: String, arg: Data)] = []
@@ -19,11 +87,14 @@ extension TaggrTests {
                 if calls.last?.method == "user" {
                     return (response, Self.queryReply(Self.currentUserFixture()))
                 }
+                if calls.last?.method == "realms" {
+                    return (response, Self.queryReply(Self.safeRealmFixture()))
+                }
                 return (response, Self.queryReply(Data("[]".utf8)))
             }
             return (response, Self.queryReply(Data("null".utf8)))
         }
-        let state = TaggrAppCoordinator(api: api)
+        let state = makeCoordinator(api: api)
         state.authSession = makeAuthSession(privateKey: Curve25519.Signing.PrivateKey())
         state.currentUser = try JSONDecoder.taggr.decode(TaggrUser.self, from: Self.currentUserFixture())
         let post = samplePost(
@@ -47,17 +118,24 @@ extension TaggrTests {
         await state.toggleHide(postId: 42)
         XCTAssertTrue(state.feed.first?.hiddenFor.contains(7) == true)
         await state.voteOnPoll(postId: 42, option: 0, anonymously: true)
+        await state.voteOnPoll(postId: 42, option: 0, anonymously: false)
         await state.togglePinnedPost(postId: 42)
         await state.deletePost(post)
 
         XCTAssertNil(state.errorMessage)
-        XCTAssertEqual(calls.filter { $0.method != "hot_posts" && $0.method != "user" }.map(\.method), [
+        let updateMethods = Set(["toggle_hide_post", "vote_on_poll", "toggle_pinned_post", "delete_post"])
+        XCTAssertEqual(calls.filter { updateMethods.contains($0.method) }.map(\.method), [
             "toggle_hide_post",
+            "vote_on_poll",
             "vote_on_poll",
             "toggle_pinned_post",
             "delete_post",
         ])
-        XCTAssertEqual(calls.first { $0.method == "vote_on_poll" }?.arg, try TaggrCandid.jsonArguments([42, 0, true]))
+        let pollCalls = calls.filter { $0.method == "vote_on_poll" }
+        XCTAssertEqual(pollCalls.map(\.arg), [
+            try TaggrCandid.jsonArguments([42, 0, true]),
+            try TaggrCandid.jsonArguments([42, 0, false]),
+        ])
         XCTAssertEqual(calls.first { $0.method == "toggle_hide_post" }?.arg, try TaggrCandid.jsonArguments([42]))
         XCTAssertEqual(calls.first { $0.method == "toggle_pinned_post" }?.arg, try TaggrCandid.jsonArguments([42]))
         XCTAssertEqual(calls.first { $0.method == "delete_post" }?.arg, try TaggrCandid.jsonArguments([42, ["edited", "hello"]]))
@@ -73,7 +151,7 @@ extension TaggrTests {
             let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
             return (response, Self.queryReply(Data("null".utf8)))
         }
-        let state = TaggrAppCoordinator(api: api)
+        let state = makeCoordinator(api: api)
         state.authSession = makeAuthSession(privateKey: Curve25519.Signing.PrivateKey())
         let post = samplePost(
             id: 42,
@@ -91,7 +169,7 @@ extension TaggrTests {
 
     @MainActor
     func testUnreadNotificationCountIgnoresReadEntries() {
-        let state = TaggrAppCoordinator()
+        let state = makeCoordinator()
         state.currentUser = notificationUser([
             1: TaggrNotificationEntry(notification: .generic("Unread"), read: false),
             2: TaggrNotificationEntry(notification: .generic("Read"), read: true),
@@ -118,7 +196,7 @@ extension TaggrTests {
             }
             return (response, Self.queryReply(Data("null".utf8)))
         }
-        let state = TaggrAppCoordinator(safety: makeSafetyStore(), api: api)
+        let state = makeCoordinator(safety: makeSafetyStore(), api: api)
         state.authSession = makeAuthSession(privateKey: Curve25519.Signing.PrivateKey())
         state.safety.accept(scope: state.safetyScope)
         state.currentUser = notificationUser([
@@ -149,7 +227,7 @@ extension TaggrTests {
             let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
             return (response, Self.queryReply(Self.currentUserFixture()))
         }
-        let state = TaggrAppCoordinator(api: api)
+        let state = makeCoordinator(api: api)
         state.authSession = makeAuthSession(privateKey: Curve25519.Signing.PrivateKey())
         state.currentUser = notificationUser([1: TaggrNotificationEntry(notification: .newPost(message: "A new reply to your post", postId: 42), read: false)])
         await state.refreshNotifications()
@@ -175,7 +253,7 @@ extension TaggrTests {
             let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
             return (response, Self.queryReply(Self.currentUserFixture()))
         }
-        let state = TaggrAppCoordinator(api: api)
+        let state = makeCoordinator(api: api)
         state.authSession = makeAuthSession(privateKey: Curve25519.Signing.PrivateKey())
         let first = Task { await state.refreshNotifications() }
         await fulfillment(of: [started], timeout: 5)
@@ -198,7 +276,7 @@ extension TaggrTests {
             let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
             return (response, Self.queryReply(Self.currentUserFixture()))
         }
-        let state = TaggrAppCoordinator(api: api)
+        let state = makeCoordinator(api: api)
         state.authSession = makeAuthSession(privateKey: Curve25519.Signing.PrivateKey())
         let task = Task { await state.refreshNotifications() }
         await fulfillment(of: [started], timeout: 5)
@@ -217,7 +295,7 @@ extension TaggrTests {
             let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
             return (response, Self.queryReply(Self.currentUserFixture()))
         }
-        let state = TaggrAppCoordinator(api: api)
+        let state = makeCoordinator(api: api)
         state.authSession = makeAuthSession(privateKey: Curve25519.Signing.PrivateKey())
         await state.pollNotifications(sleep: { throw CancellationError() })
         XCTAssertEqual(calls, 1)
@@ -236,7 +314,7 @@ extension TaggrTests {
             let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
             return (response, Self.queryReply(Data("null".utf8)))
         }
-        let state = TaggrAppCoordinator(api: api)
+        let state = makeCoordinator(api: api)
         state.authSession = makeAuthSession(privateKey: Curve25519.Signing.PrivateKey())
         state.currentUser = notificationUser([
             1: TaggrNotificationEntry(notification: .generic("Unread"), read: false),
@@ -260,7 +338,7 @@ extension TaggrTests {
             let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
             return (response, Self.queryReply(Data("null".utf8)))
         }
-        let state = TaggrAppCoordinator(api: api)
+        let state = makeCoordinator(api: api)
         state.authSession = makeAuthSession(privateKey: Curve25519.Signing.PrivateKey())
         state.currentUser = notificationUser([
             9: TaggrNotificationEntry(notification: .watchedPostEntries(postId: 42, entries: [43]), read: false),
@@ -297,7 +375,7 @@ extension TaggrTests {
             }
             return (response, Self.queryReply(Data("null".utf8)))
         }
-        let state = TaggrAppCoordinator(api: api)
+        let state = makeCoordinator(api: api)
         state.authSession = makeAuthSession(privateKey: Curve25519.Signing.PrivateKey())
         state.icpInvoice = TaggrICPInvoice(e8s: 100_000_000, paidE8s: 0, paid: true, account: [9])
 
@@ -321,7 +399,7 @@ extension TaggrTests {
             let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
             return (response, Self.queryReply(Data(#"{"Ok":{"e8s":100000000,"paid_e8s":0,"paid":false,"account":[222,173,190,239]}}"#.utf8)))
         }
-        let state = TaggrAppCoordinator(api: api)
+        let state = makeCoordinator(api: api)
         state.authSession = makeAuthSession(privateKey: Curve25519.Signing.PrivateKey())
 
         await state.checkICPInvoice()
@@ -360,7 +438,7 @@ extension TaggrTests {
                 return (response, Self.queryReply(Data("null".utf8)))
             }
         }
-        let state = TaggrAppCoordinator(api: api)
+        let state = makeCoordinator(api: api)
         state.authSession = makeAuthSession(privateKey: Curve25519.Signing.PrivateKey())
 
         await state.mintOneKCredits()
@@ -393,35 +471,36 @@ extension TaggrTests {
                 if calls.last?.method == "user" {
                     return (response, Self.queryReply(Self.currentUserFixture()))
                 }
+                if calls.last?.method == "realms" {
+                    return (response, Self.queryReply(Self.safeRealmFixture()))
+                }
                 return (response, Self.queryReply(Data("[]".utf8)))
             }
             return (response, Self.queryReply(Self.candidAddPostResultOk(42)))
         }
-        let state = TaggrAppCoordinator(safety: makeSafetyStore(), api: api)
+        let state = makeCoordinator(safety: makeSafetyStore(), api: api)
         state.authSession = makeAuthSession(privateKey: Curve25519.Signing.PrivateKey())
         state.safety.accept(scope: state.safetyScope)
 
-        await state.repost(postId: 42, text: "boost", realm: "DEV")
+        await runQueuedSubmission(state, context: .repost(42), text: "boost", realm: "DEV", images: []) { draft in
+            state.enqueueRepost(postId: 42, text: "boost", realm: "DEV", draft: draft)
+        }
+        await waitForPostReconciliation(state)
 
         XCTAssertNil(state.errorMessage)
-        XCTAssertEqual(calls.first?.method, "add_post")
+        XCTAssertEqual(calls.first { $0.method == "add_post" }?.method, "add_post")
         let extensionBlob = Data(#"{"Repost":42}"#.utf8)
-        XCTAssertEqual(
-            calls.first?.arg,
-            try TaggrCandidAdapter.addPostArguments(
-                text: "boost",
+        try assertAddPostRequest(calls.first { $0.method == "add_post" }?.arg, text: "boost",
                 refs: [],
                 parent: nil,
                 realm: "DEV",
-                extensionBlob: extensionBlob
-            ).encode()
-        )
+                extensionBlob: extensionBlob)
     }
 
     @MainActor
     func testSignOutClearsPersonalFeed() {
         let post = samplePost(body: "hello", files: [:])
-        let state = TaggrAppCoordinator(
+        let state = makeCoordinator(
             identityStore: makeTestIdentityStore(
                 config: TaggrRuntimeConfig.current,
                 service: testIdentityService()
@@ -444,7 +523,7 @@ extension TaggrTests {
     @MainActor
     func testSignOutKeepsPublicFeed() {
         let post = samplePost(body: "hello", files: [:])
-        let state = TaggrAppCoordinator(
+        let state = makeCoordinator(
             identityStore: makeTestIdentityStore(
                 config: TaggrRuntimeConfig.current,
                 service: testIdentityService()
@@ -485,7 +564,7 @@ extension TaggrTests {
             service: testIdentityService()
         )
         defer { try? identityStore.clear() }
-        let state = TaggrAppCoordinator(api: api, identityStore: identityStore)
+        let state = makeCoordinator(api: api, identityStore: identityStore)
         let session = makeAuthSession(privateKey: Curve25519.Signing.PrivateKey())
         state.route = .settings
 
@@ -497,6 +576,59 @@ extension TaggrTests {
         XCTAssertEqual(calls.first, "user")
         XCTAssertEqual(Set(calls.dropFirst().prefix(2)), Set(["stats", "config"]))
         XCTAssertEqual(calls.last, "account_balance")
+    }
+
+    @discardableResult
+    func runQueuedSubmission(
+        _ state: TaggrAppCoordinator, context: PostDraftContext,
+        text: String, realm: String?, images: [TaggrDraftImage],
+        enqueue: (PostDraftSession) -> Bool
+    ) async -> TaggrPostSubmissionPhase? {
+        let draft = PostDraftSession(context: context, initialText: "", initialRealm: "")
+        await draft.load(store: state.postDraftStore,
+                         namespace: PostDraftNamespace(canisterID: state.runtimeConfig.canisterId,
+                                                       userID: state.currentUser?.id ?? 7))
+        draft.text = text
+        draft.realm = realm ?? ""
+        draft.restoreEditorImages(images)
+        let saved = await draft.markSubmissionNeedsVerification()
+        XCTAssertTrue(saved)
+        XCTAssertTrue(enqueue(draft))
+        let submissions = Array(state.postSubmissionTasks.values)
+        XCTAssertEqual(submissions.count, 1)
+        for task in submissions { await task.value }
+        XCTAssertNotNil(state.postSubmissionNotice)
+        return state.postSubmissionNotice?.phase
+    }
+
+    func waitForPostReconciliation(_ state: TaggrAppCoordinator) async {
+        for task in Array(state.postReconciliationTasks.values) { await task.value }
+    }
+
+    func assertAddPostRequest(_ data: Data?, text: String, refs: [TaggrCandid.FileRef], parent: Int?, realm: String?, extensionBlob: Data?, file: StaticString = #filePath, line: UInt = #line) throws {
+        let wire = try CandidDecoder().decode(XCTUnwrap(data, file: file, line: line))
+        XCTAssertEqual(wire.values.count, 5, file: file, line: line)
+        XCTAssertEqual(try wire.decode(String.self, at: 0), text, file: file, line: line)
+        let files = try wire.decode([TaggrAddPostArgument2Element].self, at: 1)
+        XCTAssertEqual(files.map(\.field0), refs.map(\.id), file: file, line: line)
+        XCTAssertEqual(files.map(\.field1), refs.map(\.offset), file: file, line: line)
+        XCTAssertEqual(files.map(\.field2), refs.map(\.length), file: file, line: line)
+        XCTAssertEqual(try wire.decode(UInt64?.self, at: 2), parent.map(UInt64.init), file: file, line: line)
+        XCTAssertEqual(try wire.decode(String?.self, at: 3), realm, file: file, line: line)
+        XCTAssertEqual(try wire.decode(Data?.self, at: 4), extensionBlob, file: file, line: line)
+    }
+
+    func assertEditPostRequest(_ data: Data?, id: Int, text: String, refs: [TaggrCandid.FileRef], patch: String, realm: String?, file: StaticString = #filePath, line: UInt = #line) throws {
+        let wire = try CandidDecoder().decode(XCTUnwrap(data, file: file, line: line))
+        XCTAssertEqual(wire.values.count, 5, file: file, line: line)
+        XCTAssertEqual(try wire.decode(UInt64.self, at: 0), UInt64(id), file: file, line: line)
+        XCTAssertEqual(try wire.decode(String.self, at: 1), text, file: file, line: line)
+        let files = try wire.decode([TaggrEditPostArgument3Element].self, at: 2)
+        XCTAssertEqual(files.map(\.field0), refs.map(\.id), file: file, line: line)
+        XCTAssertEqual(files.map(\.field1), refs.map(\.offset), file: file, line: line)
+        XCTAssertEqual(files.map(\.field2), refs.map(\.length), file: file, line: line)
+        XCTAssertEqual(try wire.decode(String.self, at: 3), patch, file: file, line: line)
+        XCTAssertEqual(try wire.decode(String?.self, at: 4), realm, file: file, line: line)
     }
 
     func customRuntimeConfig() -> TaggrRuntimeConfig {
@@ -519,19 +651,21 @@ extension TaggrTests {
     ) -> ICIdentityStore {
         ICIdentityStore(
             configuration: config.icClientConfiguration,
-            service: service
+            service: service,
+            account: "session",
+            keychain: TaggrTestKeychain()
         )
     }
 
     func makeAuthSession(
         privateKey: Curve25519.Signing.PrivateKey,
         config: TaggrRuntimeConfig = .from(info: [:]),
-        targets: [Data]? = nil
+        targets: [Data]? = nil,
+        requestedAt: Date = Date(),
+        rootPrivateKey: Curve25519.Signing.PrivateKey = Curve25519.Signing.PrivateKey()
     ) -> ICAuthSession {
-        let rootPrivateKey = Curve25519.Signing.PrivateKey()
         let sessionPublicKey = ICRC167Codec.derPublicKey(from: privateKey.publicKey.rawRepresentation)
         let rootPublicKey = ICRC167Codec.derPublicKey(from: rootPrivateKey.publicKey.rawRepresentation)
-        let requestedAt = Date()
         let ttl = config.icClientConfiguration.delegationTTLNanoseconds
         let requestedAtNanoseconds = UInt64(requestedAt.timeIntervalSince1970 * 1_000_000_000)
         let expiration = requestedAtNanoseconds + ttl
@@ -710,7 +844,8 @@ extension TaggrTests {
             nodeId: nodeId,
             node: node
         )
-        TaggrURLProtocolStub.requestHandler = { request in
+        let handlerID = UUID().uuidString
+        TaggrURLProtocolStub.register(id: handlerID) { request in
             if request.url?.path.hasSuffix("/read_state") == true,
                self.readStateRequest(request, containsPathLabel: "subnet") {
                 let response = HTTPURLResponse(
@@ -795,8 +930,14 @@ extension TaggrTests {
         }
         let configuration = URLSessionConfiguration.ephemeral
         configuration.protocolClasses = [TaggrURLProtocolStub.self]
+        configuration.httpAdditionalHeaders = [TaggrURLProtocolStub.handlerHeader: handlerID]
+        let session = URLSession(configuration: configuration)
+        addTeardownBlock {
+            session.invalidateAndCancel()
+            TaggrURLProtocolStub.unregister(id: handlerID)
+        }
         return TaggrAPI(
-            session: URLSession(configuration: configuration),
+            session: session,
             config: config,
             trustRoot: .custom(root.derPublicKey)
         )
@@ -847,6 +988,10 @@ extension TaggrTests {
 
     nonisolated static func currentUserFixture() -> Data {
         Data(#"{"id":7,"name":"alice","about":"","principal":null,"realms":[],"followees":[],"followers":[],"blacklist":[],"bookmarks":[42],"pinned_posts":[],"settings":{},"controlled_realms":[],"mode":null}"#.utf8)
+    }
+
+    nonisolated static func safeRealmFixture(_ name: String = "DEV") -> Data {
+        Data("[{\"name\":\"\(name)\",\"description\":\"Builders\",\"adult_content\":false}]".utf8)
     }
 
     nonisolated static func userFixture(id: Int = 7, name: String = "alice") -> Data {
@@ -1299,7 +1444,16 @@ final class TaggrTestKeychain: ICKeychainAccess, @unchecked Sendable {
 }
 
 final class TaggrURLProtocolStub: URLProtocol {
-    nonisolated(unsafe) static var requestHandler: ((URLRequest) throws -> (HTTPURLResponse, Data))?
+    static let handlerHeader = "X-TAGGR-Test-Handler"
+    private static let handlers = LockedTestValue<[String: (URLRequest) throws -> (HTTPURLResponse, Data)]>([:])
+
+    static func register(id: String, handler: @escaping (URLRequest) throws -> (HTTPURLResponse, Data)) {
+        handlers.mutate { $0[id] = handler }
+    }
+
+    static func unregister(id: String) {
+        handlers.mutate { $0[id] = nil }
+    }
 
     override class func canInit(with request: URLRequest) -> Bool {
         true
@@ -1310,7 +1464,8 @@ final class TaggrURLProtocolStub: URLProtocol {
     }
 
     override func startLoading() {
-        guard let requestHandler = Self.requestHandler else {
+        let handlerID = request.value(forHTTPHeaderField: Self.handlerHeader) ?? ""
+        guard let requestHandler = Self.handlers.read({ $0[handlerID] }) else {
             client?.urlProtocol(self, didFailWithError: TaggrAPIError.invalidResponse("missing URLProtocol stub"))
             return
         }
@@ -1325,4 +1480,68 @@ final class TaggrURLProtocolStub: URLProtocol {
     }
 
     override func stopLoading() {}
+}
+
+extension TaggrTests {
+    func testStubbedAPIsKeepRequestsAndResponsesSeparate() async throws {
+        let firstCalls = LockedTestValue<[String]>([])
+        let secondCalls = LockedTestValue<[String]>([])
+        let first = makeStubbedAPI { request in
+            let method = try XCTUnwrap(self.requestMethodAndArg(from: request)).method
+            firstCalls.mutate { $0.append(method) }
+            return (HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!, Self.queryReply(Data(#""first response""#.utf8)))
+        }
+        let second = makeStubbedAPI { request in
+            let method = try XCTUnwrap(self.requestMethodAndArg(from: request)).method
+            secondCalls.mutate { $0.append(method) }
+            return (HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!, Self.queryReply(Data(#""second response""#.utf8)))
+        }
+        async let firstResult = first.query("first_method", as: String.self)
+        async let secondResult = second.query("second_method", as: String.self)
+        let results = try await (firstResult, secondResult)
+        XCTAssertEqual(results.0, "first response")
+        XCTAssertEqual(results.1, "second response")
+        XCTAssertEqual(firstCalls.read { $0 }, ["first_method"])
+        XCTAssertEqual(secondCalls.read { $0 }, ["second_method"])
+    }
+
+    func testSettingsRefreshDiscardsResponsesAfterAccountChanges() async throws {
+        for (delayedMethod, fails) in [("account_balance", false), ("bucket_wasm_hash", false), ("bucket_wasm_hash", true)] {
+            let started = expectation(description: "old account \(delayedMethod) started")
+            let release = DispatchSemaphore(value: 0)
+            defer { release.signal() }
+            let api = makeStubbedAPI { request in
+                let method = self.requestMethodAndArg(from: request)?.method ?? ""
+                if method == delayedMethod {
+                    started.fulfill()
+                    _ = release.wait(timeout: .now() + 5)
+                }
+                let body: Data
+                switch method {
+                case "stats": body = Data("{}".utf8)
+                case "config": body = Data("{}".utf8)
+                case "user": body = Self.currentUserFixture()
+                case "account_balance": body = Self.candidTokens(200_000_000)
+                case "bucket_wasm_hash": body = Data(#""old hash""#.utf8)
+                default: body = Data("null".utf8)
+                }
+                return (HTTPURLResponse(url: request.url!, statusCode: fails && method == delayedMethod ? 500 : 200, httpVersion: nil, headerFields: nil)!, Self.queryReply(body))
+            }
+            let state = makeCoordinator(api: api)
+            state.authSession = makeAuthSession(privateKey: Curve25519.Signing.PrivateKey())
+            state.route = .settings
+            let refresh = Task { await state.refreshVisibleRoute() }
+            await fulfillment(of: [started], timeout: 2)
+            state.signOut()
+            state.authSession = makeAuthSession(privateKey: Curve25519.Signing.PrivateKey())
+            state.icpBalanceE8s = 777
+            state.storageExpectedWasmHash = "new account hash"
+            state.errorMessage = "new account notice"
+            release.signal()
+            await refresh.value
+            XCTAssertEqual(state.icpBalanceE8s, 777)
+            XCTAssertEqual(state.storageExpectedWasmHash, "new account hash")
+            XCTAssertEqual(state.errorMessage, "new account notice")
+        }
+    }
 }

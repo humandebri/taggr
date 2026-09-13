@@ -12,7 +12,7 @@ struct RootView: View {
             if !state.acceptedSafetyTerms {
                 SafetyGateView()
             } else {
-                tabs.id(state.safetyScope)
+                tabs.id("\(state.safetyScope):\(state.runtimeGeneration):\(state.currentUser?.id.description ?? "guest")")
             }
         }
         .task(id: "\(state.safetyScope):\(state.runtimeGeneration):\(scenePhase)") {
@@ -30,6 +30,9 @@ struct RootView: View {
         }
         .tint(TaggrTheme.clickable)
         .preferredColorScheme(.dark)
+        .onChange(of: "\(state.safetyScope):\(state.runtimeGeneration):\(state.currentUser?.id.description ?? "guest")") { _, _ in
+            state.navigationStore.featureReturnRoutes = [:]
+        }
     }
 
     private var tabs: some View {
@@ -63,7 +66,7 @@ struct RootView: View {
             .tag(RootTab.inbox)
 
             NavigationStack {
-                SettingsView()
+                AccountRouteView()
             }
             .tabItem { Label("Account", systemImage: "person.crop.circle") }
             .tag(RootTab.settings)
@@ -171,7 +174,7 @@ struct RootView: View {
             return .realms
         case .inbox:
             return .inbox
-        case .settings:
+        case .settings, .bookmarks, .invites, .proposals, .proposal:
             return .settings
         default:
             return .feed
@@ -254,6 +257,11 @@ private struct FeedRouteView: View {
 
     var body: some View {
         switch state.route {
+        case .search(let query):
+            SearchView(query: query).id(query)
+        case .transactions(let account):
+            ScrollView { TransactionsView(account: account).padding() }.navigationTitle("Transactions")
+                .toolbar { ToolbarItem(placement: .topBarLeading) { Button("Back") { state.returnFromFeature(fallback: .search("")) } } }
         case .post:
             PostDetailView()
         case .profile:

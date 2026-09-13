@@ -7,11 +7,9 @@ struct TaggrMarkdownText: View {
     let text: String
     private final class PresentationBox: NSObject {
         let attributed: AttributedString
-        let hasInteractiveLink: Bool
 
-        init(attributed: AttributedString, hasInteractiveLink: Bool) {
+        init(attributed: AttributedString) {
             self.attributed = attributed
-            self.hasInteractiveLink = hasInteractiveLink
         }
     }
 
@@ -41,7 +39,7 @@ struct TaggrMarkdownText: View {
     private static func uncachedAttributedMarkdown(from text: String) -> AttributedString {
         // Foundation's Markdown parser covers inline emphasis, code, links, and
         // block intents without adding a parser dependency to the native app.
-        let displayText = preservingUserLineBreaks(in: autolinkBareURLs(in: text))
+        let displayText = preservingUserLineBreaks(in: text)
         guard var attributed = try? AttributedString(markdown: displayText) else {
             return AttributedString(text)
         }
@@ -133,10 +131,6 @@ struct TaggrMarkdownText: View {
         return result
     }
 
-    static func containsInteractiveLink(in text: String) -> Bool {
-        presentation(for: text).hasInteractiveLink
-    }
-
     static func markdownProtectedRanges(in text: String) -> [Range<String.Index>] {
         let nsRange = NSRange(text.startIndex..<text.endIndex, in: text)
         return markdownProtectedExpression
@@ -150,13 +144,8 @@ struct TaggrMarkdownText: View {
             return cached
         }
         let linkedText = autolinkBareURLs(in: linkTagsAndUsers(text))
-        let hasMarkdownLink = markdownProtectedRanges(in: text).contains(where: { range in
-            let protected = String(text[range])
-            return protected.hasPrefix("[") || protected.hasPrefix("![")
-        })
         let presentation = PresentationBox(
-            attributed: uncachedAttributedMarkdown(from: linkedText),
-            hasInteractiveLink: hasMarkdownLink || linkedText != text
+            attributed: uncachedAttributedMarkdown(from: linkedText)
         )
         presentationCache.setObject(presentation, forKey: key)
         return presentation
@@ -196,12 +185,13 @@ struct TaggrMarkdownText: View {
         }
     }
 
+    private static let bareURLExpression = try! NSRegularExpression(
+        pattern: #"(?i)(?:https?://|www\.)[^\s<>\[\]]+"#
+    )
+
     private static func autolinkBareURLs(in text: String) -> String {
-        let expression = try! NSRegularExpression(
-            pattern: #"(?i)(?:https?://|www\.)[^\s<>\[\]]+"#
-        )
         let protectedRanges = markdownProtectedRanges(in: text)
-        let matches = expression.matches(
+        let matches = bareURLExpression.matches(
             in: text,
             range: NSRange(text.startIndex..<text.endIndex, in: text)
         )

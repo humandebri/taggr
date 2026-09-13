@@ -40,7 +40,7 @@ struct TaggrPostBodyView: View {
                 ForEach(Array(blocks.enumerated()), id: \.offset) { _, block in
                     switch block {
                     case .markdown(let markdown):
-                        interactiveText(markdown, maximumLines: nil)
+                        interactiveText(markdown, maximumLines: nil, blocks: [markdown])
                     case .youtube(let preview):
                         YouTubePreviewView(preview: preview)
                     }
@@ -49,11 +49,14 @@ struct TaggrPostBodyView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .onAppear { onTruncationChange(false) }
         } else {
-            interactiveText(text, maximumLines: maximumLines)
+            interactiveText(text, maximumLines: maximumLines, blocks: blocks.compactMap {
+                guard case .markdown(let markdown) = $0 else { return nil }
+                return markdown
+            })
         }
     }
 
-    private func interactiveText(_ content: String, maximumLines: Int?) -> some View {
+    private func interactiveText(_ content: String, maximumLines: Int?, blocks: [String]) -> some View {
         TaggrInteractiveMarkdownText(
             text: content,
             maximumLines: maximumLines,
@@ -62,21 +65,12 @@ struct TaggrPostBodyView: View {
             lineSpacing: lineSpacing,
             accessibilityIdentifier: accessibilityIdentifier,
             openPost: openPost,
-            onTruncationChange: onTruncationChange
+            onTruncationChange: onTruncationChange,
+            parsedMarkdownBlocks: blocks
         )
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    static func containsInteractiveLink(in text: String) -> Bool {
-        TaggrPostBodyParser.blocks(in: text).contains { block in
-            switch block {
-            case .markdown(let markdown):
-                return TaggrMarkdownText.containsInteractiveLink(in: markdown)
-            case .youtube:
-                return true
-            }
-        }
-    }
 }
 
 enum TaggrPostContentBlock {

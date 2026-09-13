@@ -8,6 +8,8 @@ enum TaggrRoute: Hashable, Sendable {
     case realm(String)
     case inbox
     case settings
+    case bookmarks, invites, proposals
+    case search(String), transactions(String), proposal(Int)
 }
 
 enum TaggrNavigation {
@@ -59,6 +61,12 @@ enum TaggrNavigation {
             return "/realm/\(name)"
         case .inbox:
             return "/inbox"
+        case .bookmarks: return "/bookmarks"
+        case .invites: return "/invites"
+        case .proposals: return "/proposals"
+        case .search(let query): return "/search/\(pathComponent(query))"
+        case .transactions(let account): return "/transactions/\(pathComponent(account))"
+        case .proposal(let id): return "/proposal/\(id)"
         case .settings:
             return "/settings"
         }
@@ -90,7 +98,13 @@ enum TaggrNavigation {
             return .profile(handle)
         case "realm":
             return parts.dropFirst().first.map(TaggrRoute.realm)
-        case "transaction", "transactions", "tokens", "wallet", "auction":
+        case "bookmarks": return .bookmarks
+        case "invites": return .invites
+        case "proposals": return .proposals
+        case "proposal": return parts.dropFirst().first.flatMap(Int.init).map(TaggrRoute.proposal)
+        case "search": return .search(parts.dropFirst().joined(separator: "/").removingPercentEncoding ?? "")
+        case "transactions": return .transactions(parts.dropFirst().first.map { $0.removingPercentEncoding ?? $0 } ?? "2vxsx-fae")
+        case "transaction", "tokens", "wallet", "auction":
             return .settings
         case "inbox":
             return .inbox

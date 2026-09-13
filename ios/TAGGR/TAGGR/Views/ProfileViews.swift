@@ -121,6 +121,7 @@ struct ProfileView: View {
                     votingPowerActivityWeeks: state.cache?.config?.votingPowerActivityWeeks
                 )
             )
+            if user.id == state.currentUser?.id { AccountFeatureLinks() }
             if !user.about.isEmpty {
                 TaggrMarkdownText(text: user.about)
                     .font(.body)
