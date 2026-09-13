@@ -454,10 +454,11 @@ extension TaggrTests {
         let postingScope = try XCTUnwrap(state.realmPostingScope)
 
         state.safety.accept(scope: state.safetyScope)
-        await state.submitPost(text: "hello")
+        await state.submitPost(text: "    hello\n\n")
 
         XCTAssertNil(state.errorMessage)
         XCTAssertEqual(calls.first?.method, "add_post")
+        XCTAssertEqual(calls.first?.arg, try TaggrCandidAdapter.addPostArguments(text: "    hello\n\n", refs: [], parent: nil, realm: nil, extensionBlob: nil).encode())
         XCTAssertEqual(Set(calls.dropFirst().map(\.method)), Set(["user", "hot_posts"]))
         XCTAssertEqual(
             calls.first { $0.method == "hot_posts" }?.arg,
@@ -1019,6 +1020,9 @@ extension TaggrTests {
             }
             let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
             if request.url?.path.hasSuffix("/query") == true {
+                if calls.last?.method == "realms" {
+                    return (response, Self.queryReply(Data(#"[{"name":"ART","description":"Art","adult_content":false}]"#.utf8)))
+                }
                 if calls.last?.method == "user" {
                     return (response, Self.queryReply(Self.currentUserFixture()))
                 }
@@ -1039,15 +1043,17 @@ extension TaggrTests {
         let post = samplePost(id: 42, user: 7, body: "hello", files: [:], realm: "DEV")
 
         state.safety.accept(scope: state.safetyScope)
-        await state.editPost(post: post, text: "updated", realm: "ART", reloadMode: .latest)
+        await state.editPost(post: post, text: "    updated\n\n", realm: "ART", reloadMode: .latest)
 
-        let patch = TaggrEditPatch.fullReplacement(from: "updated", to: "hello")
+        XCTAssertEqual(calls.filter { $0.method == "realms" }.count, 2)
+        calls.removeAll { $0.method == "realms" }
+        let patch = TaggrEditPatch.fullReplacement(from: "    updated\n\n", to: "hello")
         XCTAssertNil(state.errorMessage)
         XCTAssertEqual(calls.first?.method, "edit_post")
         XCTAssertEqual(Set(calls.dropFirst().map(\.method)), Set(["user", "thread"]))
         XCTAssertEqual(
             calls.first?.arg,
-            try TaggrCandidAdapter.editPostArguments(id: 42, text: "updated", refs: [], patch: patch, realm: "ART").encode()
+            try TaggrCandidAdapter.editPostArguments(id: 42, text: "    updated\n\n", refs: [], patch: patch, realm: "ART").encode()
         )
         XCTAssertEqual(preferences.recentDestinations(scope: postingScope), ["ART"])
     }

@@ -26,14 +26,20 @@ calling string-edit helpers:
     system clipboard permission and rich-text paste remain manual checks.
     Clipboard contents changed by cut are restored after the test.
 -   Disabling, dismissing and reopening the editor preserve text and restore focus.
--   Bold, italic, list and link actions append their existing templates at the end;
-    they do not format the selected text. Quote acts on the selected lines.
+-   Bold, italic, list, quote and link replace the selected UTF-16 range. Empty
+    selections insert at the caret; link labels come from the selection, including
+    an empty label. Link URL input is preserved verbatim. Empty URLs and cancellation
+    preserve the document. Quotes use the Web prefix rule and ordinary newlines.
 -   Restored new-post, reply and edit drafts can be edited through the hosted input
     and saved back through the real local draft store.
 -   Narrow/wide host layouts and accessibility text sizing retain available width.
     This exercises resizing, not physical rotation or the complete composer chrome.
--   Quote selection, quote continuation/termination, and the active image segment
-    remain covered by the existing quote tests.
+-   Image insertion uses the Web newline rule at the saved document cursor without
+    deleting selected text. Formatting and image edits share document-level undo
+    history with typing and explicit-item-provider paste.
+-   Link and photo pickers snapshot the document and selection before presentation.
+    Stale results do not modify a changed or dismissed document; import cancellation
+    restores the selection. The editor is disabled during image import.
 
 For the hosted gate, use the selected target's UDID:
 
@@ -56,6 +62,25 @@ Use `idb list-targets --json` to select the target explicitly. Build with
 cannot launch tests, document that infrastructure failure and use Xcode's test
 runner against the same target. Check the executed test count: a successful
 command that selects zero tests is not a pass.
+
+## Web parity contract
+
+Run `node ios/scripts/composer-web-parity.cjs`. It extracts the actual callbacks
+and image insertion function from the Web form using the installed TypeScript
+parser and executes the same fixtures bundled into the iOS tests. The fixtures
+cover Japanese, emoji, combining characters, partial/multiline/empty selections,
+repeated formatting, empty/verbatim URLs and image boundaries.
+
+Parity means the same Markdown for the same input, selection and image markers.
+iOS retains native image presentation and local draft persistence. It does not
+add the Web-only toolbar buttons or copy Web autosave gaps. Image transcoding and
+marker generation remain platform-specific. Whitespace-only posts are rejected,
+but valid submission bodies retain leading/trailing spaces and newlines.
+
+The iOS caret contract is explicit: bold/italic retain the enclosed selection;
+empty link insertion places the caret inside `[]`; other replacements place it
+at the end. Cancellation restores the saved selection. Web does not explicitly
+set a post-transformation selection, so its browser-dependent caret is not copied.
 
 ## Before changing editor engines or distributing a build
 
@@ -120,3 +145,98 @@ No cryptographic scope or backend API changes are included.
     checks actual UIKit paste/undo/redo and the document binding; clipboard permission
     handling remains unverified. Do not treat that path as tested by the item-provider
     test.
+
+## Web parity implementation verification (2026-09-13)
+
+The editor now binds text segments directly to the document. It no longer keeps
+an additional segment-local text state that could overwrite a toolbar update
+while committing marked text. A document controller maps UTF-16 selections across
+image markers, snapshots modal operations, and shares undo history between text
+segments. Both the composer and the standard post/edit submission paths preserve
+boundary whitespace; reposting is outside this change.
+
+-   Final Simulator run: **22 composer tests passed, 0 failed, 0 skipped**.
+    This includes actual link-sheet insertion/cancellation/empty URL, active marked
+    text followed by formatting, image failure/cancellation, image insertion while
+    disabled, caret restoration, undo/redo, and formatted draft restoration in new
+    post/reply/edit contexts. New-post and edit API mocks also verified exact Candid
+    arguments preserving leading indentation and trailing newlines.
+-   Expanded run: **47 tests, 41 passed, 6 failed, 0 skipped**. Result bundle:
+    `.build/composer-investigation/Logs/Test/Test-TAGGR-2026.09.13_14-20-39-+0900.xcresult`.
+    The failures are listed below; this is not an all-suite pass.
+-   Web shared fixtures: **14 Markdown and 4 image cases passed**, using callbacks
+    extracted from the actual form rather than a duplicate Web implementation.
+-   Playwright CLI exercised the actual Web `Form` in a local API-mocked harness:
+    selected `TAGGR` became `[TAGGR](https://example.com)`, cancellation preserved
+    the text and returned focus, and Bold produced `**TAGGR**` at the selection.
+    Submission was disabled. The only browser console error was a missing favicon.
+    Screenshot: `.playwright-cli/page-2026-09-13T05-05-37-288Z.png`.
+-   `cargo check`, TypeScript checking, frontend build, `make format`, formatting
+    checks and `git diff --check` passed during implementation.
+-   idb can list and boot the Simulator with host access, but `idb xctest run app`
+    failed with `Connection lost`; Xcode's test runner is the fallback on the same
+    iPhone 17 / iOS 26.5 Simulator.
+
+Expanded checks still expose pre-existing failures outside the changed editor:
+`testEditPostUploadsImageBeforeEditPost` and
+`testSubmitPostPassesRealmAndReloadsRealmFeed` do not mock the realm lookup now
+required before publishing; `testEnqueuedPostKeepsRetryableAndUncertainDrafts`
+fails verification before reaching the update whose uncertain outcome it expects.
+`testEnqueuedPostDoesNotRefreshStaleFeedRoute` and
+`testImagePostKeepsEnqueuedAPIWhenSessionChangesDuringUpload` terminate the test
+process. `testPostDraftDocumentInsertsAndMovesImageMarkers` still disagrees about
+blank lines in the unchanged image-movement helper. These failures are not
+silently skipped or counted as passes. The edit whitespace regression test was
+updated to provide its required realm response and assert both verification calls.
+
+Physical-device Japanese keyboard conversion, actual Photos library selection,
+rotation and the minimum supported OS remain unverified for this patch. The
+hosted tests use real UIKit input and SwiftUI link-sheet controls, but synthetic
+marked text is not a substitute for a physical Japanese keyboard check. No
+physical-device installation, production submission or TestFlight upload was
+performed for this patch.
+
+## Unified editing history follow-up (2026-09-13)
+
+UIKit text changes now update the document only through `recordTyping`. The
+second segment write was removed: once a pasted blob marker splits a text
+segment, applying the same replacement again duplicated the marker and its
+following text. The regression test inserts multiple blob markers with Japanese
+and emoji text into empty and already segmented documents and checks undo/redo.
+
+Undo snapshots now retain document identity, Markdown, local image data and the
+UTF-16 selection. Image insertion, deletion, both drag destinations and YouTube
+URL insertion use the same controller as typing and formatting. Removing one of
+several references retains the attachment; undoing the last reference's deletion
+restores its data, including after the deletion was saved to disk. Upload
+acknowledgement remains outside undo/redo and follows successful draft saving.
+Automatic URL insertion does not open the keyboard, and duplicate URLs do not
+create another undo step. Disconnection clears history and pending selection.
+The existing image-movement whitespace algorithm remains unchanged.
+
+A mixed-history test exposed an additional selection issue: `UITextInput`
+insertion does not always invoke the delegate's pre-change callback. The editor
+now also remembers selection changes while the view still matches the previous
+model. This restores the original caret when undo reaches the initial typing
+operation, without capturing the selection after the text has already changed.
+
+-   All **26 composer tests passed**, including four new regression tests for
+    pasted blob Markdown, mixed history, automatic URL insertion, and actual
+    `PostDraftSession` image restoration/persistence in new/reply/edit contexts.
+-   Final expanded run: **51 tests, 45 passed, 6 failed, 0 skipped**. The same
+    six failures listed in the previous section remain; there are no additional
+    failing tests. Result bundle:
+    `.build/composer-investigation/Logs/Test/Test-TAGGR-2026.09.13_15-02-08-+0900.xcresult`.
+-   Web fixtures passed: **14 Markdown and 4 image cases**. Playwright CLI again
+    verified selected-text link insertion and cancellation preserving text and
+    restoring focus on the actual Web Form with submission disabled.
+    Snapshot: `.playwright-cli/page-2026-09-13T06-00-13-591Z.yml`.
+-   TypeScript checking, frontend build, `cargo check` and `make format` passed.
+-   Swift 6.3.2 initially crashed compiling a bound actor method used as a Binding
+    setter. An explicit setter closure compiled successfully; no toolchain or
+    dependency change was needed. Temporary diagnostic output was removed.
+
+Verification used the existing iPhone 17 / iOS 26.5 Simulator and Xcode test-runner
+fallback documented above. Physical-device Japanese keyboard and Photos picker
+checks remain unperformed. No physical install, commit, push or distribution was
+performed during this follow-up.

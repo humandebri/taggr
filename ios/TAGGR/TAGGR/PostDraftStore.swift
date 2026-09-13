@@ -128,6 +128,43 @@ enum PostDraftDocument {
         .joined()
     }
 
+    static func textOffset(in text: String, segmentID: Int) -> Int? {
+        var offset = 0
+        for segment in segments(in: text) {
+            switch segment {
+            case .text(let id, let value):
+                if id == segmentID { return offset }
+                offset += value.utf16.count
+            case .image(_, _, let markdown, _): offset += markdown.utf16.count
+            }
+        }
+        return nil
+    }
+
+    static func textSegment(in text: String, at offset: Int) -> Int? {
+        var start = 0
+        for segment in segments(in: text) {
+            switch segment {
+            case .text(let id, let value):
+                if (start...start + value.utf16.count).contains(offset) { return id }
+                start += value.utf16.count
+            case .image(_, _, let markdown, _): start += markdown.utf16.count
+            }
+        }
+        return nil
+    }
+
+    static func insertingImages(_ markdowns: [String], in text: String, at offset: Int) -> (text: String, cursor: Int) {
+        guard !markdowns.isEmpty else { return (text, offset) }
+        let source = text as NSString
+        let cursor = min(max(0, offset), source.length)
+        let before = source.substring(to: cursor)
+        let line = before.components(separatedBy: "\n").last ?? ""
+        let needsNewline = !line.isEmpty && !line.hasPrefix("![")
+        let insertion = (needsNewline ? "\n\n" : "") + markdowns.joined(separator: "\n") + "\n"
+        return (before + insertion + source.substring(from: cursor), cursor + insertion.utf16.count)
+    }
+
     static func inserting(markdowns: [String], in text: String, afterTextSegmentID: Int?) -> String {
         guard !markdowns.isEmpty else { return text }
         let insertion = markdowns.joined(separator: "\n")
@@ -555,6 +592,17 @@ final class PostDraftSession: ObservableObject {
             }
             await self?.persistCurrentState()
         }
+    }
+
+    func saveEditorChanges() async -> Bool {
+        await flush()
+        return restorationWarning != Self.saveFailureWarning
+    }
+
+    func restoreEditorImages(_ images: [TaggrDraftImage]) {
+        self.images = images
+        contentDidChange()
+        scheduleSave()
     }
 
     func addImages(_ addedImages: [TaggrDraftImage], afterTextSegmentID: Int? = nil) async {

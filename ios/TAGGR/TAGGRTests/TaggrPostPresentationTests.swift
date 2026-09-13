@@ -378,64 +378,41 @@ extension TaggrTests {
 
 @MainActor
 final class TaggrQuoteTests: XCTestCase {
-    func testQuoteSelectionAndCursor() {
-        let selected = ComposeQuoteEdit.quote("one\ntwo\nthree", selection: NSRange(location: 1, length: 7))
-        XCTAssertEqual(selected.text, "> one\n> two\nthree")
-        XCTAssertEqual(selected.selection, NSRange(location: 3, length: 9))
-        XCTAssertEqual(ComposeQuoteEdit.quote("one\ntwo", selection: NSRange(location: 5, length: 0)).text, "one\n> two")
-        XCTAssertEqual(ComposeQuoteEdit.quote("", selection: NSRange(location: 0, length: 0)).text, "> ")
-        XCTAssertEqual(ComposeQuoteEdit.quote("> existing", selection: NSRange(location: 3, length: 0)).text, "> existing")
+    func testMarkdownMatchesSharedWebFixtures() throws {
+        struct Fixture: Decodable {
+            struct Markdown: Decodable {
+                let action: String; let text: String; let start: Int; let length: Int
+                let url: String?; let expected: String; let cursor: Int; let selectedLength: Int
+            }
+            struct Image: Decodable {
+                let text: String; let start: Int; let markers: [String]; let expected: String
+            }
+            let markdown: [Markdown]; let images: [Image]
+        }
+        let url = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "composer-web-parity", withExtension: "json", subdirectory: "Fixtures"))
+        let fixtures = try JSONDecoder().decode(Fixture.self, from: Data(contentsOf: url))
+        let actions: [String: ComposeMarkdownAction] = ["bold": .bold, "italic": .italic, "list": .list, "quote": .quote, "link": .link]
+        for item in fixtures.markdown {
+            let edit = ComposeMarkdownEdit.applying(try XCTUnwrap(actions[item.action]), to: item.text, selection: NSRange(location: item.start, length: item.length), url: item.url ?? "")
+            XCTAssertEqual(edit.text, item.expected, item.action)
+            XCTAssertEqual(edit.selection, NSRange(location: item.cursor, length: item.selectedLength), item.action)
+        }
+        for item in fixtures.images {
+            let edit = PostDraftDocument.insertingImages(item.markers, in: item.text, at: item.start)
+            XCTAssertEqual(edit.text, item.expected)
+            XCTAssertEqual(edit.cursor, item.expected.utf16.count - (item.text.utf16.count - item.start))
+        }
     }
 
-    func testUnicodeAndQuoteNewlines() {
-        let text = "日本語😀"
-        let quoted = ComposeQuoteEdit.quote(text, selection: NSRange(location: (text as NSString).length, length: 0))
-        XCTAssertEqual(quoted.text, "> 日本語😀")
-        XCTAssertEqual(quoted.selection.location, (quoted.text as NSString).length)
-        let continued = ComposeQuoteEdit.newline(quoted.text, selection: quoted.selection)!
-        XCTAssertEqual(continued.text, "> 日本語😀\n> ")
-        let ended = ComposeQuoteEdit.newline(continued.text, selection: continued.selection)!
-        XCTAssertEqual(ended.text, "> 日本語😀\n\n")
-        XCTAssertEqual(ComposeQuoteEdit.newline(">a", selection: NSRange(location: 2, length: 0))?.text, ">a\n> ")
-        XCTAssertNil(ComposeQuoteEdit.newline("plain", selection: NSRange(location: 5, length: 0)))
-    }
-
-    func testQuoteOnlyChangesTheActiveImageSegment() {
-        let document = "before\n![image](/blob/photo)\nafter😀"
-        let edit = ComposeQuoteEdit.quote("\nafter😀", selection: NSRange(location: 3, length: 0))
-        XCTAssertEqual(
-            PostDraftDocument.replacingText(in: document, segmentID: 2, with: edit.text),
-            "before\n![image](/blob/photo)\n> after😀"
-        )
-    }
-
-    func testQuoteControllerUsesLastActiveEditorAndRestoresSelection() {
-        let controller = ComposeQuoteEditor()
-        var first = "first"
-        var second = "日本語😀"
-        var activated = false
-        let firstEditor = ComposeSelectableTextEditor(
-            text: Binding(get: { first }, set: { first = $0 }), quoteEditor: controller,
-            isFocused: false, activate: {}
-        ).makeCoordinator()
-        let secondEditor = ComposeSelectableTextEditor(
-            text: Binding(get: { second }, set: { second = $0 }), quoteEditor: controller,
-            isFocused: false, activate: { activated = true }
-        ).makeCoordinator()
-        let firstView = UITextView()
-        firstView.text = first
-        firstEditor.view = firstView
-        firstEditor.textViewDidBeginEditing(firstView)
-        let secondView = UITextView()
-        secondView.text = second
-        secondView.selectedRange = NSRange(location: 3, length: 2)
-        secondEditor.view = secondView
-        secondEditor.textViewDidBeginEditing(secondView)
-        controller.quote()
-        XCTAssertEqual(first, "first")
-        XCTAssertEqual(second, "> 日本語😀")
-        XCTAssertEqual(secondView.selectedRange, NSRange(location: 5, length: 2))
-        XCTAssertTrue(activated)
+    func testQuoteNewlineUsesPlainTextInput() async throws {
+        let fixture = try HostedComposer(text: "> 日本語😀")
+        defer { fixture.close() }
+        try await fixture.settle()
+        let input = try fixture.input()
+        input.selectedRange = NSRange(location: input.text.utf16.count, length: 0)
+        input.insertText("\n")
+        try await fixture.settle()
+        XCTAssertEqual(fixture.state.text, "> 日本語😀\n")
     }
 
     func testQuoteBarsFollowFontSizeAndNestedDepth() {
@@ -468,14 +445,17 @@ final class TaggrQuoteTests: XCTestCase {
     @MainActor
     private final class ComposerState: ObservableObject {
         @Published var text = ""
+        @Published var images: [TaggrDraftImage] = []
         @Published var focused: Int? = 0
         @Published var imageTarget: Int?
         @Published var enabled = true
         @Published var visible = true
         @Published var revision = 0
+        @Published var showsToolbar = false
+        let app = TaggrAppCoordinator()
         var changed: ((String) -> Void)?
         let documentID = UUID()
-        let quotes = ComposeQuoteEditor()
+        let quotes = ComposeEditingController()
     }
 
     private struct ComposerHarness: View {
@@ -485,13 +465,17 @@ final class TaggrQuoteTests: XCTestCase {
                 VStack(alignment: .leading, spacing: 16) {
                     if state.visible {
                         ComposePostDocumentEditor(
-                            text: $state.text, draftImages: [], existingImages: [:],
+                            text: $state.text, draftImages: $state.images, existingImages: [:],
                             placeholder: "Write a post \(state.revision)", documentID: state.documentID,
                             focusedTextSegmentID: $state.focused,
                             imageInsertionSegmentID: $state.imageTarget,
                             removeImage: { _, _ in }, moveImage: { _, _ in }
                         )
                         .disabled(!state.enabled)
+                        if state.showsToolbar {
+                            ComposePostAttachmentBar(text: $state.text, selectedPhotos: .constant([]), youtubeTarget: nil, insertYouTubeURL: { _ in }, isSubmitting: false, isImagePickerDisabled: false)
+                                .environment(state.app)
+                        }
                     }
                 }
                 .padding(.horizontal, 18)
@@ -699,34 +683,341 @@ final class TaggrQuoteTests: XCTestCase {
         XCTAssertEqual(fixture.state.text, "日本語😀\n/text")
     }
 
-    func testComposerToolbarPreservesAppendSemanticsAndSelection() async throws {
+    func testComposerFormatsSelectionAndUndoRedo() async throws {
         let fixture = try HostedComposer(text: "日本語😀")
         defer { fixture.close() }
         try await fixture.settle()
         let input = try fixture.input()
         input.selectedRange = NSRange(location: 0, length: 3)
-        let bar = ComposePostAttachmentBar(
-            text: Binding(get: { fixture.state.text }, set: { fixture.state.text = $0 }),
-            selectedPhotos: .constant([]), youtubeTarget: nil, insertYouTubeURL: { _ in },
-            isSubmitting: false, isImagePickerDisabled: true
-        )
-        for (action, expected) in [
-            (ComposeMarkdownAction.bold, "日本語😀 **bold**"),
-            (.italic, "日本語😀 **bold** _italic_"),
-            (.list, "日本語😀 **bold** _italic_\n- item")
-        ] {
-            bar.perform(action)
-            try await fixture.settle()
-            XCTAssertEqual(fixture.state.text, expected)
-            XCTAssertEqual(input.text, expected)
-            XCTAssertEqual(input.selectedRange, NSRange(location: 0, length: 3))
+        fixture.state.quotes.perform(.bold)
+        try await fixture.settle()
+        XCTAssertEqual(fixture.state.text, "**日本語**😀")
+        XCTAssertEqual(input.selectedRange, NSRange(location: 2, length: 3))
+        let undo = try XCTUnwrap(input.undoManager)
+        undo.undo()
+        try await fixture.settle()
+        XCTAssertEqual(fixture.state.text, "日本語😀")
+        XCTAssertEqual(input.selectedRange, NSRange(location: 0, length: 3))
+        undo.redo()
+        try await fixture.settle()
+        XCTAssertEqual(fixture.state.text, "**日本語**😀")
+    }
+
+    func testLinkSnapshotCancellationAndStaleDocument() async throws {
+        let fixture = try HostedComposer(text: "before TAGGR after")
+        defer { fixture.close() }
+        try await fixture.settle()
+        let input = try fixture.input()
+        input.selectedRange = NSRange(location: 7, length: 5)
+        let controller = fixture.state.quotes
+        let cancelled = try XCTUnwrap(controller.capture(suspend: true))
+        controller.restore(cancelled)
+        try await fixture.settle()
+        XCTAssertEqual(fixture.state.text, "before TAGGR after")
+        XCTAssertEqual(input.selectedRange, NSRange(location: 7, length: 5))
+        XCTAssertTrue(input.isFirstResponder)
+        let snapshot = try XCTUnwrap(controller.capture(suspend: true))
+        controller.perform(.link, snapshot: snapshot, url: "https://example.com")
+        try await fixture.settle()
+        XCTAssertEqual(fixture.state.text, "before [TAGGR](https://example.com) after")
+        controller.perform(.link, snapshot: snapshot, url: "duplicate")
+        XCTAssertEqual(fixture.state.text, "before [TAGGR](https://example.com) after")
+        let stale = try XCTUnwrap(controller.capture(suspend: true))
+        controller.disconnect()
+        controller.perform(.link, snapshot: stale, url: "stale")
+        XCTAssertEqual(fixture.state.text, "before [TAGGR](https://example.com) after")
+    }
+
+    func testActualLinkSheetInsertsAndCancels() async throws {
+        let fixture = try HostedComposer(text: "before TAGGR after")
+        defer { fixture.close() }
+        fixture.state.showsToolbar = true
+        try await fixture.settle()
+        let input = try fixture.input()
+        input.selectedRange = NSRange(location: 7, length: 5)
+
+        func descendants(_ view: UIView) -> [UIView] { [view] + view.subviews.flatMap(descendants) }
+        func activate(_ label: String) throws {
+            var visited = Set<ObjectIdentifier>()
+            func accessible(_ object: NSObject) -> [NSObject] {
+                guard visited.insert(ObjectIdentifier(object)).inserted else { return [] }
+                var children: [NSObject] = (object as? UIView)?.subviews ?? []
+                if let elements = object.accessibilityElements as? [NSObject] { children += elements }
+                let count = object.accessibilityElementCount()
+                if count > 0 && count < 1000 {
+                    children += (0..<count).compactMap { object.accessibilityElement(at: $0) as? NSObject }
+                }
+                return [object] + children.flatMap(accessible)
+            }
+            let elements = accessible(fixture.window)
+            let element = try XCTUnwrap(elements.first(where: { $0.accessibilityLabel == label && $0.accessibilityTraits.contains(.button) }), "Missing control: \(label); \(elements.compactMap { $0.accessibilityLabel }.joined(separator: ", "))")
+            if let control = element as? UIControl { control.sendActions(for: control.allControlEvents) }
+            else if !element.accessibilityActivate() {
+                let labelView = descendants(fixture.window).first { ($0 as? UILabel)?.text == label }
+                var ancestor = labelView?.superview
+                while ancestor != nil && !(ancestor is UIControl) { ancestor = ancestor?.superview }
+                let control = try XCTUnwrap(ancestor as? UIControl, "Cannot activate \(label)")
+                control.sendActions(for: control.allControlEvents)
+            }
         }
-        bar.appendInline("[example](https://example.com)")
+        try activate("Link")
+        try await Task.sleep(for: .milliseconds(600))
+        let field = try XCTUnwrap(descendants(fixture.window).compactMap { $0 as? UITextField }.first)
+        field.text = "https://example.com"
+        field.sendActions(for: .editingChanged)
         try await fixture.settle()
-        XCTAssertEqual(input.text, "日本語😀 **bold** _italic_\n- item [example](https://example.com)")
-        fixture.state.quotes.quote()
+        try activate("Insert")
+        try await Task.sleep(for: .milliseconds(600))
+        XCTAssertEqual(fixture.state.text, "before [TAGGR](https://example.com) after")
+        XCTAssertTrue(input.isFirstResponder)
+        let selection = input.selectedRange
+        try activate("Link")
+        try await Task.sleep(for: .milliseconds(600))
+        try activate("Cancel")
+        try await Task.sleep(for: .milliseconds(600))
+        XCTAssertEqual(fixture.state.text, "before [TAGGR](https://example.com) after")
+        XCTAssertEqual(input.selectedRange, selection)
+        XCTAssertTrue(input.isFirstResponder)
+        try activate("Link")
+        try await Task.sleep(for: .milliseconds(600))
+        try activate("Insert")
+        try await Task.sleep(for: .milliseconds(600))
+        XCTAssertEqual(fixture.state.text, "before [TAGGR](https://example.com) after")
+        XCTAssertEqual(input.selectedRange, selection)
+        XCTAssertTrue(input.isFirstResponder)
+    }
+
+    func testImageImportFailureAndCancellationPreserveDocument() async throws {
+        let fixture = try HostedComposer(text: "before after")
+        defer { fixture.close() }
         try await fixture.settle()
-        XCTAssertEqual(fixture.state.text, "> 日本語😀 **bold** _italic_\n- item [example](https://example.com)")
+        let input = try fixture.input()
+        input.selectedRange = NSRange(location: 7, length: 0)
+        let controller = fixture.state.quotes
+        let snapshot = try XCTUnwrap(controller.capture(suspend: true))
+        let importer = ImageImportCoordinator()
+        let failure = ImageImportBatchResult(images: [], failures: [ImageImportFailure(index: 0, reason: .photoReadFailed)])
+        var completions = 0
+        var warning: String?
+        importer.start(operation: { failure }, completion: { result in
+            completions += 1
+            warning = result.warning
+            controller.restore(snapshot)
+        })
+        try await fixture.settle()
+        XCTAssertFalse(importer.isImporting)
+        XCTAssertNotNil(warning)
+        XCTAssertEqual(fixture.state.text, "before after")
+        XCTAssertEqual(input.selectedRange, snapshot.selection)
+        XCTAssertTrue(input.isFirstResponder)
+        importer.start(operation: {
+            try? await Task.sleep(for: .milliseconds(50))
+            return failure
+        }, completion: { _ in completions += 1 })
+        importer.cancel()
+        try await fixture.settle()
+        XCTAssertFalse(importer.isImporting)
+        XCTAssertEqual(completions, 1)
+        XCTAssertEqual(fixture.state.text, "before after")
+    }
+
+    func testFormattingCommitsMarkedTextWithoutLosingCharacters() async throws {
+        let fixture = try HostedComposer(text: "abc")
+        defer { fixture.close() }
+        try await fixture.settle()
+        let input = try fixture.input()
+        XCTAssertTrue(input.isFirstResponder)
+        input.selectedRange = NSRange(location: 3, length: 0)
+        input.setMarkedText("日本", selectedRange: NSRange(location: 2, length: 0))
+        XCTAssertNotNil(input.markedTextRange)
+        fixture.state.quotes.perform(.bold)
+        try await fixture.settle()
+        XCTAssertNil(input.markedTextRange)
+        XCTAssertEqual(input.text, "abc日本****")
+        XCTAssertEqual(fixture.state.text, "abc日本****")
+        XCTAssertEqual(input.selectedRange, NSRange(location: 7, length: 0))
+    }
+
+    func testImageInsertionUndoRedoAndStaleResult() async throws {
+        let fixture = try HostedComposer(text: "abcd")
+        defer { fixture.close() }
+        try await fixture.settle()
+        let input = try fixture.input()
+        input.selectedRange = NSRange(location: 2, length: 2)
+        let controller = fixture.state.quotes
+        let snapshot = try XCTUnwrap(controller.capture(suspend: true))
+        fixture.state.enabled = false
+        try await fixture.settle()
+        let inserted = PostDraftDocument.insertingImages(["![a](/blob/a)"], in: snapshot.text, at: snapshot.selection.location)
+        let image = TaggrDraftImage(id: "a", data: Data([1]), width: 1, height: 1)
+        let undo = try XCTUnwrap(input.undoManager)
+        controller.apply(ComposeMarkdownEdit(text: inserted.text, selection: NSRange(location: inserted.cursor, length: 0)), replacing: snapshot, images: [image])
+        try await fixture.settle()
+        XCTAssertEqual(fixture.state.text, "ab\n\n![a](/blob/a)\ncd")
+        fixture.state.enabled = true
+        try await fixture.settle()
+        let tail = try XCTUnwrap(fixture.inputs.last)
+        XCTAssertTrue(tail.isFirstResponder)
+        XCTAssertEqual(tail.selectedRange, NSRange(location: 1, length: 0))
+        undo.undo()
+        try await fixture.settle()
+        XCTAssertEqual(fixture.state.text, "abcd")
+        XCTAssertEqual(fixture.state.images, [])
+        undo.redo()
+        try await fixture.settle()
+        XCTAssertEqual(fixture.state.text, inserted.text)
+        XCTAssertEqual(fixture.state.images, [image])
+        controller.apply(ComposeMarkdownEdit(text: "stale", selection: NSRange(location: 0, length: 0)), replacing: snapshot)
+        XCTAssertEqual(fixture.state.text, inserted.text)
+    }
+
+    func testPastingBlobMarkdownDoesNotDuplicateSegments() async throws {
+        for initial in ["", "前![old](/blob/old)後"] {
+            let fixture = try HostedComposer(text: initial)
+            defer { fixture.close() }
+            try await fixture.settle()
+            for useTail in [false, true] {
+                let input = try XCTUnwrap(useTail ? fixture.inputs.last : fixture.inputs.first)
+                input.becomeFirstResponder()
+                input.selectedRange = NSRange(location: 0, length: 0)
+                let before = fixture.state.text
+                let pasted = "日本😀![a](/blob/a)中![b](/blob/b)末尾"
+                let segment = useTail ? PostDraftDocument.segments(in: before).last!.id : 0
+                let expected = PostDraftDocument.replacingText(in: before, segmentID: segment, with: pasted + input.text)
+                input.insertText(pasted)
+                try await fixture.settle()
+                XCTAssertEqual(fixture.state.text, expected)
+                fixture.state.quotes.undoManager.undo()
+                try await fixture.settle()
+                XCTAssertEqual(fixture.state.text, before)
+                fixture.state.quotes.undoManager.redo()
+                try await fixture.settle()
+                XCTAssertEqual(fixture.state.text, expected)
+            }
+        }
+    }
+
+    func testMixedImageAndURLHistoryRestoresEveryState() async throws {
+        let fixture = try HostedComposer(text: "日本😀")
+        defer { fixture.close() }
+        try await fixture.settle()
+        let controller = fixture.state.quotes
+        let input = try fixture.input()
+        input.selectedRange = NSRange(location: 4, length: 0)
+        var states: [ComposeEditingController.Snapshot] = [try XCTUnwrap(controller.capture())]
+        input.insertText("追記")
+        try await fixture.settle()
+        states.append(try XCTUnwrap(controller.capture()))
+        controller.perform(.bold)
+        try await fixture.settle()
+        states.append(try XCTUnwrap(controller.capture()))
+        let images = [TaggrDraftImage(id: "a", data: Data([1]), width: 1, height: 1), TaggrDraftImage(id: "b", data: Data([2]), width: 1, height: 1)]
+        let snapshot = try XCTUnwrap(controller.capture())
+        let inserted = PostDraftDocument.insertingImages(images.map(\.markdown), in: snapshot.text, at: snapshot.selection.location)
+        controller.apply(ComposeMarkdownEdit(text: inserted.text, selection: NSRange(location: inserted.cursor, length: 0)), replacing: snapshot, images: images)
+        try await fixture.settle()
+        states.append(try XCTUnwrap(controller.capture()))
+        controller.moveImage(occurrence: 0, before: nil)
+        try await fixture.settle()
+        states.append(try XCTUnwrap(controller.capture()))
+        controller.moveImage(occurrence: 1, afterTextSegmentID: 0)
+        try await fixture.settle()
+        states.append(try XCTUnwrap(controller.capture()))
+        controller.removeImage(occurrence: 0)
+        try await fixture.settle()
+        states.append(try XCTUnwrap(controller.capture()))
+        XCTAssertTrue(controller.insertExternalURL(URL(string: "https://youtu.be/example")!))
+        try await fixture.settle()
+        states.append(try XCTUnwrap(controller.capture()))
+        for expected in states.dropLast().reversed() {
+            controller.undoManager.undo()
+            try await fixture.settle()
+            XCTAssertEqual(fixture.state.text, expected.text)
+            XCTAssertEqual(fixture.state.images, expected.images)
+            XCTAssertEqual(controller.capture()?.selection, expected.selection)
+        }
+        for expected in states.dropFirst() {
+            controller.undoManager.redo()
+            try await fixture.settle()
+            XCTAssertEqual(fixture.state.text, expected.text)
+            XCTAssertEqual(fixture.state.images, expected.images)
+            XCTAssertEqual(controller.capture()?.selection, expected.selection)
+        }
+        controller.undoManager.undo()
+        try await fixture.settle()
+        controller.perform(.italic)
+        try await fixture.settle()
+        XCTAssertFalse(controller.undoManager.canRedo)
+    }
+
+    func testAutomaticURLInsertionDoesNotFocusOrDuplicate() async throws {
+        let fixture = try HostedComposer(text: "本文")
+        defer { fixture.close() }
+        try await fixture.settle()
+        fixture.state.focused = nil
+        try await fixture.settle()
+        let controller = fixture.state.quotes
+        let url = URL(string: "https://youtu.be/example")!
+        XCTAssertTrue(controller.insertExternalURL(url))
+        try await fixture.settle()
+        XCTAssertEqual(fixture.state.text, "本文\n\nhttps://youtu.be/example")
+        XCTAssertFalse(try fixture.input().isFirstResponder)
+        XCTAssertTrue(controller.insertExternalURL(url))
+        try await fixture.settle()
+        controller.undoManager.undo()
+        try await fixture.settle()
+        XCTAssertEqual(fixture.state.text, "本文")
+        controller.undoManager.redo()
+        try await fixture.settle()
+        XCTAssertEqual(fixture.state.text, "本文\n\nhttps://youtu.be/example")
+    }
+
+    func testImageHistoryPersistsRestoredDataAndResetsAcrossDrafts() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let store = PostDraftStore(rootURL: root)
+        let namespace = PostDraftNamespace(canisterID: "test", userID: 7)
+        let image = TaggrDraftImage(id: "same", data: Data([1, 2, 3]), width: 1, height: 1)
+        for context in [PostDraftContext.newPost, .reply(42), .edit(42)] {
+            let draft = PostDraftSession(context: context, initialText: "", initialRealm: "")
+            await draft.load(store: store, namespace: namespace)
+            let controller = ComposeEditingController()
+            controller.connect(documentID: UUID(), text: Binding(get: { draft.text }, set: { draft.text = $0 }), images: Binding(get: { draft.images }, set: { draft.restoreEditorImages($0) }), focus: .constant(nil))
+            let snapshot = try XCTUnwrap(controller.capture())
+            let text = "前" + image.markdown + "中" + image.markdown + "後"
+            controller.apply(ComposeMarkdownEdit(text: text, selection: NSRange(location: 0, length: 0)), replacing: snapshot, images: [image])
+            try await Task.sleep(for: .milliseconds(50))
+            controller.removeImage(occurrence: 0)
+            XCTAssertEqual(draft.images, [image])
+            try await Task.sleep(for: .milliseconds(50))
+            controller.removeImage(occurrence: 0)
+            XCTAssertEqual(draft.images, [])
+            await draft.flush()
+            try await Task.sleep(for: .milliseconds(50))
+            controller.undoManager.undo()
+            XCTAssertEqual(draft.images, [image])
+            await draft.flush()
+            let restored = await store.load(namespace: namespace, context: context)
+            XCTAssertEqual(restored.text, draft.text)
+            XCTAssertEqual(restored.images, [image])
+            controller.disconnect()
+            controller.connect(documentID: UUID(), text: .constant("別の下書き"), images: .constant([]), focus: .constant(nil))
+            XCTAssertFalse(controller.undoManager.canUndo)
+            XCTAssertFalse(controller.undoManager.canRedo)
+        }
+    }
+
+    func testImageSegmentSelectionMapsToDocument() async throws {
+        let fixture = try HostedComposer(text: "before\n![image](/blob/photo)\nafter😀")
+        defer { fixture.close() }
+        try await fixture.settle()
+        let input = try XCTUnwrap(fixture.inputs.last)
+        input.becomeFirstResponder()
+        input.selectedRange = NSRange(location: 1, length: 5)
+        fixture.state.quotes.perform(.italic)
+        try await fixture.settle()
+        XCTAssertEqual(fixture.state.text, "before\n![image](/blob/photo)\n_after_😀")
+        XCTAssertEqual(input.selectedRange, NSRange(location: 2, length: 5))
     }
 
     func testComposerRestoredDraftEditsPersistInEachContext() async throws {
@@ -750,9 +1041,12 @@ final class TaggrQuoteTests: XCTestCase {
             input.selectedRange = NSRange(location: (input.text as NSString).length, length: 0)
             input.insertText("追記")
             try await fixture.settle()
+            input.selectedRange = NSRange(location: 2, length: 4)
+            fixture.state.quotes.perform(.italic)
+            try await fixture.settle()
             await restored.flush()
             let saved = await store.load(namespace: namespace, context: context)
-            XCTAssertEqual(saved.text, "**保存済み**😀追記")
+            XCTAssertEqual(saved.text, "**_保存済み_**😀追記")
         }
     }
 
@@ -783,32 +1077,16 @@ final class TaggrQuoteTests: XCTestCase {
     }
 
     func testHostedEditorQuotesWithoutPriorTyping() async throws {
-        let controller = ComposeQuoteEditor()
-        var text = "日本語😀"
-        let host = UIHostingController(rootView: ComposeSelectableTextEditor(
-            text: Binding(get: { text }, set: { text = $0 }), quoteEditor: controller,
-            isFocused: true, activate: {}
-        ))
-        let scene = try XCTUnwrap(UIApplication.shared.connectedScenes.first as? UIWindowScene)
-        let previousWindow = scene.windows.first(where: \.isKeyWindow)
-        let window = UIWindow(windowScene: scene)
-        window.rootViewController = host
-        window.makeKeyAndVisible()
-        defer {
-            window.isHidden = true
-            previousWindow?.makeKey()
-        }
-        host.view.layoutIfNeeded()
-        await Task.yield()
-        controller.quote()
-        XCTAssertEqual(text, "> 日本語😀")
-        func textView(in view: UIView) -> UITextView? {
-            if let view = view as? UITextView { return view }
-            return view.subviews.compactMap { textView(in: $0) }.first
-        }
-        let input = try XCTUnwrap(textView(in: host.view))
+        let fixture = try HostedComposer(text: "日本語😀")
+        defer { fixture.close() }
+        try await fixture.settle()
+        let input = try fixture.input()
+        input.selectedRange = NSRange(location: 0, length: 0)
+        fixture.state.quotes.quote()
+        try await fixture.settle()
+        XCTAssertEqual(fixture.state.text, "> 日本語😀")
+        XCTAssertEqual(input.text, fixture.state.text)
         XCTAssertTrue(input.isFirstResponder)
-        XCTAssertEqual(input.text, text)
     }
 
     func testQuoteDecorationIsActuallyDrawn() {

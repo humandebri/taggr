@@ -111,7 +111,7 @@ extension TaggrAppCoordinator {
         do {
             try await requireSafePublishing(text: text, realm: realm, parentID: parent)
             guard context.runtimeGeneration == runtimeGeneration, context.userID == currentUser?.id else { throw TaggrSafetyError.unavailable }
-            let body = text.trimmingCharacters(in: .whitespacesAndNewlines)
+            let body = text
             let refs = try await uploadBlobs(
                 referencedNewBlobs(in: body, draftImages: images, existingBlobIDs: []),
                 context: context
@@ -475,7 +475,7 @@ extension TaggrAppCoordinator {
         do {
             try await requireSafePublishing(text: text, realm: realm ?? post.realm)
             guard context.runtimeGeneration == runtimeGeneration, context.userID == currentUser?.id, !post.isNSFW else { throw TaggrSafetyError.unavailable }
-            let body = text.trimmingCharacters(in: .whitespacesAndNewlines)
+            let body = text
             let refs = try await uploadBlobs(
                 referencedNewBlobs(in: body, draftImages: images, existingBlobIDs: Self.blobIDs(in: post.files)),
                 context: context

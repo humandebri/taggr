@@ -413,7 +413,8 @@ struct InlineReplyComposer: View {
     @Binding var hasDraftChanges: Bool
     @StateObject private var draft: PostDraftSession
     @StateObject private var imageImport = ImageImportCoordinator()
-    @StateObject private var quoteEditor = ComposeQuoteEditor()
+    @StateObject private var editingController = ComposeEditingController()
+    @State private var editorVisible = false
     @State private var selectedPhotos: [PhotosPickerItem] = []
     @State private var imageImportWarning: String?
     @State private var imageInsertionSegmentID: Int?
@@ -445,7 +446,7 @@ struct InlineReplyComposer: View {
         VStack(alignment: .leading, spacing: 8) {
             ComposePostDocumentEditor(
                 text: $draft.text,
-                draftImages: draft.images,
+                draftImages: Binding(get: { draft.images }, set: { draft.restoreEditorImages($0) }),
                 existingImages: [:],
                 placeholder: "Reply here...",
                 documentID: documentID,
@@ -455,8 +456,8 @@ struct InlineReplyComposer: View {
                 moveImage: moveImageMarker,
                 moveImageToTextSegment: moveImageMarker
             )
-            .environmentObject(quoteEditor)
-            .disabled(!draft.isLoaded)
+            .environmentObject(editingController)
+            .disabled(!draft.isLoaded || imageImport.isImporting || isSubmitting)
             .padding(8)
             .background(TaggrTheme.darkPanel)
             .clipShape(RoundedRectangle(cornerRadius: 7))
@@ -510,7 +511,7 @@ struct InlineReplyComposer: View {
                     itemSpacing: 6,
                     background: .clear
                 )
-                .environmentObject(quoteEditor)
+                .environmentObject(editingController)
 
                 Button("Submit") {
                     submit()
@@ -544,11 +545,17 @@ struct InlineReplyComposer: View {
             guard phase != .active else { return }
             Task { await draft.flush() }
         }
+        .onAppear { editorVisible = true }
         .onDisappear {
+            editorVisible = false
+            editingController.disconnect()
             cancelImageImport()
             Task { await draft.flush() }
         }
         .task(id: draftNamespaceID) {
+            cancelImageImport()
+            editingController.disconnect()
+            documentID = UUID()
             guard let namespace = draftNamespace else { return }
             await draft.load(store: state.postDraftStore, namespace: namespace)
             await consumeCompletedYouTubeUpload()
@@ -576,11 +583,11 @@ struct InlineReplyComposer: View {
     }
 
     var composedBody: String {
-        draft.text.trimmingCharacters(in: .whitespacesAndNewlines)
+        draft.text
     }
 
     var canSubmit: Bool {
-        draft.isLoaded && state.currentUser != nil && !composedBody.isEmpty && imageWarning == nil
+        draft.isLoaded && state.currentUser != nil && !composedBody.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && imageWarning == nil
             && !draft.submissionNeedsVerification
             && !imageImport.isImporting && !isSubmitting && !state.isBusy && !hasRunningYouTubeUpload
             && !state.hasPendingPostSubmission
@@ -617,7 +624,8 @@ struct InlineReplyComposer: View {
 
     func loadPhotos(_ items: [PhotosPickerItem]) {
         guard !items.isEmpty, !imageImport.isImporting else { return }
-        let insertionSegmentID = imageInsertionSegmentID
+        guard let snapshot = editingController.imageSnapshot ?? editingController.capture(suspend: true) else { return }
+        editingController.imageSnapshot = snapshot
         focusedTextSegmentID = nil
         imageInsertionSegmentID = nil
         imageImportWarning = nil
@@ -629,14 +637,26 @@ struct InlineReplyComposer: View {
                 await ImageDrafts.importPhotos(items, maxBytes: maxBytes)
             },
             completion: { result in
+                editingController.imageSnapshot = nil
                 selectedPhotos = []
                 imageImportWarning = result.warning
                 let loaded = ImageDrafts.uniquedDraftImages(
                     result.images,
                     existingIDs: Set(draft.images.map(\.id))
                 )
-                if !loaded.isEmpty {
-                    await draft.addImages(loaded, afterTextSegmentID: insertionSegmentID)
+                guard draft.text == snapshot.text, editingController.matches(snapshot) else {
+                    editingController.restore(snapshot)
+                    return
+                }
+                if loaded.isEmpty {
+                    editingController.restore(snapshot)
+                } else {
+                    let inserted = PostDraftDocument.insertingImages(loaded.map(\.markdown), in: snapshot.text, at: snapshot.selection.location)
+                    editingController.apply(
+                        ComposeMarkdownEdit(text: inserted.text, selection: NSRange(location: inserted.cursor, length: 0)), replacing: snapshot,
+                        images: snapshot.images + loaded
+                    )
+                    await draft.flush()
                 }
             }
         )
@@ -644,28 +664,25 @@ struct InlineReplyComposer: View {
 
     func cancelImageImport() {
         imageImport.cancel()
+        if let snapshot = editingController.imageSnapshot { editingController.restore(snapshot) }
+        editingController.imageSnapshot = nil
         selectedPhotos = []
         imageImportWarning = nil
     }
 
-    func removeImage(_ image: TaggrDraftImage, occurrence: Int) {
-        Task { await draft.removeImage(image, occurrence: occurrence) }
-    }
-
-    func removeImageMarker(_ occurrence: Int, blobID: String) {
-        if let image = draft.images.first(where: { $0.id == blobID }) {
-            removeImage(image, occurrence: occurrence)
-        } else {
-            Task { await draft.removeImageMarker(occurrence: occurrence) }
-        }
+    func removeImageMarker(_ occurrence: Int, blobID _: String) {
+        editingController.removeImage(occurrence: occurrence)
+        Task { await draft.flush() }
     }
 
     func moveImageMarker(_ occurrence: Int, before target: Int?) {
-        Task { await draft.moveImageMarker(occurrence: occurrence, before: target) }
+        editingController.moveImage(occurrence: occurrence, before: target)
+        Task { await draft.flush() }
     }
 
     func moveImageMarker(_ occurrence: Int, afterTextSegmentID: Int) {
-        Task { await draft.moveImageMarker(occurrence: occurrence, afterTextSegmentID: afterTextSegmentID) }
+        editingController.moveImage(occurrence: occurrence, afterTextSegmentID: afterTextSegmentID)
+        Task { await draft.flush() }
     }
 
     func discardConfirmedSubmission() {
@@ -733,9 +750,17 @@ struct InlineReplyComposer: View {
         state.youtubeUpload.job?.target == youtubeDraftTarget
     }
 
+    private func insertExternalURLInEditor(_ url: URL) async -> Bool {
+        guard editorVisible, draft.isLoaded else { return false }
+        editingController.connect(documentID: documentID, text: $draft.text,
+                                  images: Binding(get: { draft.images }, set: { draft.restoreEditorImages($0) }), focus: $focusedTextSegmentID)
+        guard editingController.insertExternalURL(url) else { return false }
+        return await draft.saveEditorChanges()
+    }
+
     func insertYouTubeURL(_ url: URL) {
         Task {
-            let inserted = await draft.addExternalURL(url)
+            let inserted = await insertExternalURLInEditor(url)
             if inserted, let youtubeDraftTarget {
                 await state.youtubeUpload.acknowledgeCompletion(for: youtubeDraftTarget)
             }
@@ -745,7 +770,7 @@ struct InlineReplyComposer: View {
     func consumeCompletedYouTubeUpload() async {
         guard let youtubeDraftTarget,
               let url = state.youtubeUpload.completedURL(for: youtubeDraftTarget) else { return }
-        if await draft.addExternalURL(url) {
+        if await insertExternalURLInEditor(url) {
             await state.youtubeUpload.acknowledgeCompletion(for: youtubeDraftTarget)
         }
     }

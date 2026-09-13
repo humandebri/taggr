@@ -5,7 +5,7 @@ import SwiftUI
 
 struct ComposePostAttachmentBar: View {
     @Environment(TaggrAppCoordinator.self) private var state
-    @EnvironmentObject private var quoteEditor: ComposeQuoteEditor
+    @EnvironmentObject private var editingController: ComposeEditingController
     @Binding var text: String
     @Binding var selectedPhotos: [PhotosPickerItem]
     let youtubeTarget: YouTubeDraftTarget?
@@ -17,14 +17,27 @@ struct ComposePostAttachmentBar: View {
     var itemSpacing: CGFloat = 8
     var background: Color = TaggrTheme.background
     @State private var linkSheetPresented = false
+    @State private var linkSnapshot: ComposeEditingController.Snapshot?
+    @State private var photoPickerPresented = false
     @State private var youtubeSheetPresented = false
 
     var body: some View {
         HStack {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: itemSpacing) {
-                    PhotosPicker(selection: $selectedPhotos, selectionBehavior: .ordered, matching: .images) {
+                    Button {
+                        guard let snapshot = editingController.capture(suspend: true) else { return }
+                        editingController.imageSnapshot = snapshot
+                        photoPickerPresented = true
+                    } label: {
                         ComposeMarkdownButtonLabel(kind: .image)
+                    }
+                    .photosPicker(isPresented: $photoPickerPresented, selection: $selectedPhotos, selectionBehavior: .ordered, matching: .images)
+                    .onChange(of: photoPickerPresented) { _, presented in
+                        if !presented, selectedPhotos.isEmpty, let snapshot = editingController.imageSnapshot {
+                            editingController.restore(snapshot)
+                            editingController.imageSnapshot = nil
+                        }
                     }
                     .disabled(isImagePickerDisabled)
                     .accessibilityLabel("Attach image")
@@ -58,6 +71,7 @@ struct ComposePostAttachmentBar: View {
                             ComposeMarkdownButtonLabel(kind: action.kind)
                         }
                         .buttonStyle(.plain)
+                        .disabled(isSubmitting || isImagePickerDisabled)
                         .accessibilityLabel(action.accessibilityLabel)
                     }
                 }
@@ -71,9 +85,15 @@ struct ComposePostAttachmentBar: View {
         .padding(.horizontal, horizontalPadding)
         .padding(.vertical, verticalPadding)
         .background(background)
-        .sheet(isPresented: $linkSheetPresented) {
-            ComposeLinkSheet { label, url in
-                appendInline("[\(label)](\(url))")
+        .sheet(isPresented: $linkSheetPresented, onDismiss: {
+            if let snapshot = linkSnapshot { editingController.restore(snapshot) }
+            editingController.resumeFocus()
+            linkSnapshot = nil
+        }) {
+            ComposeLinkSheet { url in
+                guard let snapshot = linkSnapshot, text == snapshot.text else { return }
+                editingController.perform(.link, snapshot: snapshot, url: url)
+                linkSnapshot = nil
             }
         }
         .sheet(isPresented: $youtubeSheetPresented) {
@@ -85,35 +105,11 @@ struct ComposePostAttachmentBar: View {
     }
 
     func perform(_ action: ComposeMarkdownAction) {
-        switch action {
-        case .bold:
-            appendInline("**bold**")
-        case .italic:
-            appendInline("_italic_")
-        case .list:
-            appendBlock("- item")
-        case .quote:
-            quoteEditor.quote()
-        case .link:
-            linkSheetPresented = true
-        }
-    }
-
-    func appendInline(_ snippet: String) {
-        if text.isEmpty || text.last?.isWhitespace == true {
-            text += snippet
+        if action == .link {
+            linkSnapshot = editingController.capture(suspend: true)
+            linkSheetPresented = linkSnapshot != nil
         } else {
-            text += " " + snippet
-        }
-    }
-
-    private func appendBlock(_ snippet: String) {
-        if text.isEmpty {
-            text = snippet
-        } else if text.hasSuffix("\n") {
-            text += snippet
-        } else {
-            text += "\n" + snippet
+            editingController.perform(action)
         }
     }
 }
@@ -222,18 +218,12 @@ private struct ComposeMarkdownIcon: View {
 
 private struct ComposeLinkSheet: View {
     @Environment(\.dismiss) private var dismiss
-    @State private var label = ""
     @State private var url = ""
-    let insert: (String, String) -> Void
+    let insert: (String) -> Void
 
     var body: some View {
         NavigationStack {
             VStack(alignment: .leading, spacing: 14) {
-                TextField("Text", text: $label)
-                    .textInputAutocapitalization(.sentences)
-                    .padding(12)
-                    .background(TaggrTheme.panelRaised)
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
                 TextField("URL", text: $url)
                     .keyboardType(.URL)
                     .textInputAutocapitalization(.never)
@@ -253,23 +243,13 @@ private struct ComposeLinkSheet: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Insert") {
-                        insert(effectiveLabel, trimmedURL)
+                        insert(url)
                         dismiss()
                     }
-                    .disabled(trimmedURL.isEmpty)
                 }
             }
         }
         .presentationBackground(TaggrTheme.background)
         .preferredColorScheme(.dark)
-    }
-
-    private var trimmedURL: String {
-        url.trimmingCharacters(in: .whitespacesAndNewlines)
-    }
-
-    private var effectiveLabel: String {
-        let trimmed = label.trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmed.isEmpty ? trimmedURL : trimmed
     }
 }

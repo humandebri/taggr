@@ -13,7 +13,8 @@ struct ComposePostView: View {
     let dismiss: () -> Void
     @StateObject private var draft: PostDraftSession
     @StateObject private var imageImport = ImageImportCoordinator()
-    @StateObject private var quoteEditor = ComposeQuoteEditor()
+    @StateObject private var editingController = ComposeEditingController()
+    @State private var editorVisible = false
     @State private var selectedPhotos: [PhotosPickerItem] = []
     @State private var imageImportWarning: String?
     @State private var imageInsertionSegmentID: Int?
@@ -65,7 +66,7 @@ struct ComposePostView: View {
                     VStack(alignment: .leading, spacing: 16) {
                         ComposePostDocumentEditor(
                             text: $draft.text,
-                            draftImages: draft.images,
+                            draftImages: Binding(get: { draft.images }, set: { draft.restoreEditorImages($0) }),
                             existingImages: existingImagesByID,
                             placeholder: mode.placeholder,
                             documentID: documentID,
@@ -75,7 +76,7 @@ struct ComposePostView: View {
                             moveImage: moveImageMarker,
                             moveImageToTextSegment: moveImageMarker
                         )
-                        .disabled(!draft.isLoaded)
+                        .disabled(!draft.isLoaded || imageImport.isImporting || isSubmitting)
                         if let realmWarning {
                             ComposePostImageWarning(
                                 text: realmWarning,
@@ -134,7 +135,7 @@ struct ComposePostView: View {
                 )
             }
         }
-        .environmentObject(quoteEditor)
+        .environmentObject(editingController)
         .onChange(of: selectedPhotos) { _, items in
             loadPhotos(items)
         }
@@ -150,11 +151,17 @@ struct ComposePostView: View {
             guard phase != .active else { return }
             Task { await draft.flush() }
         }
+        .onAppear { editorVisible = true }
         .onDisappear {
+            editorVisible = false
+            editingController.disconnect()
             cancelImageImport()
             Task { await draft.flush() }
         }
         .task(id: draftNamespaceID) {
+            cancelImageImport()
+            editingController.disconnect()
+            documentID = UUID()
             guard let namespace = draftNamespace else { return }
             await draft.load(store: state.postDraftStore, namespace: namespace)
             guard !Task.isCancelled else { return }
@@ -197,7 +204,7 @@ struct ComposePostView: View {
               !hasRunningYouTubeUpload,
               !state.hasPendingPostSubmission else { return false }
         let body = composedBody
-        guard !body.isEmpty else { return false }
+        guard !body.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return false }
         guard imageWarning == nil else { return false }
         guard realmWarning == nil else { return false }
         guard let editingPost = mode.editingPost else { return true }
@@ -205,11 +212,11 @@ struct ComposePostView: View {
     }
 
     private var composedBody: String {
-        draft.text.trimmingCharacters(in: .whitespacesAndNewlines)
+        draft.text
     }
 
     private var shouldShowCreditCost: Bool {
-        !composedBody.isEmpty
+        !composedBody.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
     private var creditCostRefreshKey: String {
@@ -341,7 +348,8 @@ struct ComposePostView: View {
 
     private func loadPhotos(_ items: [PhotosPickerItem]) {
         guard !items.isEmpty, !imageImport.isImporting else { return }
-        let insertionSegmentID = imageInsertionSegmentID
+        guard let snapshot = editingController.imageSnapshot ?? editingController.capture(suspend: true) else { return }
+        editingController.imageSnapshot = snapshot
         focusedTextSegmentID = nil
         imageInsertionSegmentID = nil
         imageImportWarning = nil
@@ -353,14 +361,26 @@ struct ComposePostView: View {
                 await ImageDrafts.importPhotos(items, maxBytes: maxBytes)
             },
             completion: { result in
+                editingController.imageSnapshot = nil
                 selectedPhotos = []
                 imageImportWarning = result.warning
                 let loaded = ImageDrafts.uniquedDraftImages(
                     result.images,
                     existingIDs: Set(draft.images.map(\.id))
                 )
-                if !loaded.isEmpty {
-                    await draft.addImages(loaded, afterTextSegmentID: insertionSegmentID)
+                guard draft.text == snapshot.text, editingController.matches(snapshot) else {
+                    editingController.restore(snapshot)
+                    return
+                }
+                if loaded.isEmpty {
+                    editingController.restore(snapshot)
+                } else {
+                    let inserted = PostDraftDocument.insertingImages(loaded.map(\.markdown), in: snapshot.text, at: snapshot.selection.location)
+                    editingController.apply(
+                        ComposeMarkdownEdit(text: inserted.text, selection: NSRange(location: inserted.cursor, length: 0)), replacing: snapshot,
+                        images: snapshot.images + loaded
+                    )
+                    await draft.flush()
                 }
             }
         )
@@ -368,28 +388,25 @@ struct ComposePostView: View {
 
     private func cancelImageImport() {
         imageImport.cancel()
+        if let snapshot = editingController.imageSnapshot { editingController.restore(snapshot) }
+        editingController.imageSnapshot = nil
         selectedPhotos = []
         imageImportWarning = nil
     }
 
-    private func removeImage(_ image: TaggrDraftImage, occurrence: Int) {
-        Task { await draft.removeImage(image, occurrence: occurrence) }
-    }
-
-    private func removeImageMarker(_ occurrence: Int, blobID: String) {
-        if let image = draft.images.first(where: { $0.id == blobID }) {
-            removeImage(image, occurrence: occurrence)
-        } else {
-            Task { await draft.removeImageMarker(occurrence: occurrence) }
-        }
+    private func removeImageMarker(_ occurrence: Int, blobID _: String) {
+        editingController.removeImage(occurrence: occurrence)
+        Task { await draft.flush() }
     }
 
     private func moveImageMarker(_ occurrence: Int, before target: Int?) {
-        Task { await draft.moveImageMarker(occurrence: occurrence, before: target) }
+        editingController.moveImage(occurrence: occurrence, before: target)
+        Task { await draft.flush() }
     }
 
     private func moveImageMarker(_ occurrence: Int, afterTextSegmentID: Int) {
-        Task { await draft.moveImageMarker(occurrence: occurrence, afterTextSegmentID: afterTextSegmentID) }
+        editingController.moveImage(occurrence: occurrence, afterTextSegmentID: afterTextSegmentID)
+        Task { await draft.flush() }
     }
 
     private func discardConfirmedSubmission() {
@@ -412,9 +429,17 @@ struct ComposePostView: View {
         state.youtubeUpload.job?.target == youtubeDraftTarget
     }
 
+    private func insertExternalURLInEditor(_ url: URL) async -> Bool {
+        guard editorVisible, draft.isLoaded else { return false }
+        editingController.connect(documentID: documentID, text: $draft.text,
+                                  images: Binding(get: { draft.images }, set: { draft.restoreEditorImages($0) }), focus: $focusedTextSegmentID)
+        guard editingController.insertExternalURL(url) else { return false }
+        return await draft.saveEditorChanges()
+    }
+
     private func insertYouTubeURL(_ url: URL) {
         Task {
-            let inserted = await draft.addExternalURL(url)
+            let inserted = await insertExternalURLInEditor(url)
             if inserted, let youtubeDraftTarget {
                 await state.youtubeUpload.acknowledgeCompletion(for: youtubeDraftTarget)
             }
@@ -424,7 +449,7 @@ struct ComposePostView: View {
     private func consumeCompletedYouTubeUpload() async {
         guard let youtubeDraftTarget,
               let url = state.youtubeUpload.completedURL(for: youtubeDraftTarget) else { return }
-        if await draft.addExternalURL(url) {
+        if await insertExternalURLInEditor(url) {
             await state.youtubeUpload.acknowledgeCompletion(for: youtubeDraftTarget)
         }
     }
@@ -436,7 +461,7 @@ struct ComposePostView: View {
     @MainActor
     private func refreshCreditCost() async {
         let body = composedBody
-        guard !body.isEmpty else {
+        guard !body.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             creditCost = nil
             creditCostUnavailable = false
             return
@@ -639,8 +664,9 @@ private struct ComposeRealmPicker: View {
 /// Keeps generated blob Markdown out of the editable text surface. The post is
 /// still stored as Markdown, so web and older app clients remain compatible.
 struct ComposePostDocumentEditor: View {
+    @EnvironmentObject private var editingController: ComposeEditingController
     @Binding var text: String
-    let draftImages: [TaggrDraftImage]
+    @Binding var draftImages: [TaggrDraftImage]
     let existingImages: [String: TaggrEditablePostImage]
     let placeholder: String
     let documentID: UUID
@@ -652,7 +678,7 @@ struct ComposePostDocumentEditor: View {
 
     init(
         text: Binding<String>,
-        draftImages: [TaggrDraftImage],
+        draftImages: Binding<[TaggrDraftImage]>,
         existingImages: [String: TaggrEditablePostImage],
         placeholder: String,
         documentID: UUID,
@@ -663,7 +689,7 @@ struct ComposePostDocumentEditor: View {
         moveImageToTextSegment: @escaping (Int, Int) -> Void = { _, _ in }
     ) {
         _text = text
-        self.draftImages = draftImages
+        _draftImages = draftImages
         self.existingImages = existingImages
         self.placeholder = placeholder
         self.documentID = documentID
@@ -689,6 +715,15 @@ struct ComposePostDocumentEditor: View {
                 }
             }
         }
+        .onAppear { connectEditor() }
+        .onChange(of: documentID) { _, _ in connectEditor() }
+        .onChange(of: text) { _, _ in connectEditor() }
+        .onChange(of: draftImages) { _, _ in connectEditor() }
+        .onDisappear { editingController.disconnect() }
+    }
+
+    private func connectEditor() {
+        editingController.connect(documentID: documentID, text: $text, images: $draftImages, focus: focusedTextSegmentID)
     }
 
     private func textBlock(id: Int, value: String) -> some View {
@@ -707,7 +742,7 @@ struct ComposePostDocumentEditor: View {
                 text = updated
             },
             activate: {
-                imageInsertionSegmentID = id
+                if imageInsertionSegmentID != id { imageInsertionSegmentID = id }
             },
             dropImage: { item in
                 guard accepts(item) else { return false }
@@ -791,7 +826,7 @@ struct ComposePostDocumentEditor: View {
 }
 
 private struct ComposePostTextSegmentEditor: View {
-    @EnvironmentObject private var quoteEditor: ComposeQuoteEditor
+    @EnvironmentObject private var editingController: ComposeEditingController
     let segmentID: Int
     let value: String
     let placeholder: String?
@@ -799,7 +834,6 @@ private struct ComposePostTextSegmentEditor: View {
     let updateText: (String) -> Void
     let activate: () -> Void
     let dropImage: (PostDraftImageDragItem) -> Bool
-    @State private var inputText: String
 
     init(
         segmentID: Int,
@@ -817,28 +851,28 @@ private struct ComposePostTextSegmentEditor: View {
         self.updateText = updateText
         self.activate = activate
         self.dropImage = dropImage
-        _inputText = State(initialValue: value)
     }
 
     var body: some View {
         ZStack(alignment: .topLeading) {
             ComposeSelectableTextEditor(
-                text: $inputText,
-                quoteEditor: quoteEditor,
+                text: Binding(get: { value }, set: updateText),
+                editingController: editingController,
                 isFocused: focusedTextSegmentID.wrappedValue == segmentID,
                 activate: {
-                    focusedTextSegmentID.wrappedValue = segmentID
+                    if focusedTextSegmentID.wrappedValue != segmentID { focusedTextSegmentID.wrappedValue = segmentID }
                     activate()
-                }
+                },
+                segmentID: segmentID
             )
-                .frame(maxWidth: .infinity, minHeight: inputText.isEmpty ? 70 : 120, alignment: .topLeading)
+                .frame(maxWidth: .infinity, minHeight: value.isEmpty ? 70 : 120, alignment: .topLeading)
                 .tint(TaggrTheme.clickable)
                 .onTapGesture(perform: activate)
                 .dropDestination(for: PostDraftImageDragItem.self) { items, _ in
                     guard let item = items.first else { return false }
                     return dropImage(item)
                 }
-            if inputText.isEmpty, let placeholder {
+            if value.isEmpty, let placeholder {
                 Text(placeholder)
                     .font(.title3)
                     .foregroundStyle(TaggrTheme.secondaryText)
@@ -846,14 +880,6 @@ private struct ComposePostTextSegmentEditor: View {
                     .padding(.leading, 5)
                     .allowsHitTesting(false)
             }
-        }
-        .onChange(of: inputText) { _, replacement in
-            guard replacement != value else { return }
-            updateText(replacement)
-        }
-        .onChange(of: value) { _, updatedValue in
-            guard inputText != updatedValue else { return }
-            inputText = updatedValue
         }
     }
 }
@@ -1022,80 +1048,253 @@ enum TaggrPostCreditCost {
 }
 
 
-struct ComposeQuoteEdit {
+struct ComposeMarkdownEdit {
     let text: String
     let selection: NSRange
 
-    static func quote(_ text: String, selection: NSRange) -> Self {
+    static func applying(_ action: ComposeMarkdownAction, to text: String, selection: NSRange, url: String = "") -> Self {
         let source = text as NSString
-        let start = min(selection.location, source.length)
-        let end = min(NSMaxRange(selection), source.length)
-        let first = source.lineRange(for: NSRange(location: start, length: 0)).location
-        let last = source.lineRange(for: NSRange(location: end > start ? end - 1 : end, length: 0))
-        var positions: [Int] = []
-        var cursor = first
-        repeat {
-            let line = source.lineRange(for: NSRange(location: cursor, length: 0))
-            if quotePrefix(source.substring(with: line)) == nil { positions.append(cursor) }
-            guard NSMaxRange(line) > cursor else { break }
-            cursor = NSMaxRange(line)
-        } while cursor < NSMaxRange(last)
-        let result = NSMutableString(string: text)
-        for position in positions.reversed() { result.insert("> ", at: position) }
-        let shiftedStart = start + positions.filter { $0 <= start }.count * 2
-        let shiftedEnd = end + positions.filter { $0 <= end }.count * 2
-        return Self(text: result as String, selection: NSRange(location: shiftedStart, length: shiftedEnd - shiftedStart))
-    }
-
-    static func newline(_ text: String, selection: NSRange) -> Self? {
-        let source = text as NSString
-        guard selection.length == 0, selection.location <= source.length else { return nil }
-        let line = source.lineRange(for: selection)
-        let value = source.substring(with: line).trimmingCharacters(in: .newlines)
-        guard selection.location == line.location + (value as NSString).length,
-              let prefix = quotePrefix(value) else { return nil }
-        let result = NSMutableString(string: text)
-        if value.dropFirst(prefix.count).trimmingCharacters(in: .whitespaces).isEmpty {
-            result.replaceCharacters(in: NSRange(location: line.location, length: (value as NSString).length), with: "\n")
-            return Self(text: result as String, selection: NSRange(location: line.location + 1, length: 0))
+        let start = min(max(0, selection.location), source.length)
+        let range = NSRange(location: start, length: min(max(0, selection.length), source.length - start))
+        let selected = source.substring(with: range)
+        let replacement: String
+        let resultSelection: NSRange
+        switch action {
+        case .bold, .italic:
+            let marker = action == .bold ? "**" : "_"
+            replacement = marker + selected + marker
+            resultSelection = NSRange(location: start + marker.utf16.count, length: range.length)
+        case .list:
+            replacement = selected.components(separatedBy: "\n").map { "- " + $0 }.joined(separator: "\n")
+            resultSelection = NSRange(location: start + replacement.utf16.count, length: 0)
+        case .quote:
+            replacement = "> " + selected
+            resultSelection = NSRange(location: start + replacement.utf16.count, length: 0)
+        case .link:
+            guard !url.isEmpty else { return Self(text: text, selection: range) }
+            replacement = "[\(selected)](\(url))"
+            resultSelection = NSRange(location: start + (range.length == 0 ? 1 : replacement.utf16.count), length: 0)
         }
-        let insertion = "\n" + prefix + (prefix.hasSuffix(" ") ? "" : " ")
-        result.insert(insertion, at: selection.location)
-        return Self(text: result as String, selection: NSRange(location: selection.location + (insertion as NSString).length, length: 0))
-    }
-
-    private static func quotePrefix(_ line: String) -> String? {
-        let indentation = line.prefix { $0 == " " }
-        guard indentation.count <= 3 else { return nil }
-        var end = line.index(line.startIndex, offsetBy: indentation.count)
-        guard end < line.endIndex, line[end] == ">" else { return nil }
-        repeat {
-            end = line.index(after: end)
-            while end < line.endIndex, line[end] == " " { end = line.index(after: end) }
-        } while end < line.endIndex && line[end] == ">"
-        let prefix = String(line[..<end])
-        return prefix
+        return Self(text: source.replacingCharacters(in: range, with: replacement), selection: resultSelection)
     }
 }
 
 @MainActor
-final class ComposeQuoteEditor: ObservableObject {
-    fileprivate weak var active: ComposeSelectableTextEditor.Coordinator?
+final class ComposeEditingController: ObservableObject {
+    struct Snapshot {
+        let documentID: UUID
+        let text: String
+        let selection: NSRange
+        var images: [TaggrDraftImage] = []
+    }
 
-    func quote() { active?.quote() }
+    let undoManager = UndoManager()
+    fileprivate weak var active: ComposeSelectableTextEditor.Coordinator?
+    fileprivate var pendingSelection: NSRange?
+    private var documentID: UUID?
+    private var document: Binding<String>?
+    private var images: Binding<[TaggrDraftImage]>?
+    fileprivate var pendingSelectionRequestsFocus = true
+    private var focus: Binding<Int?>?
+    // UIKit can change text between SwiftUI renders; offsets must use that latest text.
+    fileprivate private(set) var documentText: String?
+    private(set) var suspended = false
+    var imageSnapshot: Snapshot?
+
+    func connect(documentID: UUID, text: Binding<String>, images: Binding<[TaggrDraftImage]>, focus: Binding<Int?>) {
+        if self.documentID != nil && self.documentID != documentID {
+            undoManager.removeAllActions()
+            active = nil
+            pendingSelection = nil
+            imageSnapshot = nil
+        }
+        self.documentID = documentID
+        document = text
+        self.images = images
+        documentText = text.wrappedValue
+        self.focus = focus
+        if !suspended { active?.restorePendingSelection(in: text.wrappedValue) }
+    }
+
+    func disconnect() {
+        undoManager.removeAllActions()
+        documentID = nil
+        document = nil
+        images = nil
+        focus = nil
+        pendingSelection = nil
+        pendingSelectionRequestsFocus = true
+        documentText = nil
+        active = nil
+        imageSnapshot = nil
+        suspended = false
+    }
+
+    func capture(suspend: Bool = false) -> Snapshot? {
+        guard let documentID, let document, var current = documentText else { return nil }
+        let hadMarkedText = active?.view?.markedTextRange != nil
+        active?.view?.unmarkText()
+        // Commit IME text synchronously, but never overwrite a newer model update.
+        if let active, let view = active.view {
+            if hadMarkedText {
+                current = PostDraftDocument.replacingText(in: current, segmentID: active.parent.segmentID, with: view.text)
+                documentText = current
+                document.wrappedValue = current
+            } else {
+                guard case .text(_, let current)? = PostDraftDocument.segments(in: current).first(where: { $0.id == active.parent.segmentID }), current == view.text else { return nil }
+            }
+        }
+        let text = current
+        let selection: NSRange
+        if let active, let view = active.view,
+           let offset = PostDraftDocument.textOffset(in: text, segmentID: active.parent.segmentID) {
+            selection = NSRange(location: offset + view.selectedRange.location, length: view.selectedRange.length)
+        } else {
+            selection = NSRange(location: text.utf16.count, length: 0)
+        }
+        if suspend {
+            suspended = true
+            focus?.wrappedValue = nil
+            active?.view?.resignFirstResponder()
+        }
+        return Snapshot(documentID: documentID, text: text, selection: selection, images: images?.wrappedValue ?? [])
+    }
+
+    func matches(_ snapshot: Snapshot) -> Bool {
+        documentID == snapshot.documentID && documentText == snapshot.text && document?.wrappedValue == snapshot.text && images?.wrappedValue == snapshot.images
+    }
+
+    func restore(_ snapshot: Snapshot) {
+        suspended = false
+        guard matches(snapshot) else { return }
+        select(snapshot.selection, in: snapshot.text)
+    }
+
+    func perform(_ action: ComposeMarkdownAction, snapshot: Snapshot? = nil, url: String = "") {
+        guard let snapshot = snapshot ?? capture(), matches(snapshot) else { return }
+        let edit = ComposeMarkdownEdit.applying(action, to: snapshot.text, selection: snapshot.selection, url: url)
+        apply(edit, replacing: snapshot)
+    }
+
+    func recordTyping(segmentID: Int, text: String, beforeSelection: NSRange, selection: NSRange) {
+        guard let documentID, let previous = documentText,
+              let offset = PostDraftDocument.textOffset(in: previous, segmentID: segmentID) else { return }
+        let updated = PostDraftDocument.replacingText(in: previous, segmentID: segmentID, with: text)
+        guard previous != updated else { return }
+        let before = NSRange(location: offset + beforeSelection.location, length: beforeSelection.length)
+        let after = NSRange(location: offset + selection.location, length: selection.length)
+        apply(ComposeMarkdownEdit(text: updated, selection: after),
+              replacing: Snapshot(documentID: documentID, text: previous, selection: before, images: images?.wrappedValue ?? []),
+              restoreSelection: false)
+    }
+
+    func resumeFocus() {
+        guard documentID != nil, !suspended, let active, let view = active.view, view.isEditable else { return }
+        active.parent.activate()
+        view.becomeFirstResponder()
+    }
+
+    func quote() { perform(.quote) }
+
+    func apply(_ edit: ComposeMarkdownEdit, replacing snapshot: Snapshot, images updatedImages: [TaggrDraftImage]? = nil, restoreSelection: Bool = true, requestFocus: Bool = true) {
+        guard matches(snapshot), let document, let images else { return }
+        suspended = false
+        let nextImages = updatedImages ?? snapshot.images
+        let next = Snapshot(documentID: snapshot.documentID, text: edit.text, selection: edit.selection, images: nextImages)
+        if edit.text != snapshot.text || nextImages != snapshot.images {
+            undoManager.registerUndo(withTarget: self) { target in
+                target.apply(ComposeMarkdownEdit(text: snapshot.text, selection: snapshot.selection), replacing: next, images: snapshot.images)
+            }
+            documentText = edit.text
+            document.wrappedValue = edit.text
+            if images.wrappedValue != nextImages { images.wrappedValue = nextImages }
+        }
+        if restoreSelection { select(edit.selection, in: edit.text, requestFocus: requestFocus) }
+    }
+
+    func removeImage(occurrence: Int) {
+        guard let snapshot = capture(), let range = imageRange(occurrence: occurrence, in: snapshot.text) else { return }
+        let text = PostDraftDocument.removing(imageOccurrence: occurrence, from: snapshot.text)
+        let removedID = PostDraftDocument.segments(in: snapshot.text).compactMap { segment -> String? in
+            if case .image(_, let index, _, let id) = segment, index == occurrence { return id }; return nil
+        }.first
+        let remaining = snapshot.images.filter { $0.id != removedID || PostDraftDocument.containsImageMarker(blobID: $0.id, in: text) }
+        apply(ComposeMarkdownEdit(text: text, selection: NSRange(location: range.location, length: 0)), replacing: snapshot, images: remaining)
+    }
+
+    func moveImage(occurrence: Int, before target: Int?) {
+        guard let snapshot = capture(), imageRange(occurrence: occurrence, in: snapshot.text) != nil,
+              target != occurrence else { return }
+        let text = PostDraftDocument.moving(imageOccurrence: occurrence, before: target, in: snapshot.text)
+        let count = PostDraftDocument.segments(in: text).filter { if case .image = $0 { return true }; return false }.count
+        let destination = target.map { $0 > occurrence ? $0 - 1 : $0 } ?? (count - 1)
+        applyImageMove(text, occurrence: destination, snapshot: snapshot)
+    }
+
+    func moveImage(occurrence: Int, afterTextSegmentID: Int) {
+        guard let snapshot = capture(), imageRange(occurrence: occurrence, in: snapshot.text) != nil,
+              PostDraftDocument.textOffset(in: snapshot.text, segmentID: afterTextSegmentID) != nil else { return }
+        let text = PostDraftDocument.moving(imageOccurrence: occurrence, afterTextSegmentID: afterTextSegmentID, in: snapshot.text)
+        let precedingImages = afterTextSegmentID / 2
+        let destination = precedingImages - (occurrence < precedingImages ? 1 : 0)
+        applyImageMove(text, occurrence: destination, snapshot: snapshot)
+    }
+
+    private func applyImageMove(_ text: String, occurrence: Int, snapshot: Snapshot) {
+        guard text != snapshot.text, let range = imageRange(occurrence: occurrence, in: text) else { return }
+        apply(ComposeMarkdownEdit(text: text, selection: NSRange(location: NSMaxRange(range), length: 0)), replacing: snapshot)
+    }
+
+    private func imageRange(occurrence: Int, in text: String) -> NSRange? {
+        var offset = 0
+        for segment in PostDraftDocument.segments(in: text) {
+            switch segment {
+            case .text(_, let value): offset += value.utf16.count
+            case .image(_, let index, let markdown, _):
+                if index == occurrence { return NSRange(location: offset, length: markdown.utf16.count) }
+                offset += markdown.utf16.count
+            }
+        }
+        return nil
+    }
+
+    @discardableResult
+    func insertExternalURL(_ url: URL) -> Bool {
+        guard let documentID, let text = documentText, let images else { return false }
+        // Upload completion can arrive before UIKit has rendered a restored draft.
+        let snapshot = capture() ?? Snapshot(documentID: documentID, text: text, selection: NSRange(location: text.utf16.count, length: 0), images: images.wrappedValue)
+        guard matches(snapshot) else { return false }
+        let updated = PostDraftDocument.appendingExternalURL(url, to: snapshot.text)
+        let start = min(snapshot.selection.location, updated.utf16.count)
+        let selection = NSRange(location: start, length: min(snapshot.selection.length, updated.utf16.count - start))
+        apply(ComposeMarkdownEdit(text: updated, selection: selection), replacing: snapshot, requestFocus: false)
+        return true
+    }
+
+    private func select(_ selection: NSRange, in text: String, requestFocus: Bool = true) {
+        pendingSelection = selection
+        pendingSelectionRequestsFocus = requestFocus
+        if requestFocus, let id = PostDraftDocument.textSegment(in: text, at: selection.location) {
+            focus?.wrappedValue = id
+        }
+        // A no-op/cancel still needs to restore focus without a SwiftUI text change.
+        active?.restorePendingSelection(in: text)
+    }
 }
 
 struct ComposeSelectableTextEditor: UIViewRepresentable {
     @Environment(\.isEnabled) private var isEnabled
     @Binding var text: String
-    let quoteEditor: ComposeQuoteEditor
+    let editingController: ComposeEditingController
     let isFocused: Bool
     let activate: () -> Void
+    var segmentID: Int = 0
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
 
     func makeUIView(context: Context) -> TextView {
         let view = TextView()
+        view.editorUndoManager = editingController.undoManager
         view.delegate = context.coordinator
         view.backgroundColor = .clear
         view.font = UIFont.preferredFont(forTextStyle: .title3)
@@ -1105,7 +1304,7 @@ struct ComposeSelectableTextEditor: UIViewRepresentable {
         view.isScrollEnabled = false
         view.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         context.coordinator.view = view
-        if quoteEditor.active == nil { quoteEditor.active = context.coordinator }
+        if editingController.active == nil { editingController.active = context.coordinator }
         return view
     }
 
@@ -1115,12 +1314,18 @@ struct ComposeSelectableTextEditor: UIViewRepresentable {
         view.isSelectable = isEnabled
         if view.markedTextRange == nil, view.text != text {
             let selection = view.selectedRange
-            view.text = text
+            let undo = view.undoManager
+            undo?.disableUndoRegistration()
+            view.textStorage.replaceCharacters(in: NSRange(location: 0, length: view.text.utf16.count), with: text)
+            undo?.enableUndoRegistration()
             let start = min(selection.location, (text as NSString).length)
             view.selectedRange = NSRange(location: start, length: min(selection.length, (text as NSString).length - start))
         }
-        view.shouldBeFocused = isFocused && isEnabled
+        view.shouldBeFocused = isFocused && isEnabled && !editingController.suspended
         view.updateFocus()
+        if isFocused && isEnabled {
+            context.coordinator.restorePendingSelection(in: editingController.documentText ?? text)
+        }
     }
 
     func sizeThatFits(_ proposal: ProposedViewSize, uiView: TextView, context: Context) -> CGSize? {
@@ -1131,6 +1336,8 @@ struct ComposeSelectableTextEditor: UIViewRepresentable {
 
     final class TextView: UITextView {
         var shouldBeFocused = false
+        weak var editorUndoManager: UndoManager?
+        override var undoManager: UndoManager? { editorUndoManager ?? super.undoManager }
 
         override func didMoveToWindow() {
             super.didMoveToWindow()
@@ -1151,35 +1358,47 @@ struct ComposeSelectableTextEditor: UIViewRepresentable {
     final class Coordinator: NSObject, UITextViewDelegate {
         var parent: ComposeSelectableTextEditor
         weak var view: UITextView?
+        private var beforeSelection = NSRange(location: 0, length: 0)
         init(_ parent: ComposeSelectableTextEditor) { self.parent = parent }
 
         func textViewDidBeginEditing(_ textView: UITextView) {
-            parent.quoteEditor.active = self
+            parent.editingController.active = self
             parent.activate()
-        }
-
-        func textViewDidChange(_ textView: UITextView) { parent.text = textView.text }
-
-        func quote() {
-            guard let view, view.isEditable else { return }
-            view.unmarkText()
-            apply(ComposeQuoteEdit.quote(view.text, selection: view.selectedRange), to: view)
-            parent.activate()
-            view.becomeFirstResponder()
         }
 
         func textView(_ textView: UITextView, shouldChangeTextIn range: NSRange, replacementText text: String) -> Bool {
-            guard text == "\n", textView.markedTextRange == nil,
-                  let edit = ComposeQuoteEdit.newline(textView.text, selection: range) else { return true }
-            apply(edit, to: textView)
-            return false
+            beforeSelection = textView.selectedRange
+            return true
         }
 
-        private func apply(_ edit: ComposeQuoteEdit, to view: UITextView) {
-            view.text = edit.text
-            view.selectedRange = edit.selection
-            parent.text = edit.text
-            view.invalidateIntrinsicContentSize()
+        func textViewDidChange(_ textView: UITextView) {
+            parent.editingController.recordTyping(segmentID: parent.segmentID, text: textView.text, beforeSelection: beforeSelection, selection: textView.selectedRange)
+        }
+
+        func textViewDidChangeSelection(_ textView: UITextView) {
+            let controller = parent.editingController
+            if textView.isFirstResponder { controller.active = self }
+            // UITextInput.insertText and IME updates need not call shouldChangeTextIn.
+            // Remember selection only before the text diverges from the model.
+            if let text = controller.documentText,
+               case .text(_, let value)? = PostDraftDocument.segments(in: text).first(where: { $0.id == parent.segmentID }),
+               value == textView.text {
+                beforeSelection = textView.selectedRange
+            }
+        }
+
+        func restorePendingSelection(in text: String) {
+            let controller = parent.editingController
+            guard let view, view.isEditable, let selection = controller.pendingSelection,
+                  PostDraftDocument.textSegment(in: text, at: selection.location) == parent.segmentID,
+                  let offset = PostDraftDocument.textOffset(in: text, segmentID: parent.segmentID) else { return }
+            guard case .text(_, let expected)? = PostDraftDocument.segments(in: text).first(where: { $0.id == parent.segmentID }), view.text == expected else { return }
+            let local = NSRange(location: selection.location - offset, length: selection.length)
+            guard NSMaxRange(local) <= view.text.utf16.count else { return }
+            view.selectedRange = local
+            controller.pendingSelection = nil
+            if controller.pendingSelectionRequestsFocus { view.becomeFirstResponder() }
+            view.selectedRange = local
         }
     }
 }
