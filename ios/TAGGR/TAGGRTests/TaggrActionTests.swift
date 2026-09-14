@@ -50,6 +50,7 @@ extension XCTestCase {
             try? FileManager.default.removeItem(at: root)
         }
         let state = TaggrAppCoordinator(
+            retirementDefaults: defaults,
             navigationStore: NavigationStore(defaults: defaults),
             safety: safety ?? TaggrSafetyStore(defaults: defaults), api: api,
             identityStore: identityStore, identityAuthenticator: identityAuthenticator,
@@ -1411,6 +1412,7 @@ fileprivate struct TaggrTestBLSKey: @unchecked Sendable {
 }
 
 final class TaggrTestKeychain: ICKeychainAccess, @unchecked Sendable {
+    var deletionStatus: OSStatus = errSecSuccess
     private var data: Data?
 
     func copyMatching(
@@ -1438,6 +1440,7 @@ final class TaggrTestKeychain: ICKeychainAccess, @unchecked Sendable {
     }
 
     func delete(_ query: CFDictionary) -> OSStatus {
+        guard deletionStatus == errSecSuccess else { return deletionStatus }
         data = nil
         return errSecSuccess
     }

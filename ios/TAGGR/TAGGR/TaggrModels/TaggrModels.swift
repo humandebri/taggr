@@ -922,6 +922,7 @@ struct TaggrConfig: Codable, Equatable, Sendable {
     let postDeletionPenaltyFactor: Int?
     let votingPowerActivityWeeks: Int?
     let creditTransactionFee: Int?
+    var accountActivationCost: Int? = nil
     var identityChangeCost: Int? = nil
     var minCreditsForInviting: Int? = nil
     var realmCost: Int? = nil
@@ -949,6 +950,7 @@ struct TaggrConfig: Codable, Equatable, Sendable {
         case votingPowerActivityWeeks
         case identityChangeCost, minCreditsForInviting, realmCost, maxRealmName, defaultMaxDownvotes, maxFundingAmount, proposalApprovalThreshold
         case creditTransactionFee
+        case accountActivationCost
     }
 }
 

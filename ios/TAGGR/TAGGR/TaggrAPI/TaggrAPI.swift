@@ -87,6 +87,7 @@ actor TaggrAPI {
     static let memoTopUpCanister: UInt64 = 0x50555054
     private nonisolated let config: TaggrRuntimeConfig
     private let icClient: ICClient
+    private var retiredPrincipals = Set<String>()
 
     nonisolated var domain: String { config.domain }
 
@@ -135,6 +136,9 @@ actor TaggrAPI {
 
     func updateJSON(_ method: String, args: sending [Any?] = [], identity: ICAuthSession?) async throws -> Data {
         let identity = try Self.requireIdentity(identity)
+        guard !retiredPrincipals.contains(identity.principal) || ["withdraw_rewards", "cancel_bid", "unlink_cold_wallet"].contains(method) else {
+            throw TaggrAPIError.rejected("This account is stopped. Only asset recovery is available in iOS.")
+        }
         let arg = try TaggrCandid.jsonArguments(args)
         let response = try await updateRaw(method, arg: arg, identity: identity)
         try Self.throwIfRejectedJSON(response)
@@ -475,5 +479,47 @@ extension JSONDecoder {
         let decoder = JSONDecoder()
         decoder.keyDecodingStrategy = .convertFromSnakeCase
         return decoder
+    }
+}
+
+
+extension TaggrAPI {
+    func restrictSNS(_ principal: String, restricted: Bool) {
+        if restricted { retiredPrincipals.insert(principal) } else { retiredPrincipals.remove(principal) }
+    }
+
+    // These two cleanup calls intentionally remain available while the retirement UI is locked.
+    func clearRetirementProfile(_ user: TaggrUser, identity: ICAuthSession) async throws {
+        guard let mode = user.mode else { throw TaggrAPIError.invalidResponse("Missing account mode") }
+        let arg = try TaggrCandid.jsonArguments(["", "", user.controllers, user.filters.noise.jsonObject, user.governance, mode, user.showPostsInRealms])
+        try Self.validateRetirementCleanup(try await updateRaw("update_user", arg: arg, identity: identity))
+    }
+
+    func clearRetirementLinks(_ user: TaggrUser, identity: ICAuthSession) async throws {
+        var settings = user.settings
+        settings.removeValue(forKey: "links")
+        settings.removeValue(forKey: "pgp")
+        let arg = try TaggrCandid.jsonArguments([settings])
+        try Self.validateRetirementCleanup(try await updateRaw("update_user_settings", arg: arg, identity: identity))
+    }
+
+    private static func validateRetirementCleanup(_ response: Data) throws {
+        try throwIfRejectedJSON(response)
+        guard let object = try JSONSerialization.jsonObject(with: response) as? [String: Any], object["Ok"] != nil else {
+            throw TaggrAPIError.invalidResponse("Profile cleanup was not confirmed")
+        }
+    }
+
+    func stopForRetirement(seed: String, identity: ICAuthSession) async throws {
+        // Transport errors are deliberately not treated as a definite failure of this toggle.
+        let response: Data
+        do {
+            response = try await icClient.callRaw(method: "crypt", arg: TaggrCandid.jsonArguments([seed]), identity: identity)
+        } catch ICClientError.rejected(let rejection) where rejection.isCertified {
+            throw TaggrRetirementError.notApplied
+        }
+        let result = try JSONDecoder().decode(TaggrUpdateResult<Int>.self, from: response)
+        if result.err != nil { throw TaggrRetirementError.notApplied }
+        guard result.ok != nil else { throw TaggrAPIError.emptyResponse }
     }
 }

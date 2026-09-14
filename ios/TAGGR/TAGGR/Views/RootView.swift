@@ -9,7 +9,9 @@ struct RootView: View {
 
     var body: some View {
         Group {
-            if !state.acceptedSafetyTerms {
+            if state.accountRetired {
+                NavigationStack { RetiredAccountView() }
+            } else if !state.acceptedSafetyTerms {
                 SafetyGateView()
             } else {
                 tabs.id("\(state.safetyScope):\(state.runtimeGeneration):\(state.currentUser?.id.description ?? "guest")")
@@ -30,6 +32,9 @@ struct RootView: View {
         }
         .tint(TaggrTheme.clickable)
         .preferredColorScheme(.dark)
+        .alert("Account stopped", isPresented: Binding(get: { state.retirementCompleted }, set: { state.retirementCompleted = $0 })) {
+            Button("OK") {}
+        } message: { Text("Profile cleanup and account suspension are complete. TAGGR credentials and post caches were cleared from this device.") }
         .onChange(of: "\(state.safetyScope):\(state.runtimeGeneration):\(state.currentUser?.id.description ?? "guest")") { _, _ in
             state.navigationStore.featureReturnRoutes = [:]
         }

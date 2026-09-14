@@ -1044,6 +1044,7 @@ extension TaggrAppCoordinator {
         identityStore = store
         currentUser = user
         authSession = session
+        await api.restrictSNS(session.principal, restricted: accountRetired)
         errorMessage = nil
         clearAuthorNameCache()
         if let user {
@@ -1309,6 +1310,8 @@ extension TaggrAppCoordinator {
         guard userRefreshID == requestID, isCurrentRuntimeGeneration(generation), self.authSession?.principal == authSession.principal else { return }
         notificationRefreshFailed = false
         currentUser = loadedUser
+        await activeAPI.restrictSNS(authSession.principal, restricted: accountRetired)
+        guard isCurrentRuntimeGeneration(generation), self.authSession?.principal == authSession.principal else { return }
         storageCreationState = Self.storageCreationState(from: loadedUser?.settings)
         if let loadedUser {
             cacheAuthorName(loadedUser.name, userID: loadedUser.id)

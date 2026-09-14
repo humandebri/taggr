@@ -218,6 +218,11 @@ final class TaggrAppCoordinator {
         set { walletStorageStore.storageCreationState = newValue }
     }
 
+    var retirementDefaults: UserDefaults
+    var retirementRevision = 0
+    var retirementBusy = false
+    var retirementCompleted = false
+    var retirementMessage: String?
     var api: TaggrAPI
     var identityStore: ICIdentityStore
     var identityAuthenticator: ICInternetIdentityAuthenticator
@@ -265,6 +270,7 @@ final class TaggrAppCoordinator {
     var postSubmissionNoticeDismissTask: Task<Void, Never>?
 
     init(
+        retirementDefaults: UserDefaults = .standard,
         navigationStore: NavigationStore = NavigationStore(),
         safety: TaggrSafetyStore = TaggrSafetyStore(),
         api: TaggrAPI? = nil,
@@ -305,6 +311,7 @@ final class TaggrAppCoordinator {
         self.api = api ?? apiFactory(buildConfig)
         self.identityStore = identityStore ?? identityStoreFactory(buildConfig)
         self.identityAuthenticator = identityAuthenticator ?? identityAuthenticatorFactory(buildConfig)
+        self.retirementDefaults = retirementDefaults
         self.postDraftStore = postDraftStore
         self.realmPostingPreferences = realmPostingPreferences
         self.youtubeUpload = youtubeUpload ?? YouTubeUploadCoordinator()
@@ -403,6 +410,7 @@ final class TaggrAppCoordinator {
     }
 
     func loadCurrentRoute() async {
+        guard !accountRetired else { return }
         switch route {
         case .feed(let mode):
             await loadFeed(mode: mode, reset: true)

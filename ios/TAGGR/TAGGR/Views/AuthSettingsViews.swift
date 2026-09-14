@@ -20,6 +20,7 @@ enum YouTubeSettingsMode: Equatable {
 
 struct SettingsView: View {
     @Environment(TaggrAppCoordinator.self) private var state
+    @State private var retirementConfirmationPresented = false
     @State private var accountCreationPresented = false
     @State private var sendICPPresented = false
     @State private var mintConfirmationPresented = false
@@ -167,6 +168,14 @@ struct SettingsView: View {
                             }
                         }
                     }
+                    if state.currentUser != nil {
+                        SettingsPanel(title: "Account deletion") {
+                            Button("Delete account", role: .destructive) { retirementConfirmationPresented = true }
+                                .disabled(state.isBusy || state.retirementBusy || state.cache?.config?.accountActivationCost == nil)
+                            if let cost = state.cache?.config?.accountActivationCost { Text("Required: \(cost) credits") }
+                            if let message = state.retirementMessage { Text(message).foregroundStyle(.red) }
+                        }
+                    }
                     SettingsPanel(title: "Privacy & support") {
                         Link("Privacy Policy", destination: TaggrSafetyStore.siteURL.appendingPathComponent("privacy-policy"))
                         Link("Contact @FF on TAGGR", destination: TaggrSafetyStore.contactURL)
@@ -175,6 +184,12 @@ struct SettingsView: View {
                 .padding(16)
             }
             .taggrRefreshable()
+        }
+        .confirmationDialog("Delete account using account suspension?", isPresented: $retirementConfirmationPresented, titleVisibility: .visible) {
+            Button("Delete account", role: .destructive) { Task { await state.retireAccount() } }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This clears your biography, links and PGP setting, then encrypts ordinary posts using a random key that is not saved. iOS offers no recovery. Names, previous names, images (including access through known URLs), DAO proposals and financial records remain. This uses the existing suspension feature and costs \(state.cache?.config?.accountActivationCost ?? 0) credits. It does not erase all account data.")
         }
         .taggrNavigationChrome()
         .sheet(isPresented: $accountCreationPresented) {
@@ -563,7 +578,7 @@ private struct StorageTopUpSheet: View {
     }
 }
 
-private struct SendICPSheet: View {
+struct SendICPSheet: View {
     @Environment(TaggrAppCoordinator.self) private var state
     @Environment(\.dismiss) private var dismiss
     @State private var recipient = ""

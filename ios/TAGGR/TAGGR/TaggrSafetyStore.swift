@@ -147,7 +147,7 @@ final class TaggrSafetyStore {
 extension TaggrAppCoordinator {
     var safetyScope: String { "\(runtimeConfig.canisterId):\(authSession?.principal ?? "guest")" }
     var acceptedSafetyTerms: Bool { safety.accepted(scope: safetyScope) }
-    var canAccessUGC: Bool { acceptedSafetyTerms }
+    var canAccessUGC: Bool { acceptedSafetyTerms && !accountRetired }
 
     func isUserBlocked(_ id: Int) -> Bool {
         safety.isBlocked(userID: id, scope: safetyScope, remote: currentUser?.blacklist ?? [])
