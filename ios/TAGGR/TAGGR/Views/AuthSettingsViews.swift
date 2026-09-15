@@ -42,7 +42,7 @@ struct SettingsView: View {
                             VStack(alignment: .leading, spacing: 8) {
                                 Text(user.name)
                                     .font(.largeTitle.bold())
-                                    .foregroundStyle(TaggrTheme.text)
+                                    .foregroundStyle(TaggrTheme.clickable)
                                 UserAttributeBadgesView(
                                     badges: TaggrUserBadge.badges(
                                         for: user,
@@ -171,7 +171,9 @@ struct SettingsView: View {
                         }
                     }
                 }
-                .padding(16)
+                .padding(.horizontal, 16)
+                .padding(.top, 4)
+                .padding(.bottom, 16)
             }
             .taggrRefreshable()
         }
