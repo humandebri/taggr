@@ -2,6 +2,129 @@
 // Uses existing user_posts queries so profile and account entry points share one flow.
 import SwiftUI
 
+struct AccountPhotoPreviewCard: View {
+    @Environment(TaggrAppCoordinator.self) private var state
+    @State private var images: [TaggrAccountImage] = []
+    @State private var sourcePosts: [Int: TaggrPost] = [:]
+    @State private var selectedImage: TaggrAccountImage?
+    @State private var page = 0
+    @State private var pagingOffset = 0
+    @State private var loading = false
+    @State private var reachedEnd = false
+    @State private var errorMessage: String?
+
+    let handle: String
+
+    private let columns = Array(repeating: GridItem(.flexible(minimum: 0), spacing: 3), count: 3)
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Photos")
+                .font(.caption.bold())
+                .foregroundStyle(TaggrTheme.secondaryText)
+                .textCase(.uppercase)
+            VStack(alignment: .leading, spacing: 12) {
+                if loading && visibleImages.isEmpty {
+                    ProgressView()
+                        .frame(maxWidth: .infinity, minHeight: 96)
+                } else if visibleImages.isEmpty {
+                    Label("No posted images", systemImage: "photo.on.rectangle")
+                        .font(.subheadline)
+                        .foregroundStyle(TaggrTheme.secondaryText)
+                        .frame(maxWidth: .infinity, minHeight: 96)
+                } else {
+                    LazyVGrid(columns: columns, spacing: 3) {
+                        ForEach(visibleImages) { image in
+                            TaggrAccountImageThumbnail(
+                                image: image,
+                                accessibilityLabel: "Open image from post \(image.postId)"
+                            ) {
+                                selectedImage = image
+                            }
+                        }
+                    }
+                    Button("Show more", systemImage: "photo.on.rectangle.angled") {
+                        state.route = .userPhotos(handle)
+                    }
+                    .font(.subheadline.bold())
+                    .frame(minHeight: 44)
+                }
+                if let errorMessage {
+                    Text(errorMessage)
+                        .font(.footnote)
+                        .foregroundStyle(.red)
+                        .textSelection(.enabled)
+                    Button("Retry", systemImage: "arrow.clockwise") {
+                        Task { await reload() }
+                    }
+                }
+            }
+            .padding(14)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(TaggrTheme.panel)
+            .clipShape(.rect(cornerRadius: 8))
+        }
+        .task(id: handle) {
+            await reload()
+        }
+        .fullScreenCover(item: $selectedImage) { image in
+            AccountImagePagerView(images: visibleImages, selectedImage: image)
+        }
+    }
+
+    private var visibleImages: [TaggrAccountImage] {
+        let visible = images.filter { image in
+            sourcePosts[image.postId].map {
+                state.canDisplayPost($0) && $0.contentRestriction(viewerID: state.currentUser?.id) == nil
+            } ?? false
+        }
+        return Array(visible.prefix(TaggrAccountImagePaging.previewLimit))
+    }
+
+    private func reload() async {
+        images = []
+        sourcePosts = [:]
+        selectedImage = nil
+        page = 0
+        pagingOffset = 0
+        reachedEnd = false
+        errorMessage = nil
+        await loadPreview()
+    }
+
+    private func loadPreview() async {
+        guard !loading, !handle.isEmpty else { return }
+        loading = true
+        defer { loading = false }
+
+        do {
+            while TaggrAccountImagePaging.shouldContinueLoadingPreview(
+                visibleImageCount: visibleImages.count,
+                reachedEnd: reachedEnd
+            ) {
+                let requestOffset = page == 0 ? 0 : pagingOffset
+                let posts = try await state.loadUserPosts(handle: handle, page: page, offset: requestOffset)
+                try Task.checkCancellation()
+                let result = TaggrAccountImagePaging.append(
+                    posts: posts,
+                    to: images,
+                    page: page,
+                    pagingOffset: pagingOffset
+                )
+                for post in posts { sourcePosts[post.id] = post }
+                images = result.images
+                page = result.page
+                pagingOffset = result.pagingOffset
+                reachedEnd = result.reachedEnd
+            }
+        } catch is CancellationError {
+            return
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+}
+
 struct UserImageLibraryView: View {
     @Environment(TaggrAppCoordinator.self) private var state
     @State private var images: [TaggrAccountImage] = []

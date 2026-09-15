@@ -6,6 +6,13 @@ import ICNativeClient
 @testable import TAGGR
 
 extension TaggrTests {
+    func testAccountDeletionRequiresExactLowercaseConfirmation() {
+        XCTAssertTrue(AccountDeletionInput.isValid("delete"))
+        for invalid in ["", "Delete", "DELETE", " delete", "delete ", "delete\n"] {
+            XCTAssertFalse(AccountDeletionInput.isValid(invalid))
+        }
+    }
+
     func testYouTubeSettingsModeKeepsReconnectAvailableAfterDisconnect() {
         let channel = YouTubeChannel(id: "channel-id", title: "TAGGR")
 
@@ -480,6 +487,10 @@ extension TaggrTests {
         )
         XCTAssertTrue(end.reachedEnd)
         XCTAssertFalse(TaggrAccountImagePaging.shouldContinueLoading(previousImageCount: second.images.count, result: end))
+        XCTAssertTrue(TaggrAccountImagePaging.shouldContinueLoadingPreview(visibleImageCount: 0, reachedEnd: false))
+        XCTAssertTrue(TaggrAccountImagePaging.shouldContinueLoadingPreview(visibleImageCount: 8, reachedEnd: false))
+        XCTAssertFalse(TaggrAccountImagePaging.shouldContinueLoadingPreview(visibleImageCount: 9, reachedEnd: false))
+        XCTAssertFalse(TaggrAccountImagePaging.shouldContinueLoadingPreview(visibleImageCount: 0, reachedEnd: true))
     }
 
     func testPostExtensionDecodesPollRepostAndProposal() throws {

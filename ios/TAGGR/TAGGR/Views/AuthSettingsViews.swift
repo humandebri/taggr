@@ -20,37 +20,43 @@ enum YouTubeSettingsMode: Equatable {
 
 struct SettingsView: View {
     @Environment(TaggrAppCoordinator.self) private var state
+    @State private var retirementInputPresented = false
+    @State private var retirementConfirmationRequested = false
     @State private var retirementConfirmationPresented = false
     @State private var accountCreationPresented = false
     @State private var sendICPPresented = false
     @State private var mintConfirmationPresented = false
     @State private var principalCopied = false
     @State private var signOutConfirmationPresented = false
+    @State private var profileEditingPresented = false
 
     var body: some View {
         ZStack {
             TaggrTheme.background.ignoresSafeArea()
             ScrollView {
                 VStack(alignment: .leading, spacing: 18) {
-                    AccountFeatureLinks()
-                    SettingsPanel(title: "Identity") {
-                        if let user = state.currentUser {
-                            Button {
-                                state.navigateToProfile(user.name)
-                            } label: {
+                    if let user = state.currentUser {
+                        Button {
+                            state.navigateToProfile(user.name)
+                        } label: {
+                            VStack(alignment: .leading, spacing: 8) {
                                 Text(user.name)
-                                    .font(.subheadline.weight(.bold))
-                                    .foregroundStyle(TaggrTheme.clickable)
-                            }
-                            .buttonStyle(.plain)
-                            UserAttributeBadgesView(
-                                badges: TaggrUserBadge.badges(
-                                    for: user,
-                                    viewerID: user.id,
-                                    votingPowerActivityWeeks: state.cache?.config?.votingPowerActivityWeeks
+                                    .font(.largeTitle.bold())
+                                    .foregroundStyle(TaggrTheme.text)
+                                UserAttributeBadgesView(
+                                    badges: TaggrUserBadge.badges(
+                                        for: user,
+                                        viewerID: user.id,
+                                        votingPowerActivityWeeks: state.cache?.config?.votingPowerActivityWeeks
+                                    )
                                 )
-                            )
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
                         }
+                        .buttonStyle(.plain)
+                        .accessibilityHint("Opens your profile")
+                    }
+                    SettingsPanel(title: "Identity") {
                         if let message = state.errorMessage {
                             Text(message)
                                 .font(.footnote)
@@ -81,30 +87,12 @@ struct SettingsView: View {
                                 .foregroundStyle(principalCopied ? TaggrTheme.accent : TaggrTheme.clickable)
                             }
                             if state.currentUser == nil {
-                                HStack(spacing: 10) {
-                                    Button {
-                                        state.icpInvoice = nil
-                                        accountCreationPresented = true
-                                    } label: {
-                                        Label("Create TAGGR user", systemImage: "person.badge.plus")
-                                            .font(.subheadline.weight(.bold))
-                                    }
-                                    Spacer()
-                                    signOutButton
-                                }
-                            } else if let user = state.currentUser {
-                                HStack(spacing: 10) {
-                                    Button {
-                                        state.route = .userPhotos(user.name)
-                                    } label: {
-                                        Label("Photos", systemImage: "photo.on.rectangle")
-                                            .labelStyle(.iconOnly)
-                                            .frame(width: 44, height: 44)
-                                            .background(TaggrTheme.panelRaised)
-                                            .clipShape(RoundedRectangle(cornerRadius: 8))
-                                    }
-                                    .buttonStyle(.plain)
-                                    signOutButton
+                                Button {
+                                    state.icpInvoice = nil
+                                    accountCreationPresented = true
+                                } label: {
+                                    Label("Create TAGGR user", systemImage: "person.badge.plus")
+                                        .font(.subheadline.weight(.bold))
                                 }
                             }
                         } else {
@@ -127,6 +115,7 @@ struct SettingsView: View {
                             SettingsPanel(title: "Storage") {
                                 StorageSettingsPanel(user: user)
                             }
+                            AccountPhotoPreviewCard(handle: user.name)
                         }
                     }
                     let youtubeMode = YouTubeSettingsMode.resolve(
@@ -170,30 +159,43 @@ struct SettingsView: View {
                             }
                         }
                     }
-                    if state.currentUser != nil {
-                        SettingsPanel(title: "Account deletion") {
-                            Button("Delete account", role: .destructive) { retirementConfirmationPresented = true }
-                                .disabled(state.isBusy || state.retirementBusy || state.cache?.config?.accountActivationCost == nil)
-                            if let cost = state.cache?.config?.accountActivationCost { Text("Required: \(cost) credits") }
-                            if let message = state.retirementMessage { Text(message).foregroundStyle(.red) }
-                        }
-                    }
                     SettingsPanel(title: "Privacy & support") {
                         Link("Privacy Policy", destination: TaggrSafetyStore.siteURL.appendingPathComponent("privacy-policy"))
                         Link("Contact @FF on TAGGR", destination: TaggrSafetyStore.contactURL)
+                    }
+                    if state.currentUser != nil {
+                        SettingsPanel(title: "Account deletion") {
+                            Button("Delete account", role: .destructive) { retirementInputPresented = true }
+                                .disabled(state.isBusy || state.retirementBusy || state.cache?.config?.accountActivationCost == nil)
+                            if let message = state.retirementMessage { Text(message).foregroundStyle(.red) }
+                        }
                     }
                 }
                 .padding(16)
             }
             .taggrRefreshable()
         }
-        .confirmationDialog("Delete account using account suspension?", isPresented: $retirementConfirmationPresented, titleVisibility: .visible) {
-            Button("Delete account", role: .destructive) { Task { await state.retireAccount() } }
-            Button("Cancel", role: .cancel) {}
+        .confirmationDialog("Delete this account?", isPresented: $retirementConfirmationPresented, titleVisibility: .visible) {
+            Button("Yes", role: .destructive) { Task { await state.retireAccount() } }
+            Button("No", role: .cancel) {}
         } message: {
             Text("This clears your biography, links and PGP setting, then encrypts ordinary posts using a random key that is not saved. iOS offers no recovery. Names, previous names, images (including access through known URLs), DAO proposals and financial records remain. This uses the existing suspension feature and costs \(state.cache?.config?.accountActivationCost ?? 0) credits. It does not erase all account data.")
         }
         .taggrNavigationChrome()
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                accountMenu
+            }
+        }
+        .sheet(isPresented: $profileEditingPresented) {
+            ProfileEditView().id("\(state.safetyScope):\(state.runtimeGeneration)")
+        }
+        .sheet(isPresented: $retirementInputPresented, onDismiss: completeRetirementInputDismissal) {
+            AccountDeletionInputSheet {
+                retirementConfirmationRequested = true
+                retirementInputPresented = false
+            }
+        }
         .sheet(isPresented: $accountCreationPresented) {
             AccountCreationSheet()
                 .environment(state)
@@ -223,22 +225,30 @@ struct SettingsView: View {
         }
     }
 
-    private var signOutButton: some View {
-        Button {
-            signOutConfirmationPresented = true
-        } label: {
-            Label("Sign out", systemImage: "rectangle.portrait.and.arrow.right")
-                .labelStyle(.iconOnly)
-                .frame(width: 44, height: 44)
-                .background(.red.opacity(0.08))
-                .overlay {
-                    RoundedRectangle(cornerRadius: 8)
-                        .stroke(.red.opacity(0.85), lineWidth: 1)
+    private var accountMenu: some View {
+        Menu("Account menu", systemImage: "line.3.horizontal") {
+            if state.currentUser != nil {
+                Button("Edit profile", systemImage: "person.crop.circle") {
+                    profileEditingPresented = true
                 }
-                .clipShape(RoundedRectangle(cornerRadius: 8))
+                Button("Bookmarks", systemImage: "bookmark") {
+                    state.navigate(to: .bookmarks)
+                }
+                Button("Invites", systemImage: "person.badge.plus") {
+                    state.navigate(to: .invites)
+                }
+            }
+            Button("Proposals", systemImage: "checkmark.seal") {
+                state.navigate(to: .proposals)
+            }
+            if state.authSession != nil {
+                Divider()
+                Button("Sign out", systemImage: "rectangle.portrait.and.arrow.right", role: .destructive) {
+                    signOutConfirmationPresented = true
+                }
+            }
         }
-        .buttonStyle(.plain)
-        .foregroundStyle(.red)
+        .labelStyle(.iconOnly)
         .confirmationDialog(
             "Sign out?",
             isPresented: $signOutConfirmationPresented,
@@ -251,6 +261,12 @@ struct SettingsView: View {
         } message: {
             Text("This removes the saved Internet Identity session from this device. Your TAGGR account and posts remain.")
         }
+    }
+
+    private func completeRetirementInputDismissal() {
+        guard retirementConfirmationRequested else { return }
+        retirementConfirmationRequested = false
+        retirementConfirmationPresented = true
     }
 
     private func walletPanel(_ user: TaggrUser?) -> some View {
@@ -309,6 +325,61 @@ struct SettingsView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(TaggrTheme.panelRaised)
         .clipShape(RoundedRectangle(cornerRadius: 8))
+    }
+}
+
+enum AccountDeletionInput {
+    static let requiredText = "delete"
+
+    static func isValid(_ text: String) -> Bool {
+        text == requiredText
+    }
+}
+
+private struct AccountDeletionInputSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    @State private var text = ""
+    let continueDeletion: () -> Void
+
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                TaggrTheme.background.ignoresSafeArea()
+                VStack(alignment: .leading, spacing: 16) {
+                    Text("Type delete to continue")
+                        .font(.headline)
+                        .foregroundStyle(TaggrTheme.text)
+                    Text("This confirmation is case-sensitive and cannot be undone.")
+                        .font(.footnote)
+                        .foregroundStyle(TaggrTheme.secondaryText)
+                    TextField("delete", text: $text)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .textFieldStyle(.plain)
+                        .foregroundStyle(TaggrTheme.text)
+                        .padding(14)
+                        .background(TaggrTheme.panelRaised)
+                        .clipShape(.rect(cornerRadius: 8))
+                        .accessibilityLabel("Type delete to continue")
+                    Button("Continue") {
+                        continueDeletion()
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(.red)
+                    .disabled(!AccountDeletionInput.isValid(text))
+                    Spacer()
+                }
+                .padding(16)
+            }
+            .navigationTitle("Delete account")
+            .taggrInlineNavigationChrome()
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                }
+            }
+        }
+        .presentationDetents([.medium])
     }
 }
 

@@ -10,9 +10,6 @@ struct RetiredAccountView: View {
                 Text(state.retirementStatusTitle)
                 Text(state.retirementStatusDetail)
                 if let message = state.retirementMessage { Text(message).foregroundStyle(.red) }
-                if state.retirementStage == "preparing", let cost = state.cache?.config?.accountActivationCost {
-                    Text("Required: \(cost) credits")
-                }
                 if state.retirementStage != nil {
                     Button(state.retirementActionTitle) {
                         Task { await state.retireAccount() }

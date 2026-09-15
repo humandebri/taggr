@@ -69,6 +69,8 @@ struct TaggrAccountImagePageResult: Equatable {
 }
 
 enum TaggrAccountImagePaging {
+    static let previewLimit = 9
+
     static func append(
         posts: [TaggrPost],
         to images: [TaggrAccountImage],
@@ -100,5 +102,12 @@ enum TaggrAccountImagePaging {
         result: TaggrAccountImagePageResult
     ) -> Bool {
         !result.reachedEnd && result.images.count == previousImageCount
+    }
+
+    static func shouldContinueLoadingPreview(
+        visibleImageCount: Int,
+        reachedEnd: Bool
+    ) -> Bool {
+        !reachedEnd && visibleImageCount < previewLimit
     }
 }
