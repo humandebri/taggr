@@ -29,18 +29,18 @@ No production updates, TestFlight upload or review submission are part of this c
 
 ### Remaining coverage limits
 
-- Device discovery again found only the iPhone 17 simulator (iOS 26.5). No physical-device deletion, real-device asset recovery, or App Review recording was performed.
-- Archived-post suspension on a running canister remains unverified. The existing backend archives only above 10,000 heap posts; the 1,000-post workload does not reach that threshold. The two existing Rust tests cover archiving and encryption separately, not their combined account-stop flow. No test-only backend API or changed archive threshold was introduced.
-- No SDK request handle is persisted, so an unknown stop result can still remain pending indefinitely. No TestFlight upload or App Store submission was made.
+-   Device discovery again found only the iPhone 17 simulator (iOS 26.5). No physical-device deletion, real-device asset recovery, or App Review recording was performed.
+-   Archived-post suspension on a running canister remains unverified. The existing backend archives only above 10,000 heap posts; the 1,000-post workload does not reach that threshold. The two existing Rust tests cover archiving and encryption separately, not their combined account-stop flow. No test-only backend API or changed archive threshold was introduced.
+-   No SDK request handle is persisted, so an unknown stop result can still remain pending indefinitely. No TestFlight upload or App Store submission was made.
 
 ### Local account-stop results
 
-| Own posts | Encrypted posts checked | Stop result | Stop cost | CLI round-trip |
-| --- | --- | --- | --- | --- |
-| 0 | 0 | `Ok(0)`, stopped | 1,000 credits | 0.177 s |
-| 1 | 1, including edit history | Stopped | 1,000 credits (accounting log) | Not retained |
-| 100 | 100, including edit history | `Ok(100)`, stopped | 1,000 credits | 0.360 s |
-| 1,000 | 1,000, including edit history | `Ok(1000)`, stopped | 1,000 credits | 0.297 s |
+| Own posts | Encrypted posts checked       | Stop result         | Stop cost                      | CLI round-trip |
+| --------- | ----------------------------- | ------------------- | ------------------------------ | -------------- |
+| 0         | 0                             | `Ok(0)`, stopped    | 1,000 credits                  | 0.177 s        |
+| 1         | 1, including edit history     | Stopped             | 1,000 credits (accounting log) | Not retained   |
+| 100       | 100, including edit history   | `Ok(100)`, stopped  | 1,000 credits                  | 0.360 s        |
+| 1,000     | 1,000, including edit history | `Ok(1000)`, stopped | 1,000 credits                  | 0.297 s        |
 
 The workload mixed short bodies and approximately 2 KiB bodies; the first post was edited before stopping. Every returned post was checked for its encrypted flag and absence of the original body/history marker. TAGGR balances were unchanged in the measured 0/100/1,000 cases (the test accounts held zero TAGGR). This does not validate a nonzero-asset withdrawal. The one-post stop succeeded before the harness was adjusted for the API's `[post, metadata]` response shape; its state, encrypted body/history and 1,000-credit accounting entry were then verified read-only, without resending `crypt`.
 

@@ -260,7 +260,31 @@ private struct FeedRouteView: View {
     @Environment(TaggrAppCoordinator.self) private var state
     let scrollToTopRevision: Int
 
+    private var retainsFeed: Bool {
+        if case .feed = state.route { return true }
+        if case .post = state.route, case .feed = state.currentPostReturnRoute { return true }
+        return false
+    }
+
     var body: some View {
+        ZStack {
+            if retainsFeed {
+                FeedView(scrollToTopRevision: scrollToTopRevision)
+                    .opacity(isShowingFeed ? 1 : 0)
+                    .allowsHitTesting(isShowingFeed)
+                    .accessibilityHidden(!isShowingFeed)
+            }
+            destination
+        }
+    }
+
+    private var isShowingFeed: Bool {
+        if case .feed = state.route { return true }
+        return false
+    }
+
+    @ViewBuilder
+    private var destination: some View {
         switch state.route {
         case .search(let query):
             SearchView(query: query).id(query)
@@ -277,6 +301,8 @@ private struct FeedRouteView: View {
                 title: "\(handle)'s Photos",
                 backRoute: .profile(handle)
             )
+        case .feed:
+            EmptyView()
         default:
             FeedView(scrollToTopRevision: scrollToTopRevision)
         }

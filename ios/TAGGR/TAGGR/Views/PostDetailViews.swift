@@ -12,14 +12,14 @@ struct PostDetailView: View {
                 LazyVStack(alignment: .leading, spacing: 0) {
                     FeedHeader(selectedMode: selectedMode, changeMode: changeMode, backAction: nil)
                     if let focusedPost = state.focusedPost {
-                        let posts = state.feed.isEmpty ? [focusedPost] : state.feed
+                        let posts = state.postThread.isEmpty ? [focusedPost] : state.postThread
                         ForEach(posts) { post in
                             if post.parent == nil {
-                                PostRow(post: post) {
+                                PostRow(post: post, isDetail: post.id == focusedPost.id) {
                                     state.navigateToPost(post.id)
                                 }
                             } else {
-                                ReplyPostRow(post: post) {
+                                ReplyPostRow(post: post, isDetail: post.id == focusedPost.id) {
                                     state.navigateToPost(post.id)
                                 }
                             }

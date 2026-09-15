@@ -152,6 +152,7 @@ final class FeedStore {
 @MainActor
 @Observable
 final class ContentStore {
+    var postThread: [TaggrPost] = []
     var focusedPost: TaggrPost?
     var profile: TaggrUser?
     var profileActionInFlight = false

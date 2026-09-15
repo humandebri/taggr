@@ -81,12 +81,16 @@ struct SettingsView: View {
                                 .foregroundStyle(principalCopied ? TaggrTheme.accent : TaggrTheme.clickable)
                             }
                             if state.currentUser == nil {
-                                Button {
-                                    state.icpInvoice = nil
-                                    accountCreationPresented = true
-                                } label: {
-                                    Label("Create TAGGR user", systemImage: "person.badge.plus")
-                                        .font(.subheadline.weight(.bold))
+                                HStack(spacing: 10) {
+                                    Button {
+                                        state.icpInvoice = nil
+                                        accountCreationPresented = true
+                                    } label: {
+                                        Label("Create TAGGR user", systemImage: "person.badge.plus")
+                                            .font(.subheadline.weight(.bold))
+                                    }
+                                    Spacer()
+                                    signOutButton
                                 }
                             } else if let user = state.currentUser {
                                 HStack(spacing: 10) {
@@ -102,8 +106,6 @@ struct SettingsView: View {
                                     .buttonStyle(.plain)
                                     signOutButton
                                 }
-                            } else {
-                                signOutButton
                             }
                         } else {
                             Button {
@@ -253,15 +255,6 @@ struct SettingsView: View {
 
     private func walletPanel(_ user: TaggrUser?) -> some View {
         VStack(alignment: .leading, spacing: 14) {
-            if user == nil {
-                Button {
-                    state.icpInvoice = nil
-                    accountCreationPresented = true
-                } label: {
-                    Label("Create TAGGR user", systemImage: "person.badge.plus")
-                        .font(.subheadline.weight(.bold))
-                }
-            }
             LazyVGrid(columns: [GridItem(.adaptive(minimum: 118), spacing: 8)], spacing: 8) {
                 walletMetric("TAGGR", value: user.map { TaggrTokenAmount.format($0.balance ?? 0, decimals: state.cache?.config?.tokenDecimals) } ?? "-")
                 walletMetric("Credits", value: user.map { ($0.cycles ?? 0).formatted() } ?? "-")

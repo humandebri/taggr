@@ -1,5 +1,6 @@
 import CryptoKit
 import XCTest
+import UIKit
 @testable import TAGGR
 
 extension TaggrTests {
@@ -418,4 +419,35 @@ extension TaggrTests {
             ##"[{"name":"DEV","cleanup_penalty":10,"controllers":[7],"description":"\##(description)","filter":{},"label_color":"#123456","max_downvotes":4,"whitelist":[],"adult_content":false,"comments_filtering":true}]"##.utf8
         )
     }
+}
+
+
+extension TaggrTests {
+    @MainActor
+    func testPostTapYieldsToAncestorScrollingAndAllowsNextTap() {
+        let scroll = PostTapTestScrollView()
+        let container = UIView()
+        let textView = TaggrInteractiveMarkdownText.TextView()
+        scroll.addSubview(container)
+        container.addSubview(textView)
+        let parent = TaggrInteractiveMarkdownText(
+            text: "post", maximumLines: nil, textStyle: .body, textColor: .label,
+            lineSpacing: 0, accessibilityIdentifier: nil, openPost: {}, onTruncationChange: { _ in })
+        let coordinator = parent.makeCoordinator()
+        coordinator.textView = textView
+        let tap = UITapGestureRecognizer()
+        XCTAssertTrue(coordinator.gestureRecognizer(tap, shouldRequireFailureOf: scroll.panGestureRecognizer))
+        XCTAssertFalse(coordinator.gestureRecognizer(tap, shouldRecognizeSimultaneouslyWith: scroll.panGestureRecognizer))
+        XCTAssertFalse(coordinator.gestureRecognizer(tap, shouldRequireFailureOf: textView.panGestureRecognizer))
+        scroll.deceleratingForTest = true
+        XCTAssertFalse(coordinator.gestureRecognizer(tap, shouldReceive: UITouch()))
+        scroll.deceleratingForTest = false
+        XCTAssertTrue(coordinator.gestureRecognizer(tap, shouldReceive: UITouch()))
+    }
+}
+
+@MainActor
+private final class PostTapTestScrollView: UIScrollView {
+    var deceleratingForTest = false
+    override var isDecelerating: Bool { deceleratingForTest }
 }

@@ -107,14 +107,25 @@ final class TaggrAppCoordinator {
     var authSession: ICAuthSession? {
         get { sessionStore.authSession }
         set {
-            if sessionStore.authSession?.principal != newValue?.principal { featurePosts.reset() }
+            if sessionStore.authSession?.principal != newValue?.principal {
+                featurePosts.reset()
+                restoredFeedMode = nil
+                postThread = []
+                loadedFeedMode = nil
+            }
             sessionStore.authSession = newValue
         }
     }
     var currentUser: TaggrUser? {
         get { sessionStore.currentUser }
         set {
-            if sessionStore.currentUser?.id != newValue?.id { featurePosts.reset() }
+            if let previousUserID = sessionStore.currentUser?.id,
+               previousUserID != newValue?.id {
+                featurePosts.reset()
+                restoredFeedMode = nil
+                postThread = []
+                loadedFeedMode = nil
+            }
             sessionStore.currentUser = newValue
         }
     }
@@ -148,6 +159,13 @@ final class TaggrAppCoordinator {
     }
     var runtimeConfig: TaggrRuntimeConfig {
         sessionStore.runtimeConfig
+    }
+    // Consumed once by the route task when returning to an intact timeline.
+    var restoredFeedMode: TaggrFeedMode?
+    var loadedFeedMode: TaggrFeedMode?
+    var postThread: [TaggrPost] {
+        get { contentStore.postThread }
+        set { contentStore.postThread = newValue }
     }
     var feed: [TaggrPost] {
         get { feedStore.feed }
@@ -256,7 +274,14 @@ final class TaggrAppCoordinator {
     @ObservationIgnored var userRefreshTask: Task<TaggrUser?, Error>?
     @ObservationIgnored var userRefreshKey: String?
     @ObservationIgnored var userRefreshID: UUID?
-    var runtimeGeneration = 0 { didSet { featurePosts.reset() } }
+    var runtimeGeneration = 0 {
+        didSet {
+            featurePosts.reset()
+            restoredFeedMode = nil
+            postThread = []
+            loadedFeedMode = nil
+        }
+    }
     var requestSequences: [RequestScope: Int] = [:]
     var requestTasks: [RequestScope: Task<Void, Never>] = [:]
     var activeOperationIDs: Set<UUID> = []
@@ -409,11 +434,15 @@ final class TaggrAppCoordinator {
         }
     }
 
-    func loadCurrentRoute() async {
+    func loadCurrentRoute(forceFeedReload: Bool = false) async {
         guard !accountRetired else { return }
         switch route {
         case .feed(let mode):
-            await loadFeed(mode: mode, reset: true)
+            let restoresFeed = restoredFeedMode == mode
+            restoredFeedMode = nil
+            if !restoresFeed || forceFeedReload {
+                await loadFeed(mode: mode, reset: true)
+            }
         case .post(let id):
             await loadPost(id)
         case .profile(let handle):
@@ -448,7 +477,7 @@ final class TaggrAppCoordinator {
         case .inbox:
             break
         default:
-            await loadCurrentRoute()
+            await loadCurrentRoute(forceFeedReload: true)
         }
     }
 
@@ -486,6 +515,7 @@ final class TaggrAppCoordinator {
     }
 
     func loadFeed(mode: TaggrFeedMode, reset: Bool, showsBusyOverlay: Bool = true) async {
+        if reset { loadedFeedMode = nil }
         let request = beginRequest(.feed)
         let activeAPI = api
         returnFeedMode = mode
@@ -514,6 +544,7 @@ final class TaggrAppCoordinator {
                 }
                 guard self.isCurrentRequest(request) else { return }
                 self.feed = reset ? posts : self.feed + posts
+                self.loadedFeedMode = mode
                 self.canLoadMoreFeed = posts.count >= pageSize
             }
             if showsBusyOverlay {
@@ -537,6 +568,7 @@ final class TaggrAppCoordinator {
     }
 
     func navigateToPost(_ id: Int, from mode: TaggrFeedMode? = nil) {
+        restoredFeedMode = nil
         if let mode {
             returnFeedMode = mode
         }
@@ -596,6 +628,7 @@ final class TaggrAppCoordinator {
         switch destination {
         case .feed(let mode):
             navigateToFeed(mode)
+            restoredFeedMode = loadedFeedMode == mode ? mode : nil
         case .realm(let name):
             navigateToRealm(name)
         case .post:
@@ -607,6 +640,7 @@ final class TaggrAppCoordinator {
     }
 
     func navigateToFeed(_ mode: TaggrFeedMode) {
+        restoredFeedMode = nil
         returnFeedMode = mode
         navigationStore.rememberHomeFeedMode(mode)
         focusedPost = nil
@@ -614,6 +648,7 @@ final class TaggrAppCoordinator {
     }
 
     func navigateToHomeFeed() {
+        restoredFeedMode = nil
         let mode = effectiveHomeFeedMode
         returnFeedMode = mode
         focusedPost = nil
@@ -690,7 +725,7 @@ final class TaggrAppCoordinator {
                 }
                 guard self.isCurrentRequest(request) else { return }
                 self.focusedPost = thread.last
-                self.feed = thread
+                self.postThread = thread
                 if let refreshedReplies {
                     self.repliesByPostID[id] = refreshedReplies
                 }
@@ -852,6 +887,7 @@ final class TaggrAppCoordinator {
     }
 
     func loadRealmsList() async {
+        loadedFeedMode = nil
         let request = beginRequest(.realm)
         let generation = request.runtimeGeneration
         let activeAPI = api
@@ -880,6 +916,7 @@ final class TaggrAppCoordinator {
     }
 
     func loadAllRealmsList(reset: Bool = true) async {
+        loadedFeedMode = nil
         guard reset || (canLoadMoreRealms && !isLoadingMoreRealms) else { return }
         if !reset {
             isLoadingMoreRealms = true
@@ -917,6 +954,7 @@ final class TaggrAppCoordinator {
     }
 
     func loadRealm(_ name: String, showsBusyOverlay: Bool = true) async {
+        loadedFeedMode = nil
         let request = beginRequest(.realm)
         let activeAPI = api
         let normalized = normalizedRealmName(name)

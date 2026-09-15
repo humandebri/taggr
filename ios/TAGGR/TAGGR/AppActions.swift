@@ -535,6 +535,7 @@ extension TaggrAppCoordinator {
             return
         }
         let previousFeed = feed
+        let previousPostThread = postThread
         let previousFocusedPost = focusedPost
         let previousReplies = repliesByPostID
         applyOptimisticReaction(postId: postId, reaction: reaction)
@@ -545,6 +546,7 @@ extension TaggrAppCoordinator {
         }
         if !succeeded {
             feed = previousFeed
+            postThread = previousPostThread
             focusedPost = previousFocusedPost
             repliesByPostID = previousReplies
         }
@@ -560,6 +562,7 @@ extension TaggrAppCoordinator {
             return
         }
         let previousFeed = feed
+        let previousPostThread = postThread
         let previousFocusedPost = focusedPost
         let previousReplies = repliesByPostID
         if let userId = currentUser?.id {
@@ -574,6 +577,7 @@ extension TaggrAppCoordinator {
         }
         if !succeeded {
             feed = previousFeed
+            postThread = previousPostThread
             focusedPost = previousFocusedPost
             repliesByPostID = previousReplies
         }
@@ -591,6 +595,7 @@ extension TaggrAppCoordinator {
         }
         guard let userId = currentUser?.id else { return }
         let previousFeed = feed
+        let previousPostThread = postThread
         let previousFocusedPost = focusedPost
         let previousReplies = repliesByPostID
         updatePost(postId) { post in
@@ -607,6 +612,7 @@ extension TaggrAppCoordinator {
         }
         if !succeeded {
             feed = previousFeed
+            postThread = previousPostThread
             focusedPost = previousFocusedPost
             repliesByPostID = previousReplies
         }
@@ -1453,6 +1459,9 @@ extension TaggrAppCoordinator {
     func updatePost(_ postId: Int, transform: (TaggrPost) -> TaggrPost) {
         if let post = featurePosts.posts[postId] { featurePosts.posts[postId] = transform(post) }
         feed = feed.map { post in
+            post.id == postId ? transform(post) : post
+        }
+        postThread = postThread.map { post in
             post.id == postId ? transform(post) : post
         }
         if focusedPost?.id == postId, let focusedPost {

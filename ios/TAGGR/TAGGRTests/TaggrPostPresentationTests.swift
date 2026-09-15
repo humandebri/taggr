@@ -557,6 +557,25 @@ final class TaggrQuoteTests: XCTestCase {
         }
     }
 
+    func testProgrammaticallyLoadedComposerTextUsesThemeColor() async throws {
+        let fixture = try HostedComposer(app: makeCoordinator())
+        defer { fixture.close() }
+        try await fixture.settle()
+
+        fixture.state.text = "Existing post body"
+        try await fixture.settle()
+
+        let input = try fixture.input()
+        let color = try XCTUnwrap(
+            input.textStorage.attribute(.foregroundColor, at: 0, effectiveRange: nil) as? UIColor
+        )
+        let font = try XCTUnwrap(
+            input.textStorage.attribute(.font, at: 0, effectiveRange: nil) as? UIFont
+        )
+        XCTAssertEqual(color, UIColor(TaggrTheme.text))
+        XCTAssertEqual(font.pointSize, UIFont.preferredFont(forTextStyle: .title3).pointSize)
+    }
+
     func testComposerJapaneseCompositionSurvivesParentUpdates() async throws {
         let fixture = try HostedComposer(app: makeCoordinator())
         defer { fixture.close() }

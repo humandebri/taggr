@@ -158,6 +158,7 @@ extension TaggrAppCoordinator {
         feed = []
         repliesByPostID = [:]
         focusedPost = nil
+        postThread = []
         profile = nil
         contentStore.journalPosts = []
         featurePosts.reset()

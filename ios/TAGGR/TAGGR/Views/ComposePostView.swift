@@ -1319,15 +1319,28 @@ struct ComposeSelectableTextEditor: UIViewRepresentable {
         context.coordinator.parent = self
         view.isEditable = isEnabled
         view.isSelectable = isEnabled
+        let textColor = UIColor(TaggrTheme.text)
+        let font = UIFont.preferredFont(forTextStyle: .title3, compatibleWith: view.traitCollection)
+        view.font = font
+        view.textColor = textColor
+        view.tintColor = UIColor(TaggrTheme.clickable)
         if view.markedTextRange == nil, view.text != text {
             let selection = view.selectedRange
             let undo = view.undoManager
             undo?.disableUndoRegistration()
             view.textStorage.replaceCharacters(in: NSRange(location: 0, length: view.text.utf16.count), with: text)
+            if view.textStorage.length > 0 {
+                view.textStorage.addAttributes(
+                    [.font: font, .foregroundColor: textColor],
+                    range: NSRange(location: 0, length: view.textStorage.length)
+                )
+            }
             undo?.enableUndoRegistration()
             let start = min(selection.location, (text as NSString).length)
             view.selectedRange = NSRange(location: start, length: min(selection.length, (text as NSString).length - start))
         }
+        view.typingAttributes[.font] = font
+        view.typingAttributes[.foregroundColor] = textColor
         view.shouldBeFocused = isFocused && isEnabled && !editingController.suspended
         view.updateFocus()
         if isFocused && isEnabled {

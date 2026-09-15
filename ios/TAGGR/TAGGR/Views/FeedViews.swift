@@ -42,12 +42,18 @@ struct FeedView: View {
                             }
                             if state.canLoadMoreFeed {
                                 TaggrLoadMoreView(loading: state.isLoadingMoreFeed) {
-                                    Task { await state.loadMoreFeed(mode: selectedMode) }
+                                    Task {
+                                        guard case .feed = state.route else { return }
+                                        await state.loadMoreFeed(mode: selectedMode)
+                                    }
                                 }
                             }
                         }
                     }
                     .padding(.bottom, 8)
+                }
+                .onChange(of: selectedMode) { _, _ in
+                    scrollProxy.scrollTo(FeedScrollAnchor.top, anchor: .top)
                 }
                 .onChange(of: scrollToTopRevision) { _, _ in
                     withAnimation {
@@ -314,6 +320,7 @@ struct EmptyFeedView: View {
 }
 
 struct PostRow: View {
+    let isDetail: Bool
     @Environment(TaggrAppCoordinator.self) private var state
     let post: TaggrPost
     let open: () -> Void
@@ -328,7 +335,8 @@ struct PostRow: View {
     @State private var translationRequestID = 0
     @State private var bodyIsTruncated = false
 
-    init(post: TaggrPost, onVisible: @escaping () -> Void = {}, open: @escaping () -> Void) {
+    init(post: TaggrPost, isDetail: Bool = false, onVisible: @escaping () -> Void = {}, open: @escaping () -> Void) {
+        self.isDetail = isDetail
         self.post = post
         self.onVisible = onVisible
         self.open = open
@@ -522,13 +530,6 @@ struct PostRow: View {
         !isDetail && !showFullBody && rawBody.contains(TaggrPost.timelineCutMarker)
     }
 
-    var isDetail: Bool {
-        if case .post(let id) = state.route {
-            return id == post.id
-        }
-        return false
-    }
-
     var safetyNotice: PostSafetyNoticeModel? {
         guard let restriction = post.contentRestriction(viewerID: state.currentUser?.id) else {
             return nil
@@ -608,10 +609,11 @@ struct PostRow: View {
 
 struct ReplyPostRow: View {
     let post: TaggrPost
+    var isDetail = false
     let open: () -> Void
 
     var body: some View {
-        PostRow(post: post, open: open)
+        PostRow(post: post, isDetail: isDetail, open: open)
             .padding(.leading, 24)
     }
 }

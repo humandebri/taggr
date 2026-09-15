@@ -346,11 +346,37 @@ struct TaggrInteractiveMarkdownText: UIViewRepresentable {
             }
         }
 
+        // A tap must lose to the containing scroll view's pan. The text view's
+        // own selection gestures remain independent of post navigation.
+        private func ancestorScrollViews() -> [UIScrollView] {
+            var result: [UIScrollView] = []
+            var ancestor = textView?.superview
+            while let view = ancestor {
+                if let scrollView = view as? UIScrollView, scrollView.isScrollEnabled {
+                    result.append(scrollView)
+                }
+                ancestor = view.superview
+            }
+            return result
+        }
+
+        func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
+            // Check at touch-down: UIKit may stop deceleration before touch-up.
+            !ancestorScrollViews().contains { $0.isDragging || $0.isDecelerating }
+        }
+
+        func gestureRecognizer(
+            _ gestureRecognizer: UIGestureRecognizer,
+            shouldRequireFailureOf otherGestureRecognizer: UIGestureRecognizer
+        ) -> Bool {
+            ancestorScrollViews().contains { $0.panGestureRecognizer === otherGestureRecognizer }
+        }
+
         func gestureRecognizer(
             _ gestureRecognizer: UIGestureRecognizer,
             shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer
         ) -> Bool {
-            true
+            !ancestorScrollViews().contains { $0.panGestureRecognizer === otherGestureRecognizer }
         }
 
         func reportTruncation() {

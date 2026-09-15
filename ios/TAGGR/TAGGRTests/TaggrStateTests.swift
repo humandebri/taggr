@@ -1397,6 +1397,7 @@ extension TaggrTests {
         state.authSession = makeAuthSession(privateKey: Curve25519.Signing.PrivateKey())
         state.currentUser = try JSONDecoder.taggr.decode(TaggrUser.self, from: Self.currentUserFixture())
         state.feed = [post]
+        state.postThread = [post]
         state.focusedPost = post
         state.repliesByPostID = [100: [post]]
 
@@ -1404,6 +1405,7 @@ extension TaggrTests {
 
         XCTAssertNotNil(state.errorMessage)
         XCTAssertNil(state.feed.first?.reactions["53"])
+        XCTAssertNil(state.postThread.first?.reactions["53"])
         XCTAssertNil(state.focusedPost?.reactions["53"])
         XCTAssertNil(state.repliesByPostID[100]?.first?.reactions["53"])
     }
@@ -1472,7 +1474,8 @@ extension TaggrTests {
 
         await state.loadPost(101)
 
-        XCTAssertEqual(state.feed.map(\.id), [100, 101])
+        XCTAssertEqual(state.postThread.map(\.id), [100, 101])
+        XCTAssertTrue(state.feed.isEmpty)
         XCTAssertEqual(state.focusedPost?.id, 101)
         XCTAssertEqual(state.focusedPost?.parent, 100)
     }
@@ -1651,5 +1654,118 @@ extension TaggrTests {
         ])
         XCTAssertEqual(state.feed.map(\.id), [101])
         XCTAssertFalse(state.canLoadMoreFeed)
+    }
+}
+
+
+extension TaggrTests {
+    @MainActor
+    func testReturningFromPostPreservesLoadedFeedPagesUntilExplicitRefresh() async throws {
+        var calls: [String] = []
+        var feedPage = 0
+        let api = makeStubbedAPI { request in
+            let method = try XCTUnwrap(self.requestMethodAndArg(from: request)?.method)
+            calls.append(method)
+            if method == "hot_posts" { feedPage += 1 }
+            let id = method == "thread" ? 999 : feedPage
+            let body = Data("[\(String(data: self.postEnvelopeFixture(id: id), encoding: .utf8)!)]".utf8)
+            let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
+            return (response, Self.queryReply(body))
+        }
+        let state = makeCoordinator(api: api)
+        state.cache = TaggrBackendCache(stats: nil, config: try JSONDecoder.taggr.decode(
+            TaggrConfig.self, from: Data(#"{"feed_page_size":1}"#.utf8)))
+        state.navigateToFeed(.hot)
+        await state.loadCurrentRoute()
+        await state.loadMoreFeed(mode: .hot)
+        state.navigateToPost(999)
+        await state.loadCurrentRoute()
+        XCTAssertEqual(state.postThread.map(\.id), [999])
+        XCTAssertEqual(state.feed.map(\.id), [1, 2])
+        state.navigateToPost(998)
+        state.navigateBackFromPost()
+        await state.loadCurrentRoute()
+        XCTAssertEqual(state.feed.map(\.id), [1, 2])
+        XCTAssertTrue(state.canLoadMoreFeed)
+        XCTAssertEqual(calls, ["hot_posts", "hot_posts", "thread"])
+        await state.refreshVisibleRoute()
+        XCTAssertEqual(state.feed.map(\.id), [3])
+        XCTAssertEqual(calls.last, "hot_posts")
+    }
+
+    @MainActor
+    func testReturningWithoutLoadedFeedFetchesFirstPage() async {
+        var calls = 0
+        let api = makeStubbedAPI { request in
+            calls += 1
+            let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
+            return (response, Self.queryReply(Data("[]".utf8)))
+        }
+        let state = makeCoordinator(api: api)
+        state.navigateToPost(99)
+        state.navigateBackFromPost()
+        await state.loadCurrentRoute()
+        XCTAssertEqual(calls, 1)
+    }
+}
+
+
+extension TaggrTests {
+    @MainActor
+    func testInitialUserHydrationPreservesLoadedPostThread() throws {
+        let state = makeCoordinator()
+        state.authSession = makeAuthSession(privateKey: Curve25519.Signing.PrivateKey())
+        let thread = [
+            samplePost(id: 41, body: "parent", files: [:]),
+            samplePost(id: 42, body: "reply", files: [:]),
+        ]
+        state.postThread = thread
+
+        state.currentUser = try JSONDecoder.taggr.decode(TaggrUser.self, from: Self.currentUserFixture())
+
+        XCTAssertEqual(state.postThread.map(\.id), [41, 42])
+    }
+
+    @MainActor
+    func testAuthenticatedAccountChangeInvalidatesLoadedPostThread() throws {
+        let state = makeCoordinator()
+        state.authSession = makeAuthSession(privateKey: Curve25519.Signing.PrivateKey())
+        let user = try JSONDecoder.taggr.decode(TaggrUser.self, from: Self.currentUserFixture())
+        state.currentUser = user
+        state.postThread = [samplePost(id: 42, body: "post", files: [:])]
+
+        state.currentUser = TaggrUser(
+            id: user.id + 1,
+            name: "bob",
+            about: "",
+            principal: nil,
+            realms: [],
+            followees: [],
+            followers: [],
+            blacklist: [],
+            mode: nil
+        )
+
+        XCTAssertTrue(state.postThread.isEmpty)
+    }
+
+    @MainActor
+    func testRuntimeChangeInvalidatesFeedReturnAndThread() async {
+        var calls = 0
+        let api = makeStubbedAPI { request in
+            calls += 1
+            let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
+            return (response, Self.queryReply(Data("[]".utf8)))
+        }
+        let state = makeCoordinator(api: api)
+        state.navigateToFeed(.hot)
+        await state.loadCurrentRoute()
+        state.navigateToPost(42)
+        state.postThread = [samplePost(id: 42, body: "post", files: [:])]
+        state.runtimeGeneration += 1
+        state.navigateBackFromPost()
+        await state.loadCurrentRoute()
+        XCTAssertEqual(calls, 2)
+        XCTAssertTrue(state.postThread.isEmpty)
     }
 }
