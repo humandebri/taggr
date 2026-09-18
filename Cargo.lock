@@ -171,6 +171,7 @@ name = "bucket"
 version = "0.1.0"
 dependencies = [
  "candid",
+ "candid_parser",
  "ic-cdk 0.20.1",
  "ic-cdk-macros 0.20.1",
  "serde",

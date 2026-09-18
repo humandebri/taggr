@@ -10,6 +10,28 @@
 
 # dfx temporary files
 .dfx/
+.icp/
+.dfx-local*.log
+
+# local build outputs
+/artifacts/
+.build/
+.wrangler/
+*.xcresult/
+*.ipa
+*.dSYM/
+
+ios/DerivedData/
+ios/**/build/
+ios/**/xcuserdata/
+ios/**/*.xcuserstate
+ios/**/Logs/
+ios/**/SourcePackages/
+
+# local work preservation and exported signing artifacts
+/archive/
+*.mobileprovision
+*.p12
 
 # rust
 target/
@@ -20,6 +42,7 @@ node_modules/
 dist/
 
 # e2e tests
+.playwright-cli/
 test-results/
 playwright-report/
 e2e/icp_ledger/ledger.wasm.gz

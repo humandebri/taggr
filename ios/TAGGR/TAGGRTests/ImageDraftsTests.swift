@@ -1,0 +1,372 @@
+import ImageIO
+import UniformTypeIdentifiers
+import UIKit
+import XCTest
+@testable import TAGGR
+
+extension TaggrTests {
+    @MainActor
+    func testImageImportCoordinatorDropsCancelledAndSupersededResults() async {
+        let coordinator = ImageImportCoordinator()
+        let oldGate = ImageImportTestGate()
+        let oldStarted = expectation(description: "old import started")
+        var completedIndices: [Int] = []
+        let old = coordinator.start(operation: {
+            oldStarted.fulfill()
+            await oldGate.wait()
+            return ImageImportBatchResult(images: [], failures: [.init(index: 1, reason: .photoReadFailed)])
+        }, completion: { result in completedIndices.append(contentsOf: result.failures.map(\.index)) })
+        await fulfillment(of: [oldStarted], timeout: 1)
+        let latest = coordinator.start(operation: {
+            ImageImportBatchResult(images: [], failures: [.init(index: 2, reason: .photoReadFailed)])
+        }, completion: { result in completedIndices.append(contentsOf: result.failures.map(\.index)) })
+        await latest.value
+        await oldGate.open()
+        await old.value
+        XCTAssertEqual(completedIndices, [2])
+        XCTAssertFalse(coordinator.isImporting)
+
+        let cancelledGate = ImageImportTestGate()
+        let cancelledStarted = expectation(description: "cancelled import started")
+        let cancelled = coordinator.start(operation: {
+            cancelledStarted.fulfill()
+            await cancelledGate.wait()
+            return ImageImportBatchResult(images: [], failures: [])
+        }, completion: { _ in XCTFail("Cancelled import updated the editor") })
+        await fulfillment(of: [cancelledStarted], timeout: 1)
+        coordinator.cancel()
+        await cancelledGate.open()
+        await cancelled.value
+        XCTAssertFalse(coordinator.isImporting)
+    }
+
+    func testClipboardImageImportPreservesOrderAndReportsPartialFailure() async throws {
+        let wide = solidPNG(width: 12, height: 8)
+        let tall = solidPNG(width: 6, height: 10)
+        let operation = ImageDrafts.itemProviderImportOperation(
+            [imageProvider(wide), imageProvider(Data("invalid".utf8)), imageProvider(tall)]
+        )
+        let result = await operation(ImageDrafts.maxPostImageBytes)
+
+        XCTAssertEqual(result.images.map { [$0.width, $0.height] }, [[12, 8], [6, 10]])
+        XCTAssertEqual(result.failures, [ImageImportFailure(index: 1, reason: .invalidImage)])
+    }
+
+    @MainActor
+    func testClipboardImageImportCancelsProviderLoad() async {
+        let started = expectation(description: "provider load started")
+        let cancelled = expectation(description: "provider load cancelled")
+        let provider = NSItemProvider()
+        provider.registerDataRepresentation(forTypeIdentifier: UTType.png.identifier, visibility: .all) { completion in
+            started.fulfill()
+            let progress = Progress(totalUnitCount: 1)
+            progress.cancellationHandler = {
+                cancelled.fulfill()
+                completion(nil, CancellationError())
+            }
+            return progress
+        }
+        let operation = ImageDrafts.itemProviderImportOperation([provider])
+
+        let task = Task {
+            await operation(ImageDrafts.maxPostImageBytes)
+        }
+        await fulfillment(of: [started], timeout: 1)
+        task.cancel()
+        await fulfillment(of: [cancelled], timeout: 1)
+        _ = await task.value
+    }
+
+    func testWebPQualitySearchShortCircuitsAndFindsHighestFit() {
+        var qualities: [Int] = []
+        let maximumFits = ImageDrafts.highestQualityWebP(maxBytes: 101) { quality in
+            qualities.append(quality)
+            return Data(count: quality + 1)
+        }
+        guard case .fit(let maximumData) = maximumFits else {
+            return XCTFail("Quality 100 should fit.")
+        }
+        XCTAssertEqual(maximumData.count, 101)
+        XCTAssertLessThanOrEqual(qualities.count, 2)
+
+        qualities = []
+        let bounded = ImageDrafts.highestQualityWebP(maxBytes: 73) { quality in
+            qualities.append(quality)
+            return Data(count: quality + 1)
+        }
+        guard case .fit(let boundedData) = bounded else {
+            return XCTFail("A bounded quality should fit.")
+        }
+        XCTAssertEqual(boundedData.count, 73)
+        XCTAssertLessThanOrEqual(qualities.count, 10)
+
+        qualities = []
+        let impossible = ImageDrafts.highestQualityWebP(maxBytes: 0) { quality in
+            qualities.append(quality)
+            return Data(count: 1)
+        }
+        guard case .tooLarge(1) = impossible else {
+            return XCTFail("Quality zero should report the oversize payload.")
+        }
+        XCTAssertLessThanOrEqual(qualities.count, 2)
+    }
+
+    func testPostImagesNormalizeHighResolutionFixturesToWebP() throws {
+        for fixture in ["taggr-48mp"] {
+            let input = try fixtureData(named: fixture)
+            let draft = try ImageDrafts.postImageResult(from: input, maxBytes: ImageDrafts.maxPostImageBytes).get()
+
+            XCTAssertTrue(isWebP(draft.data), fixture)
+            XCTAssertLessThanOrEqual(draft.data.count, ImageDrafts.maxPostImageBytes, fixture)
+            XCTAssertLessThanOrEqual(draft.width * draft.height, ImageDrafts.maxPostImagePixels, fixture)
+            XCTAssertNotNil(UIImage(data: draft.data), fixture)
+            XCTAssertEqual(draft.id, ImageDrafts.blobId(for: draft.data), fixture)
+        }
+    }
+
+    func testPostImageMaximumBytesUsesTheSmallerOfLocalAndServerLimits() {
+        XCTAssertEqual(
+            ImageDrafts.postImageMaximumBytes(serverLimit: nil),
+            ImageDrafts.maxPostImageBytes
+        )
+        XCTAssertEqual(
+            ImageDrafts.postImageMaximumBytes(serverLimit: 460_800),
+            ImageDrafts.maxPostImageBytes
+        )
+        XCTAssertEqual(
+            ImageDrafts.postImageMaximumBytes(serverLimit: 150 * 1_024),
+            150 * 1_024
+        )
+    }
+
+    func testSmallJPEGAndPNGAreBothReencodedAsWebP() throws {
+        let image = try XCTUnwrap(solidImage(width: 32, height: 24, color: (20, 80, 200, 255)))
+        let png = try XCTUnwrap(UIImage(cgImage: image).pngData())
+        let jpeg = try XCTUnwrap(UIImage(cgImage: image).jpegData(compressionQuality: 0.9))
+
+        for input in [jpeg, png] {
+            let draft = try ImageDrafts.postImageResult(from: input, maxBytes: ImageDrafts.maxPostImageBytes).get()
+            XCTAssertTrue(isWebP(draft.data))
+            XCTAssertNotEqual(draft.data, input)
+            XCTAssertEqual(draft.width, 32)
+            XCTAssertEqual(draft.height, 24)
+        }
+    }
+
+    func testPostImageShrinksDimensionsWhenQualityZeroStillExceedsLimit() throws {
+        let source = try noisyPNG(width: 128, height: 128)
+        let draft = try ImageDrafts.postImageResult(from: source, maxBytes: 800).get()
+
+        XCTAssertTrue(isWebP(draft.data))
+        XCTAssertLessThanOrEqual(draft.data.count, 800)
+        XCTAssertLessThan(draft.width, 128)
+        XCTAssertLessThan(draft.height, 128)
+        XCTAssertEqual(Double(draft.width) / Double(draft.height), 1, accuracy: 0.02)
+    }
+
+    func testEXIFOrientationIsAppliedAndMetadataIsNotCopied() throws {
+        let source = try orientedJPEG()
+        let draft = try ImageDrafts.postImageResult(from: source, maxBytes: ImageDrafts.maxPostImageBytes).get()
+
+        XCTAssertEqual(draft.width, 20)
+        XCTAssertEqual(draft.height, 40)
+        XCTAssertEqual(Double(draft.width) / Double(draft.height), 0.5, accuracy: 0.01)
+        XCTAssertTrue(isWebP(draft.data))
+        for marker in ["EXIF", "XMP ", "ICCP"] {
+            XCTAssertNil(draft.data.range(of: Data(marker.utf8)), marker)
+        }
+    }
+
+    func testTransparentPNGPreservesAlphaInWebP() throws {
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        format.opaque = false
+        let renderer = UIGraphicsImageRenderer(size: CGSize(width: 16, height: 16), format: format)
+        let source = try XCTUnwrap(renderer.image { context in
+            UIColor(red: 0.9, green: 0.2, blue: 0.1, alpha: 0.5).setFill()
+            context.fill(CGRect(x: 0, y: 0, width: 16, height: 16))
+        }.pngData())
+
+        let draft = try ImageDrafts.postImageResult(from: source, maxBytes: ImageDrafts.maxPostImageBytes).get()
+        let decoded = try XCTUnwrap(UIImage(data: draft.data)?.cgImage)
+        let pixel = try rgbaPixel(in: decoded, x: 8, y: 8)
+
+        XCTAssertTrue(isWebP(draft.data))
+        XCTAssertEqual(pixel[3], 128, accuracy: 3)
+    }
+
+    func testPostImageFailureReasonsAndWarningArePreserved() {
+        guard case .failure(.invalidImage) = ImageDrafts.postImageResult(
+            from: Data("not-an-image".utf8),
+            maxBytes: ImageDrafts.maxImageBytes
+        ) else {
+            return XCTFail("Invalid input should report invalidImage.")
+        }
+        let image = solidPNG(width: 8, height: 8)
+        guard case .failure(.sizeLimitUnreachable) = ImageDrafts.postImageResult(
+            from: image,
+            maxBytes: 1
+        ) else {
+            return XCTFail("An impossible size limit should be reported.")
+        }
+
+        let result = ImageImportBatchResult(
+            images: [],
+            failures: [
+                ImageImportFailure(index: 3, reason: .photoReadFailed),
+                ImageImportFailure(index: 1, reason: .webPEncodingFailed),
+            ]
+        )
+        XCTAssertEqual(result.failures.map(\.index), [3, 1])
+        XCTAssertEqual(
+            result.warning,
+            "2 images could not be attached: 1 could not be read; 1 could not be converted to WebP."
+        )
+    }
+
+    private func fixtureData(named name: String) throws -> Data {
+        let bundle = Bundle(for: TaggrTests.self)
+        let url = try XCTUnwrap(
+            bundle.url(forResource: name, withExtension: "jpg", subdirectory: "Fixtures")
+        )
+        return try Data(contentsOf: url)
+    }
+
+    private func imageProvider(_ data: Data) -> NSItemProvider {
+        let provider = NSItemProvider()
+        provider.registerDataRepresentation(forTypeIdentifier: UTType.png.identifier, visibility: .all) { completion in
+            completion(data, nil)
+            return nil
+        }
+        return provider
+    }
+
+    private func isWebP(_ data: Data) -> Bool {
+        data.count >= 12
+            && String(data: data.prefix(4), encoding: .ascii) == "RIFF"
+            && String(data: data[8..<12], encoding: .ascii) == "WEBP"
+    }
+
+    private func orientedJPEG() throws -> Data {
+        let image = try XCTUnwrap(solidImage(width: 40, height: 20, color: (220, 40, 30, 255)))
+        let output = NSMutableData()
+        let destination = try XCTUnwrap(
+            CGImageDestinationCreateWithData(
+                output,
+                UTType.jpeg.identifier as CFString,
+                1,
+                nil
+            )
+        )
+        let properties: [CFString: Any] = [
+            kCGImagePropertyOrientation: 6,
+            kCGImagePropertyExifDictionary: [kCGImagePropertyExifUserComment: "private"],
+            kCGImagePropertyGPSDictionary: [
+                kCGImagePropertyGPSLatitude: 35.0,
+                kCGImagePropertyGPSLatitudeRef: "N",
+            ],
+            kCGImagePropertyTIFFDictionary: [kCGImagePropertyTIFFArtist: "private"],
+        ]
+        CGImageDestinationAddImage(destination, image, properties as CFDictionary)
+        XCTAssertTrue(CGImageDestinationFinalize(destination))
+        return output as Data
+    }
+
+    private func noisyPNG(width: Int, height: Int) throws -> Data {
+        var seed: UInt32 = 0x1234_5678
+        var rgba = Data(count: width * height * 4)
+        rgba.withUnsafeMutableBytes { buffer in
+            let pixels = buffer.bindMemory(to: UInt8.self)
+            for offset in stride(from: 0, to: pixels.count, by: 4) {
+                for channel in 0..<3 {
+                    seed = seed &* 1_664_525 &+ 1_013_904_223
+                    pixels[offset + channel] = UInt8(truncatingIfNeeded: seed >> 16)
+                }
+                pixels[offset + 3] = 255
+            }
+        }
+        let image = try XCTUnwrap(cgImage(width: width, height: height, rgba: rgba))
+        return try XCTUnwrap(UIImage(cgImage: image).pngData())
+    }
+
+    private func solidPNG(width: Int, height: Int) -> Data {
+        let image = solidImage(width: width, height: height, color: (255, 0, 0, 255))!
+        return UIImage(cgImage: image).pngData()!
+    }
+
+    private func solidImage(
+        width: Int,
+        height: Int,
+        color: (UInt8, UInt8, UInt8, UInt8)
+    ) -> CGImage? {
+        var rgba = Data(count: width * height * 4)
+        rgba.withUnsafeMutableBytes { buffer in
+            let pixels = buffer.bindMemory(to: UInt8.self)
+            for offset in stride(from: 0, to: pixels.count, by: 4) {
+                pixels[offset] = color.0
+                pixels[offset + 1] = color.1
+                pixels[offset + 2] = color.2
+                pixels[offset + 3] = color.3
+            }
+        }
+        return cgImage(width: width, height: height, rgba: rgba)
+    }
+
+    private func cgImage(width: Int, height: Int, rgba: Data) -> CGImage? {
+        guard let provider = CGDataProvider(data: rgba as CFData),
+              let colorSpace = CGColorSpace(name: CGColorSpace.sRGB) else {
+            return nil
+        }
+        return CGImage(
+            width: width,
+            height: height,
+            bitsPerComponent: 8,
+            bitsPerPixel: 32,
+            bytesPerRow: width * 4,
+            space: colorSpace,
+            bitmapInfo: CGBitmapInfo(
+                rawValue: CGBitmapInfo.byteOrder32Big.rawValue | CGImageAlphaInfo.last.rawValue
+            ),
+            provider: provider,
+            decode: nil,
+            shouldInterpolate: false,
+            intent: .defaultIntent
+        )
+    }
+
+    private func rgbaPixel(in image: CGImage, x: Int, y: Int) throws -> [UInt8] {
+        var bytes = [UInt8](repeating: 0, count: 4)
+        let colorSpace = try XCTUnwrap(CGColorSpace(name: CGColorSpace.sRGB))
+        let context = try XCTUnwrap(
+            CGContext(
+                data: &bytes,
+                width: 1,
+                height: 1,
+                bitsPerComponent: 8,
+                bytesPerRow: 4,
+                space: colorSpace,
+                bitmapInfo: CGBitmapInfo.byteOrder32Big.rawValue
+                    | CGImageAlphaInfo.premultipliedLast.rawValue
+            )
+        )
+        context.translateBy(x: CGFloat(-x), y: CGFloat(y - image.height + 1))
+        context.draw(image, in: CGRect(x: 0, y: 0, width: image.width, height: image.height))
+        return bytes
+    }
+}
+
+private actor ImageImportTestGate {
+    private var continuation: CheckedContinuation<Void, Never>?
+    private var opened = false
+
+    func wait() async {
+        if opened { return }
+        await withCheckedContinuation { continuation = $0 }
+    }
+
+    func open() {
+        opened = true
+        continuation?.resume()
+        continuation = nil
+    }
+}
