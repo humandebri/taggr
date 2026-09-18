@@ -763,6 +763,25 @@ final class TaggrAppCoordinator {
         }
     }
 
+    func loadReplies(postID: Int) async {
+        guard repliesByPostID[postID] == nil, !loadingReplyPostIDs.contains(postID) else {
+            return
+        }
+        let generation = runtimeGeneration
+        let activeAPI = api
+        loadingReplyPostIDs.insert(postID)
+        defer { loadingReplyPostIDs.remove(postID) }
+        do {
+            let snapshot = try await loadReplySnapshot(postID: postID, api: activeAPI)
+            guard isCurrentRuntimeGeneration(generation) else { return }
+            applyReplySnapshot(snapshot)
+        } catch {
+            guard isCurrentRuntimeGeneration(generation), !isCancellation(error) else { return }
+            NSLog("TAGGR reply refresh failed: %@", error.localizedDescription)
+            errorMessage = error.localizedDescription
+        }
+    }
+
     func loadReplySnapshot(postID: Int, api activeAPI: TaggrAPI) async throws -> (parent: TaggrPost, replies: [TaggrPost]) {
         guard let parent = try await loadPostEnvelopes(
             "posts",

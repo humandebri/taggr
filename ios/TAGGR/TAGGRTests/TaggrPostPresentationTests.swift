@@ -2,6 +2,7 @@ import XCTest
 import CryptoKit
 import SwiftUI
 import UIKit
+import UniformTypeIdentifiers
 @testable import TAGGR
 
 final class ModerationFixture: @unchecked Sendable {
@@ -455,6 +456,7 @@ final class TaggrQuoteTests: XCTestCase {
         @Published var visible = true
         @Published var revision = 0
         @Published var showsToolbar = false
+        var pastedImageProviders: [NSItemProvider] = []
         let app: TaggrAppCoordinator
         init(app: TaggrAppCoordinator) { self.app = app }
         var changed: ((String) -> Void)?
@@ -473,7 +475,8 @@ final class TaggrQuoteTests: XCTestCase {
                             placeholder: "Write a post \(state.revision)", documentID: state.documentID,
                             focusedTextSegmentID: $state.focused,
                             imageInsertionSegmentID: $state.imageTarget,
-                            removeImage: { _, _ in }, moveImage: { _, _ in }
+                            removeImage: { _, _ in }, moveImage: { _, _ in },
+                            pasteImages: { state.pastedImageProviders = $0 }
                         )
                         .disabled(!state.enabled)
                         if state.showsToolbar {
@@ -711,6 +714,26 @@ final class TaggrQuoteTests: XCTestCase {
         undo.redo()
         try await fixture.settle()
         XCTAssertEqual(fixture.state.text, "日本語😀\n/text")
+    }
+
+    func testComposerImagePasteTakesPriorityAndPreservesProviderOrder() async throws {
+        let fixture = try HostedComposer(app: makeCoordinator(), text: "日本語😀/text")
+        defer { fixture.close() }
+        try await fixture.settle()
+        let input = try fixture.input()
+        input.selectedRange = NSRange(location: 4, length: 0)
+
+        let text = NSItemProvider(object: "ignored" as NSString)
+        let firstImage = NSItemProvider(object: UIImage(systemName: "photo")!)
+        firstImage.registerObject("ignored alternative" as NSString, visibility: .all)
+        let secondImage = NSItemProvider(object: UIImage(systemName: "photo.fill")!)
+
+        input.paste(itemProviders: [text, firstImage, secondImage])
+
+        XCTAssertEqual(fixture.state.text, "日本語😀/text")
+        XCTAssertEqual(fixture.state.pastedImageProviders.count, 2)
+        XCTAssertTrue(fixture.state.pastedImageProviders[0] === firstImage)
+        XCTAssertTrue(fixture.state.pastedImageProviders[1] === secondImage)
     }
 
     func testComposerFormatsSelection() async throws {

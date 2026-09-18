@@ -40,6 +40,43 @@ extension TaggrTests {
         XCTAssertFalse(coordinator.isImporting)
     }
 
+    func testClipboardImageImportPreservesOrderAndReportsPartialFailure() async throws {
+        let wide = solidPNG(width: 12, height: 8)
+        let tall = solidPNG(width: 6, height: 10)
+        let operation = ImageDrafts.itemProviderImportOperation(
+            [imageProvider(wide), imageProvider(Data("invalid".utf8)), imageProvider(tall)]
+        )
+        let result = await operation(ImageDrafts.maxPostImageBytes)
+
+        XCTAssertEqual(result.images.map { [$0.width, $0.height] }, [[12, 8], [6, 10]])
+        XCTAssertEqual(result.failures, [ImageImportFailure(index: 1, reason: .invalidImage)])
+    }
+
+    @MainActor
+    func testClipboardImageImportCancelsProviderLoad() async {
+        let started = expectation(description: "provider load started")
+        let cancelled = expectation(description: "provider load cancelled")
+        let provider = NSItemProvider()
+        provider.registerDataRepresentation(forTypeIdentifier: UTType.png.identifier, visibility: .all) { completion in
+            started.fulfill()
+            let progress = Progress(totalUnitCount: 1)
+            progress.cancellationHandler = {
+                cancelled.fulfill()
+                completion(nil, CancellationError())
+            }
+            return progress
+        }
+        let operation = ImageDrafts.itemProviderImportOperation([provider])
+
+        let task = Task {
+            await operation(ImageDrafts.maxPostImageBytes)
+        }
+        await fulfillment(of: [started], timeout: 1)
+        task.cancel()
+        await fulfillment(of: [cancelled], timeout: 1)
+        _ = await task.value
+    }
+
     func testWebPQualitySearchShortCircuitsAndFindsHighestFit() {
         var qualities: [Int] = []
         let maximumFits = ImageDrafts.highestQualityWebP(maxBytes: 101) { quality in
@@ -183,7 +220,7 @@ extension TaggrTests {
         XCTAssertEqual(result.failures.map(\.index), [3, 1])
         XCTAssertEqual(
             result.warning,
-            "2 images could not be attached: 1 could not be read from Photos; 1 could not be converted to WebP."
+            "2 images could not be attached: 1 could not be read; 1 could not be converted to WebP."
         )
     }
 
@@ -193,6 +230,15 @@ extension TaggrTests {
             bundle.url(forResource: name, withExtension: "jpg", subdirectory: "Fixtures")
         )
         return try Data(contentsOf: url)
+    }
+
+    private func imageProvider(_ data: Data) -> NSItemProvider {
+        let provider = NSItemProvider()
+        provider.registerDataRepresentation(forTypeIdentifier: UTType.png.identifier, visibility: .all) { completion in
+            completion(data, nil)
+            return nil
+        }
+        return provider
     }
 
     private func isWebP(_ data: Data) -> Bool {

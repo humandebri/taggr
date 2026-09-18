@@ -7,6 +7,7 @@ import ImageIO
 import PhotosUI
 import SwiftUI
 import UIKit
+import UniformTypeIdentifiers
 import libwebp
 
 enum ImageImportFailureReason: Int, CaseIterable, Error, Sendable {
@@ -18,7 +19,7 @@ enum ImageImportFailureReason: Int, CaseIterable, Error, Sendable {
     fileprivate func summary(count: Int) -> String {
         switch self {
         case .photoReadFailed:
-            return "\(count) could not be read from Photos"
+            return "\(count) could not be read"
         case .invalidImage:
             return "\(count) contained invalid or unsupported image data"
         case .webPEncodingFailed:
@@ -146,6 +147,19 @@ enum ImageDrafts {
         }
     }
 
+    @MainActor
+    static func itemProviderImportOperation(
+        _ itemProviders: [NSItemProvider],
+        maxConcurrent: Int = 2
+    ) -> @Sendable (Int) async -> ImageImportBatchResult {
+        let providers = itemProviders.map(ImageItemProvider.init)
+        return { maxBytes in
+            await importImages(count: providers.count, maxBytes: maxBytes, maxConcurrent: maxConcurrent) { index in
+                try await providers[index]?.loadData()
+            }
+        }
+    }
+
     static func importImages(
         count: Int,
         maxBytes: Int = maxPostImageBytes,
@@ -173,6 +187,7 @@ enum ImageDrafts {
                                 ImageImportFailure(index: index, reason: .photoReadFailed)
                             )
                         }
+                        try Task.checkCancellation()
                         switch postImageResult(from: data, maxBytes: maxBytes) {
                         case .success(let image):
                             return .image(index: index, image: image)
@@ -517,5 +532,103 @@ enum ImageDrafts {
         }
         let id = String(UUID().uuidString.replacingOccurrences(of: "-", with: "").prefix(8)).lowercased()
         return TaggrDraftImage(id: id, data: draft.data, width: draft.width, height: draft.height)
+    }
+}
+
+// NSItemProvider supports asynchronous representation loading from background tasks.
+private struct ImageItemProvider: @unchecked Sendable {
+    let provider: NSItemProvider
+    let typeIdentifier: String
+
+    init?(_ provider: NSItemProvider) {
+        guard let typeIdentifier = provider.registeredTypeIdentifiers.first(where: {
+            UTType($0)?.conforms(to: .image) == true
+        }) else { return nil }
+        self.provider = provider
+        self.typeIdentifier = typeIdentifier
+    }
+
+    func loadData() async throws -> Data? {
+        let load = ImageItemProviderLoad()
+        return try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { continuation in
+                load.start(provider: provider, typeIdentifier: typeIdentifier, continuation: continuation)
+            }
+        } onCancel: {
+            load.cancel()
+        }
+    }
+}
+
+private final class ImageItemProviderLoad: @unchecked Sendable {
+    private let lock = NSLock()
+    private var continuation: CheckedContinuation<Data?, Error>?
+    private var progress: Progress?
+    private var isFinished = false
+    private var isCancelled = false
+
+    func start(
+        provider: NSItemProvider,
+        typeIdentifier: String,
+        continuation: CheckedContinuation<Data?, Error>
+    ) {
+        lock.lock()
+        guard !isFinished else {
+            lock.unlock()
+            continuation.resume(throwing: CancellationError())
+            return
+        }
+        self.continuation = continuation
+        lock.unlock()
+
+        let progress = provider.loadDataRepresentation(forTypeIdentifier: typeIdentifier) { [weak self] data, error in
+            self?.finish(data: data, error: error)
+        }
+
+        lock.lock()
+        if isCancelled {
+            lock.unlock()
+            progress.cancel()
+        } else {
+            if !isFinished { self.progress = progress }
+            lock.unlock()
+        }
+    }
+
+    func cancel() {
+        lock.lock()
+        guard !isFinished else {
+            lock.unlock()
+            return
+        }
+        isFinished = true
+        isCancelled = true
+        let continuation = continuation
+        self.continuation = nil
+        let progress = progress
+        self.progress = nil
+        lock.unlock()
+
+        progress?.cancel()
+        continuation?.resume(throwing: CancellationError())
+    }
+
+    private func finish(data: Data?, error: Error?) {
+        lock.lock()
+        guard !isFinished else {
+            lock.unlock()
+            return
+        }
+        isFinished = true
+        let continuation = continuation
+        self.continuation = nil
+        progress = nil
+        lock.unlock()
+
+        if let error {
+            continuation?.resume(throwing: error)
+        } else {
+            continuation?.resume(returning: data)
+        }
     }
 }

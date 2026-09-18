@@ -59,13 +59,15 @@ extension TaggrAppCoordinator {
         parent: Int? = nil,
         realm: String? = nil,
         images: [TaggrDraftImage] = [],
-        draft: PostDraftSession
+        draft: PostDraftSession,
+        onSubmitted: (() -> Void)? = nil
     ) -> Bool {
         let key = parent.map(TaggrPostSubmissionKey.reply) ?? .newPost
         let context = postSubmissionContext()
         let reconciliation = parent.map(TaggrPostReconciliation.reply) ?? .rootPost
         return enqueuePostSubmission(key: key, draft: draft, reconciliation: {
             await self.reconcilePostSubmission(reconciliation, context: context)
+            onSubmitted?()
         }) { [weak self] in
             guard let self else {
                 return TaggrPostSubmissionResult(outcome: .retryableFailure, errorMessage: "Posting was interrupted.")

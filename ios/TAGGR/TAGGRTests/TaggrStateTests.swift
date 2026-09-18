@@ -968,10 +968,13 @@ extension TaggrTests {
         let parent = samplePost(id: 42, body: "parent", files: [:])
         state.feed = [parent]
         state.focusedPost = parent
+        var didFinishReply = false
 
         state.safety.accept(scope: state.safetyScope)
         await runQueuedSubmission(state, context: .reply(42), text: "reply", realm: "DEV", images: []) { draft in
-            state.enqueuePostSubmission(text: "reply", parent: 42, realm: "DEV", draft: draft)
+            state.enqueuePostSubmission(text: "reply", parent: 42, realm: "DEV", draft: draft) {
+                didFinishReply = state.repliesByPostID[42]?.map(\.id) == [43]
+            }
         }
         await waitForPostReconciliation(state)
 
@@ -981,6 +984,7 @@ extension TaggrTests {
         XCTAssertGreaterThanOrEqual(calls.filter { $0.method == "posts" }.count, 4)
         XCTAssertEqual(state.repliesByPostID[42]?.map(\.id), [43])
         XCTAssertEqual(state.focusedPost?.children, [43])
+        XCTAssertTrue(didFinishReply)
     }
 
     @MainActor
@@ -1060,6 +1064,49 @@ extension TaggrTests {
 
         XCTAssertEqual(requestCount, 2)
         XCTAssertEqual(state.repliesByPostID[42]?.map(\.id), [43])
+    }
+
+    @MainActor
+    func testPostSubmissionReplyReloadRecoversAfterSnapshotFailureAndUsesCache() async throws {
+        var calls: [(method: String, arg: Data)] = []
+        var parentRequestCount = 0
+        let api = makeStubbedAPI { request in
+            let call = try XCTUnwrap(self.requestMethodAndArg(from: request))
+            calls.append(call)
+            if call.arg == (try TaggrCandid.jsonArguments([[42]])) {
+                parentRequestCount += 1
+                if parentRequestCount == 1 {
+                    throw URLError(.timedOut)
+                }
+                let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
+                let body = Data("[\(String(data: self.postEnvelopeFixture(id: 42, children: [43]), encoding: .utf8)!)]".utf8)
+                return (response, Self.queryReply(body))
+            }
+            let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
+            let body = Data("[\(String(data: self.postEnvelopeFixture(id: 43, parent: 42), encoding: .utf8)!)]".utf8)
+            return (response, Self.queryReply(body))
+        }
+        let state = makeCoordinator(safety: makeSafetyStore(), api: api)
+        let staleParent = samplePost(id: 42, body: "parent", files: [:])
+        state.feed = [staleParent]
+        state.focusedPost = staleParent
+
+        do {
+            _ = try await state.loadReplySnapshot(postID: 42, api: api)
+            XCTFail("Initial reconciliation should fail.")
+        } catch {
+            XCTAssertEqual(parentRequestCount, 1)
+        }
+
+        await state.loadReplies(postID: 42)
+
+        XCTAssertEqual(state.repliesByPostID[42]?.map(\.id), [43])
+        XCTAssertEqual(state.focusedPost?.children, [43])
+        let requestCountAfterReload = calls.count
+
+        await state.loadReplies(postID: 42)
+
+        XCTAssertEqual(calls.count, requestCountAfterReload)
     }
 
     @MainActor

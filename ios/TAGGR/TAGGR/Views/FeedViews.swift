@@ -522,7 +522,8 @@ struct PostRow: View {
             isTranslating: isTranslating,
             toggleTranslation: toggleTranslation,
             repliesExpanded: repliesExpanded,
-            toggleReplies: toggleReplies
+            toggleReplies: toggleReplies,
+            showRepliesAfterSubmission: showRepliesAfterSubmission
         )
     }
 
@@ -567,6 +568,15 @@ struct PostRow: View {
         if repliesExpanded {
             Task { await state.loadReplies(for: post) }
         }
+    }
+
+    func showRepliesAfterSubmission() {
+        if !repliesExpanded {
+            withAnimation(.easeInOut(duration: 0.18)) {
+                repliesExpanded = true
+            }
+        }
+        Task { await state.loadReplies(postID: post.id) }
     }
 
     func showFullPost() {

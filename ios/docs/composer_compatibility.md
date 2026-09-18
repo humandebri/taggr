@@ -21,9 +21,11 @@ calling string-edit helpers:
 -   UTF-16 selections replace Japanese text with emoji without corrupting the document.
 -   Clearing all text keeps the field usable; multiline text increases its height.
 -   Editing after an image preserves the image marker and the preceding text.
--   Cut, plain-text paste, undo and redo update the document binding. Paste uses
-    an explicit string item provider so it does not require OS clipboard approval;
-    system clipboard permission and rich-text paste remain manual checks.
+-   Cut, plain-text paste, undo and redo update the document binding. Image paste
+    routes every image item provider through the normal attachment pipeline and
+    takes priority over alternate text in the same paste. Tests use explicit item
+    providers so they do not require OS clipboard approval; system clipboard
+    permission and rich-text paste remain manual checks.
     Clipboard contents changed by cut are restored after the test.
 -   Disabling, dismissing and reopening the editor preserve text and restore focus.
 -   Bold, italic, list, quote and link replace the selected UTF-16 range. Empty

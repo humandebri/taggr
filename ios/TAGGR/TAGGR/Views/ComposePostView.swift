@@ -74,7 +74,8 @@ struct ComposePostView: View {
                             imageInsertionSegmentID: $imageInsertionSegmentID,
                             removeImage: removeImageMarker,
                             moveImage: moveImageMarker,
-                            moveImageToTextSegment: moveImageMarker
+                            moveImageToTextSegment: moveImageMarker,
+                            pasteImages: loadPastedImages
                         )
                         .disabled(!draft.isLoaded || imageImport.isImporting || isSubmitting)
                         if let realmWarning {
@@ -349,6 +350,22 @@ struct ComposePostView: View {
     private func loadPhotos(_ items: [PhotosPickerItem]) {
         guard !items.isEmpty, !imageImport.isImporting else { return }
         guard let snapshot = editingController.imageSnapshot ?? editingController.capture(suspend: true) else { return }
+        importImages(snapshot: snapshot) {
+            await ImageDrafts.importPhotos(items, maxBytes: $0)
+        }
+    }
+
+    private func loadPastedImages(_ itemProviders: [NSItemProvider]) {
+        guard !itemProviders.isEmpty, !imageImport.isImporting,
+              let snapshot = editingController.capture(suspend: true) else { return }
+        let operation = ImageDrafts.itemProviderImportOperation(itemProviders)
+        importImages(snapshot: snapshot, operation: operation)
+    }
+
+    private func importImages(
+        snapshot: ComposeEditingController.Snapshot,
+        operation: @escaping @Sendable (Int) async -> ImageImportBatchResult
+    ) {
         editingController.imageSnapshot = snapshot
         focusedTextSegmentID = nil
         imageInsertionSegmentID = nil
@@ -358,7 +375,7 @@ struct ComposePostView: View {
         )
         imageImport.start(
             operation: {
-                await ImageDrafts.importPhotos(items, maxBytes: maxBytes)
+                await operation(maxBytes)
             },
             completion: { result in
                 editingController.imageSnapshot = nil
@@ -675,6 +692,7 @@ struct ComposePostDocumentEditor: View {
     let removeImage: (Int, String) -> Void
     let moveImage: (Int, Int?) -> Void
     let moveImageToTextSegment: (Int, Int) -> Void
+    let pasteImages: ([NSItemProvider]) -> Void
 
     init(
         text: Binding<String>,
@@ -686,7 +704,8 @@ struct ComposePostDocumentEditor: View {
         imageInsertionSegmentID: Binding<Int?>,
         removeImage: @escaping (Int, String) -> Void,
         moveImage: @escaping (Int, Int?) -> Void,
-        moveImageToTextSegment: @escaping (Int, Int) -> Void = { _, _ in }
+        moveImageToTextSegment: @escaping (Int, Int) -> Void = { _, _ in },
+        pasteImages: @escaping ([NSItemProvider]) -> Void
     ) {
         _text = text
         _draftImages = draftImages
@@ -698,6 +717,7 @@ struct ComposePostDocumentEditor: View {
         self.removeImage = removeImage
         self.moveImage = moveImage
         self.moveImageToTextSegment = moveImageToTextSegment
+        self.pasteImages = pasteImages
     }
 
     private var segments: [PostDraftDocument.Segment] {
@@ -749,7 +769,8 @@ struct ComposePostDocumentEditor: View {
                 endTextEditing()
                 moveImageToTextSegment(item.occurrence, id)
                 return true
-            }
+            },
+            pasteImages: pasteImages
         )
     }
 
@@ -834,6 +855,7 @@ private struct ComposePostTextSegmentEditor: View {
     let updateText: (String) -> Void
     let activate: () -> Void
     let dropImage: (PostDraftImageDragItem) -> Bool
+    let pasteImages: ([NSItemProvider]) -> Void
 
     init(
         segmentID: Int,
@@ -842,7 +864,8 @@ private struct ComposePostTextSegmentEditor: View {
         focusedTextSegmentID: Binding<Int?>,
         updateText: @escaping (String) -> Void,
         activate: @escaping () -> Void,
-        dropImage: @escaping (PostDraftImageDragItem) -> Bool
+        dropImage: @escaping (PostDraftImageDragItem) -> Bool,
+        pasteImages: @escaping ([NSItemProvider]) -> Void
     ) {
         self.segmentID = segmentID
         self.value = value
@@ -851,6 +874,7 @@ private struct ComposePostTextSegmentEditor: View {
         self.updateText = updateText
         self.activate = activate
         self.dropImage = dropImage
+        self.pasteImages = pasteImages
     }
 
     var body: some View {
@@ -863,6 +887,7 @@ private struct ComposePostTextSegmentEditor: View {
                     if focusedTextSegmentID.wrappedValue != segmentID { focusedTextSegmentID.wrappedValue = segmentID }
                     activate()
                 },
+                pasteImages: pasteImages,
                 segmentID: segmentID
             )
                 .frame(maxWidth: .infinity, minHeight: value.isEmpty ? 70 : 120, alignment: .topLeading)
@@ -1295,6 +1320,7 @@ struct ComposeSelectableTextEditor: UIViewRepresentable {
     let editingController: ComposeEditingController
     let isFocused: Bool
     let activate: () -> Void
+    let pasteImages: ([NSItemProvider]) -> Void
     var segmentID: Int = 0
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
@@ -1302,6 +1328,10 @@ struct ComposeSelectableTextEditor: UIViewRepresentable {
     func makeUIView(context: Context) -> TextView {
         let view = TextView()
         view.editorUndoManager = editingController.undoManager
+        view.pasteImages = pasteImages
+        view.pasteConfiguration = UIPasteConfiguration(
+            acceptableTypeIdentifiers: [UTType.text.identifier, UTType.image.identifier]
+        )
         view.delegate = context.coordinator
         view.backgroundColor = .clear
         view.font = UIFont.preferredFont(forTextStyle: .title3)
@@ -1317,6 +1347,7 @@ struct ComposeSelectableTextEditor: UIViewRepresentable {
 
     func updateUIView(_ view: TextView, context: Context) {
         context.coordinator.parent = self
+        view.pasteImages = pasteImages
         view.isEditable = isEnabled
         view.isSelectable = isEnabled
         let textColor = UIColor(TaggrTheme.text)
@@ -1356,9 +1387,21 @@ struct ComposeSelectableTextEditor: UIViewRepresentable {
 
     final class TextView: UITextView {
         var shouldBeFocused = false
+        var pasteImages: (([NSItemProvider]) -> Void)?
         weak var editorUndoManager: UndoManager?
         private var focusTask: Task<Void, Never>?
         override var undoManager: UndoManager? { editorUndoManager ?? super.undoManager }
+
+        override func paste(itemProviders: [NSItemProvider]) {
+            let imageProviders = itemProviders.filter {
+                $0.hasItemConformingToTypeIdentifier(UTType.image.identifier)
+            }
+            guard !imageProviders.isEmpty, let pasteImages else {
+                super.paste(itemProviders: itemProviders)
+                return
+            }
+            pasteImages(imageProviders)
+        }
 
         override func didMoveToWindow() {
             super.didMoveToWindow()

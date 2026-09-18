@@ -10,6 +10,7 @@ struct PostEngagementBar: View {
     let toggleTranslation: () -> Void
     let repliesExpanded: Bool
     let toggleReplies: () -> Void
+    let showRepliesAfterSubmission: () -> Void
     @State private var showingReactionPicker = false
     @State private var showingActionPanel = false
     @State private var showingRepost = false
@@ -48,6 +49,7 @@ struct PostEngagementBar: View {
                     canEdit: canEdit,
                     canDelete: canDelete,
                     currentMode: currentMode,
+                    onReplySubmitted: replySubmitted,
                     repost: { showingRepost = true },
                     toggleBookmark: { Task { await state.toggleBookmark(postId: post.id) } },
                     toggleWatch: { Task { await state.toggleFollowingPost(postId: post.id) } },
@@ -207,6 +209,13 @@ struct PostEngagementBar: View {
         FeedView.feedMode(from: state.route) ?? .latest
     }
 
+    func replySubmitted() {
+        withAnimation(.easeInOut(duration: 0.18)) {
+            showingActionPanel = false
+        }
+        showRepliesAfterSubmission()
+    }
+
     var reactionOrder: [Int] {
         let configuredOrder = state.cache?.config?.reactions?.compactMap { $0.first } ?? []
         return configuredOrder.isEmpty ? TaggrReactionIcon.defaultOrder : configuredOrder
@@ -278,6 +287,7 @@ struct PostInlineActionPanel: View {
     let canEdit: Bool
     let canDelete: Bool
     let currentMode: TaggrFeedMode
+    let onReplySubmitted: () -> Void
     let repost: () -> Void
     let toggleBookmark: () -> Void
     let toggleWatch: () -> Void
@@ -294,7 +304,8 @@ struct PostInlineActionPanel: View {
                     post: post,
                     selectedMode: currentMode,
                     clearRequest: clearReplyDraftRequest,
-                    hasDraftChanges: $replyDraftHasChanges
+                    hasDraftChanges: $replyDraftHasChanges,
+                    onSubmitted: onReplySubmitted
                 )
                     .environment(state)
             }
@@ -411,6 +422,7 @@ struct InlineReplyComposer: View {
     let selectedMode: TaggrFeedMode
     let clearRequest: Int
     @Binding var hasDraftChanges: Bool
+    let onSubmitted: () -> Void
     @StateObject private var draft: PostDraftSession
     @StateObject private var imageImport = ImageImportCoordinator()
     @StateObject private var editingController = ComposeEditingController()
@@ -427,12 +439,14 @@ struct InlineReplyComposer: View {
         post: TaggrPost,
         selectedMode: TaggrFeedMode,
         clearRequest: Int,
-        hasDraftChanges: Binding<Bool>
+        hasDraftChanges: Binding<Bool>,
+        onSubmitted: @escaping () -> Void
     ) {
         self.post = post
         self.selectedMode = selectedMode
         self.clearRequest = clearRequest
         _hasDraftChanges = hasDraftChanges
+        self.onSubmitted = onSubmitted
         _draft = StateObject(
             wrappedValue: PostDraftSession(
                 context: .reply(post.id),
@@ -454,7 +468,8 @@ struct InlineReplyComposer: View {
                 imageInsertionSegmentID: $imageInsertionSegmentID,
                 removeImage: removeImageMarker,
                 moveImage: moveImageMarker,
-                moveImageToTextSegment: moveImageMarker
+                moveImageToTextSegment: moveImageMarker,
+                pasteImages: loadPastedImages
             )
             .environmentObject(editingController)
             .disabled(!draft.isLoaded || imageImport.isImporting || isSubmitting)
@@ -625,6 +640,22 @@ struct InlineReplyComposer: View {
     func loadPhotos(_ items: [PhotosPickerItem]) {
         guard !items.isEmpty, !imageImport.isImporting else { return }
         guard let snapshot = editingController.imageSnapshot ?? editingController.capture(suspend: true) else { return }
+        importImages(snapshot: snapshot) {
+            await ImageDrafts.importPhotos(items, maxBytes: $0)
+        }
+    }
+
+    func loadPastedImages(_ itemProviders: [NSItemProvider]) {
+        guard !itemProviders.isEmpty, !imageImport.isImporting,
+              let snapshot = editingController.capture(suspend: true) else { return }
+        let operation = ImageDrafts.itemProviderImportOperation(itemProviders)
+        importImages(snapshot: snapshot, operation: operation)
+    }
+
+    func importImages(
+        snapshot: ComposeEditingController.Snapshot,
+        operation: @escaping @Sendable (Int) async -> ImageImportBatchResult
+    ) {
         editingController.imageSnapshot = snapshot
         focusedTextSegmentID = nil
         imageInsertionSegmentID = nil
@@ -634,7 +665,7 @@ struct InlineReplyComposer: View {
         )
         imageImport.start(
             operation: {
-                await ImageDrafts.importPhotos(items, maxBytes: maxBytes)
+                await operation(maxBytes)
             },
             completion: { result in
                 editingController.imageSnapshot = nil
@@ -713,7 +744,8 @@ struct InlineReplyComposer: View {
                 realm: post.realm,
                 images: images,
 
-                draft: draft
+                draft: draft,
+                onSubmitted: onSubmitted
             )
             isSubmitting = false
             guard enqueued else {
