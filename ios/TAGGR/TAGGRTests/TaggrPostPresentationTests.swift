@@ -736,6 +736,28 @@ final class TaggrQuoteTests: XCTestCase {
         XCTAssertTrue(fixture.state.pastedImageProviders[1] === secondImage)
     }
 
+    func testComposerStandardPasteActionRoutesClipboardImages() async throws {
+        let fixture = try HostedComposer(app: makeCoordinator(), text: "本文")
+        defer { fixture.close() }
+        try await fixture.settle()
+        let input = try fixture.input()
+        let pasteboard = UIPasteboard.general
+        let previousItems = pasteboard.items
+        defer { pasteboard.items = previousItems }
+        pasteboard.itemProviders = [NSItemProvider(object: UIImage(systemName: "photo")!)]
+
+        XCTAssertTrue(
+            input.canPerformAction(
+                #selector(UIResponderStandardEditActions.paste(_:)),
+                withSender: nil
+            )
+        )
+        input.paste(nil)
+
+        XCTAssertEqual(fixture.state.text, "本文")
+        XCTAssertEqual(fixture.state.pastedImageProviders.count, 1)
+    }
+
     func testComposerFormatsSelection() async throws {
         let fixture = try HostedComposer(app: makeCoordinator(), text: "日本語😀")
         defer { fixture.close() }

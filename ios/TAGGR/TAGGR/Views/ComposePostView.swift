@@ -1329,9 +1329,6 @@ struct ComposeSelectableTextEditor: UIViewRepresentable {
         let view = TextView()
         view.editorUndoManager = editingController.undoManager
         view.pasteImages = pasteImages
-        view.pasteConfiguration = UIPasteConfiguration(
-            acceptableTypeIdentifiers: [UTType.text.identifier, UTType.image.identifier]
-        )
         view.delegate = context.coordinator
         view.backgroundColor = .clear
         view.font = UIFont.preferredFont(forTextStyle: .title3)
@@ -1392,15 +1389,33 @@ struct ComposeSelectableTextEditor: UIViewRepresentable {
         private var focusTask: Task<Void, Never>?
         override var undoManager: UndoManager? { editorUndoManager ?? super.undoManager }
 
+        override func canPerformAction(_ action: Selector, withSender sender: Any?) -> Bool {
+            if action == #selector(UIResponderStandardEditActions.paste(_:)),
+               isEditable,
+               pasteImages != nil,
+               UIPasteboard.general.hasImages {
+                return true
+            }
+            return super.canPerformAction(action, withSender: sender)
+        }
+
+        override func paste(_ sender: Any?) {
+            guard !pasteImages(from: UIPasteboard.general.itemProviders) else { return }
+            super.paste(sender)
+        }
+
         override func paste(itemProviders: [NSItemProvider]) {
+            guard !pasteImages(from: itemProviders) else { return }
+            super.paste(itemProviders: itemProviders)
+        }
+
+        private func pasteImages(from itemProviders: [NSItemProvider]) -> Bool {
             let imageProviders = itemProviders.filter {
                 $0.hasItemConformingToTypeIdentifier(UTType.image.identifier)
             }
-            guard !imageProviders.isEmpty, let pasteImages else {
-                super.paste(itemProviders: itemProviders)
-                return
-            }
+            guard !imageProviders.isEmpty, let pasteImages else { return false }
             pasteImages(imageProviders)
+            return true
         }
 
         override func didMoveToWindow() {
