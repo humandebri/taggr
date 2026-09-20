@@ -45,6 +45,12 @@ extension TaggrTests {
         let votes = calls.read { $0.filter { $0.0 == "vote_on_proposal" } }
         XCTAssertEqual(votes.count, 1)
         XCTAssertEqual(votes.first?.1, try TaggrCandid.jsonArguments([1, true, "confirmed-hash"]))
+        let firstVoteMethods = calls.read { $0.map(\.0) }
+        let voteIndex = try XCTUnwrap(firstVoteMethods.firstIndex(of: "vote_on_proposal"))
+        let followIndex = try XCTUnwrap(firstVoteMethods.firstIndex(of: "toggle_following_post"))
+        let refreshedProposalIndex = try XCTUnwrap(firstVoteMethods[(voteIndex + 1)...].firstIndex(of: "proposal"))
+        XCTAssertLessThan(voteIndex, followIndex)
+        XCTAssertLessThan(followIndex, refreshedProposalIndex)
         XCTAssertNil(model.pendingVote)
         // Leaving the screen (or a presented dialog) must not cancel a vote the user already confirmed.
         await model.load(state)
@@ -406,6 +412,23 @@ extension TaggrTests {
             let data = Data("{\"id\":1,\"proposer\":7,\"timestamp\":1,\"post_id\":9,\"status\":\"\(status)\",\"payload\":{\"Future\":{}},\"bulletins\":[],\"voting_power\":0}".utf8)
             XCTAssertFalse(try JSONDecoder.taggr.decode(TaggrProposal.self, from: data).canVote(userID: 8, canonical: true))
         }
+    }
+
+    func testProposalVotingOriginMatchesPWAMainnetGate() {
+        let canonical = TaggrRuntimeConfig.from(info: [:])
+        XCTAssertTrue(canonical.canVoteOnProposals)
+
+        let customMainnet = TaggrRuntimeConfig.from(info: [
+            "TAGGR_DOMAIN": "taggr.example.com",
+        ])
+        XCTAssertFalse(customMainnet.canVoteOnProposals)
+
+        let localTunnel = TaggrRuntimeConfig.from(info: [
+            "TAGGR_CANISTER_ID": "bkyz2-fmaaa-aaaaa-qaaaq-cai",
+            "TAGGR_API_BASE_URL": "https://taggr.trycloudflare.com",
+            "TAGGR_DOMAIN": "taggr.trycloudflare.com",
+        ])
+        XCTAssertTrue(localTunnel.canVoteOnProposals)
     }
 
     func testParityProposalVotingPowerRoundsUpWithoutLosingIntegerPrecision() {

@@ -64,10 +64,7 @@ struct ProposalDetailView: View {
     private var busy: Bool { model.busy }
     private var error: String? { model.error }
     private var decimals: Int { state.cache?.config?.tokenDecimals ?? 0 }
-    private var canonical: Bool {
-        state.runtimeConfig.apiBaseURL.scheme == "http" ||
-            state.runtimeConfig.domain == "\(state.runtimeConfig.canisterId).icp0.io"
-    }
+    private var canonical: Bool { state.runtimeConfig.canVoteOnProposals }
     var body: some View {
         @Bindable var model = model
         ScrollView {

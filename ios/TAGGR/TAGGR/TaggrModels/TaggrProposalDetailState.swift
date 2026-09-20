@@ -93,14 +93,9 @@ final class TaggrProposalDetailState {
             try await context.api.voteOnProposal(id: vote.proposalID, adopted: vote.adopted, data: vote.data, identity: identity)
             saved = true
             try context.requireCurrent(state)
-            let updated = try await context.api.proposal(vote.proposalID)
-            guard updated.id == vote.proposalID else { throw TaggrAPIError.invalidResponse("Proposal ID mismatch.") }
-            let rows = try await state.loadPostEnvelopes("posts", args: [[vote.postID]], identity: identity, api: context.api)
-            let visible = try await context.visiblePosts(rows, in: state)
-            try context.requireCurrent(state)
-            if requestID == request {
-                proposal = updated; post = visible.first { $0.id == vote.postID }
-            }
+            // The PWA starts following the discussion immediately after a saved vote.
+            // Keep this independent of the proposal refresh so a transient read failure
+            // cannot leave a successful voter without discussion notifications.
             do {
                 _ = try await context.api.toggleFollowingPost(postId: vote.postID, identity: identity)
                 try await context.refreshUser(state)
@@ -108,6 +103,14 @@ final class TaggrProposalDetailState {
                 if requestID == request, context.matches(state) {
                     self.voteError = "Vote saved; discussion follow update failed: " + error.localizedDescription
                 }
+            }
+            let updated = try await context.api.proposal(vote.proposalID)
+            guard updated.id == vote.proposalID else { throw TaggrAPIError.invalidResponse("Proposal ID mismatch.") }
+            let rows = try await state.loadPostEnvelopes("posts", args: [[vote.postID]], identity: identity, api: context.api)
+            let visible = try await context.visiblePosts(rows, in: state)
+            try context.requireCurrent(state)
+            if requestID == request {
+                proposal = updated; post = visible.first { $0.id == vote.postID }
             }
         } catch {
             guard requestID == request, context.matches(state) else { return }

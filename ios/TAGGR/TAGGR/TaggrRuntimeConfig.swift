@@ -81,6 +81,12 @@ struct TaggrRuntimeConfig: Equatable, Sendable {
         apiBaseURL != Self.productionAPIBaseURL
     }
 
+    /// Matches the PWA's proposal-voting gate: non-mainnet runtimes are allowed,
+    /// while mainnet requires the canister's canonical icp0.io host.
+    var canVoteOnProposals: Bool {
+        apiBaseURL != Self.productionAPIBaseURL || domain == "\(canisterId).icp0.io"
+    }
+
     var availableIdentitySignInMethods: [TaggrIdentitySignInMethod] {
         isProductionInternetIdentity ? TaggrIdentitySignInMethod.allCases : [.passkey]
     }
