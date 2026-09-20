@@ -4,8 +4,8 @@ import ICNativeClient
 @testable import TAGGR
 
 extension TaggrTests {
-    nonisolated private func regressionProposal(_ id: Int = 1, status: String = "Open") -> Data {
-        Data("{\"Ok\":{\"id\":\(id),\"proposer\":7,\"timestamp\":1,\"post_id\":42,\"status\":\"\(status)\",\"payload\":{\"Release\":{\"commit\":\"abc\",\"hash\":\"def\"}},\"bulletins\":[],\"voting_power\":100}}".utf8)
+    nonisolated private func regressionProposal(_ id: Int = 1, status: String = "Open", payload: String = #"{"Release":{"commit":"abc","hash":"def"}}"#) -> Data {
+        Data("{\"Ok\":{\"id\":\(id),\"proposer\":7,\"timestamp\":1,\"post_id\":42,\"status\":\"\(status)\",\"payload\":\(payload),\"bulletins\":[],\"voting_power\":100}}".utf8)
     }
 
     private func regressionState(api: TaggrAPI) throws -> TaggrAppCoordinator {
@@ -14,11 +14,11 @@ extension TaggrTests {
         state.safety.accept(scope: state.safetyScope)
         state.currentUser = try JSONDecoder.taggr.decode(TaggrUser.self, from: Data(#"{"id":7,"name":"alice","cycles":1000,"realms":[],"controlled_realms":["ALPHA"]}"#.utf8))
         state.cache = TaggrBackendCache(stats: nil, config: try JSONDecoder.taggr.decode(TaggrConfig.self,
-            from: Data(#"{"realm_cost":10,"max_realm_name":20,"max_realm_cleanup_penalty":100}"#.utf8)))
+            from: Data(#"{"realm_cost":10,"max_realm_name":20,"max_realm_cleanup_penalty":100,"token_decimals":2,"max_funding_amount":500000}"#.utf8)))
         return state
     }
 
-    func testProposalConfirmationUsesSnapshotAndInvalidationPreventsVoting() async throws {
+    func testProposalVoteSendsSnapshotAndSurvivesViewInvalidation() async throws {
         let calls = LockedTestValue<[(String, Data)]>([])
         let api = makeStubbedAPI { request in
             let call = try XCTUnwrap(self.requestMethodAndArg(from: request))
@@ -38,23 +38,60 @@ extension TaggrTests {
         await model.load(state)
         XCTAssertTrue(model.canVote(state, canonical: true))
         model.data = "confirmed-hash"
-        model.prepareVote(adopted: true, state: state, canonical: true)
+        XCTAssertTrue(model.prepareVote(adopted: true, state: state, canonical: true))
         model.data = "changed-after-confirmation"
-        await model.vote(state, canonical: true)
+        XCTAssertNil(model.voteError)
+        await model.vote(state)
         let votes = calls.read { $0.filter { $0.0 == "vote_on_proposal" } }
         XCTAssertEqual(votes.count, 1)
         XCTAssertEqual(votes.first?.1, try TaggrCandid.jsonArguments([1, true, "confirmed-hash"]))
-        await model.load(state)
-        model.prepareVote(adopted: false, state: state, canonical: true)
-        model.invalidate()
-        await model.vote(state, canonical: true)
-        XCTAssertNil(model.proposal)
         XCTAssertNil(model.pendingVote)
-        XCTAssertEqual(calls.read { $0.filter { $0.0 == "vote_on_proposal" }.count }, 1)
+        // Leaving the screen (or a presented dialog) must not cancel a vote the user already confirmed.
+        await model.load(state)
+        XCTAssertTrue(model.prepareVote(adopted: false, state: state, canonical: true))
+        model.invalidate()
+        XCTAssertNotNil(model.pendingVote)
+        XCTAssertNotNil(model.proposal)
+        await model.vote(state)
+        XCTAssertNil(model.pendingVote)
+        XCTAssertFalse(model.busy)
+        XCTAssertEqual(calls.read { $0.filter { $0.0 == "vote_on_proposal" }.count }, 2)
         let other = TaggrProposalDetailState(id: 2)
         await other.load(state) // The API deliberately returns proposal 1.
         XCTAssertFalse(other.canVote(state, canonical: true))
         XCTAssertNil(other.proposal)
+    }
+
+    func testProposalRewardVoteRequiresAmountAndSurfacesValidationError() async throws {
+        let calls = LockedTestValue<[String]>([])
+        let api = makeStubbedAPI { request in
+            let method = try XCTUnwrap(self.requestMethodAndArg(from: request)).method
+            calls.mutate { $0.append(method) }
+            let data: Data
+            switch method {
+            case "proposal": data = self.regressionProposal(payload: #"{"Rewards":{"receiver":"aaaaa-aa","minted":0}}"#)
+            case "posts": data = Data("[\(String(decoding: self.postEnvelopeFixture(), as: UTF8.self))]".utf8)
+            case "users_data": data = Data("{}".utf8)
+            case "user": data = Self.currentUserFixture()
+            default: data = Data("null".utf8)
+            }
+            return (HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!, Self.queryReply(data))
+        }
+        let state = try regressionState(api: api)
+        let model = TaggrProposalDetailState(id: 1)
+        await model.load(state)
+        XCTAssertTrue(model.canVote(state, canonical: true))
+        XCTAssertFalse(model.prepareVote(adopted: true, state: state, canonical: true))
+        XCTAssertNotNil(model.voteError)
+        XCTAssertNil(model.pendingVote)
+        model.data = "0.5"
+        XCTAssertFalse(model.prepareVote(adopted: true, state: state, canonical: true))
+        XCTAssertTrue(calls.read { $0.filter { $0 == "vote_on_proposal" }.isEmpty })
+        model.data = "1000"
+        XCTAssertTrue(model.prepareVote(adopted: true, state: state, canonical: true))
+        XCTAssertNil(model.voteError)
+        await model.vote(state)
+        XCTAssertEqual(calls.read { $0.filter { $0 == "vote_on_proposal" }.count }, 1)
     }
 
     func testProposalLateLoadCannotOverwriteNewerLoad() async throws {

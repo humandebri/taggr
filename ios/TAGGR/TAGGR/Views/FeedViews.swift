@@ -365,7 +365,7 @@ struct PostRow: View {
                 Text("Translated")
                     .font(.caption2.weight(.bold))
                     .foregroundStyle(TaggrTheme.clickable)
-                TaggrMarkdownText(text: translatedDisplayBody)
+                Text(verbatim: translatedDisplayBody)
                     .font(.subheadline)
                     .foregroundStyle(TaggrTheme.secondaryText)
                     .lineSpacing(2)
@@ -464,7 +464,7 @@ struct PostRow: View {
                             previewImage = attachment
                         }
                     }
-                    PostExtensionView(post: post)
+                    PostExtensionView(post: post, isDetail: isDetail, openPost: open)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -629,6 +629,150 @@ struct ReplyPostRow: View {
 }
 
 @available(iOS 18.0, *)
+struct TaggrPostTranslationBatch {
+    let lines: [String]
+    /// Fenced code is code, not prose: those lines stay verbatim and never reach the session.
+    let verbatimLineIndices: Set<Int>
+    /// Structural markers are displayed but never sent through translation, so they cannot be dropped.
+    let displayPrefixes: [Int: String]
+
+    // Translating the visible text instead of the raw body keeps Markdown syntax and link
+    // destinations away from the session, which would otherwise mangle them into stray brackets.
+    @MainActor
+    init(sourceText: String) {
+        let split = Self.splitSourceText(sourceText)
+        lines = split.lines
+        verbatimLineIndices = split.verbatimLineIndices
+        displayPrefixes = split.displayPrefixes
+    }
+
+    init(
+        lines: [String],
+        verbatimLineIndices: Set<Int> = [],
+        displayPrefixes: [Int: String] = [:]
+    ) {
+        self.lines = lines
+        self.verbatimLineIndices = verbatimLineIndices
+        self.displayPrefixes = displayPrefixes
+    }
+
+    var isEmpty: Bool {
+        translatableIndices.isEmpty
+    }
+
+    var requests: [TranslationSession.Request] {
+        translatableIndices.map {
+            TranslationSession.Request(sourceText: lines[$0], clientIdentifier: String($0))
+        }
+    }
+
+    // The translation session joins the segments it is handed, so translating a whole body in one
+    // request drops the author's line breaks and paragraph spacing. Translating each display line
+    // separately and rejoining them keeps the structure the reader sees in the original post.
+    func translatedBody(from responses: [TranslationSession.Response]) -> String? {
+        var translations: [Int: String] = [:]
+        for response in responses {
+            guard let identifier = response.clientIdentifier,
+                  let index = Int(identifier),
+                  translatableIndices.contains(index),
+                  translations[index] == nil else {
+                continue
+            }
+            translations[index] = response.targetText
+        }
+        guard translations.count == translatableIndices.count else { return nil }
+        return lines.indices.map {
+            displayPrefixes[$0, default: ""] + (translations[$0] ?? lines[$0])
+        }.joined(separator: "\n")
+    }
+
+    private var translatableIndices: [Int] {
+        lines.indices.filter {
+            !verbatimLineIndices.contains($0) && !lines[$0].trimmingCharacters(in: .whitespaces).isEmpty
+        }
+    }
+
+    /// Splits the body into display lines, resolving Markdown per paragraph and keeping fenced code
+    /// verbatim. Resolving the whole body in one pass flattens the author's structure (the renderer
+    /// carries block breaks as intents, not newlines), while resolving one line at a time leaves
+    /// syntax from multi-line constructs (`**bold`, links) inside the text sent to the session.
+    @MainActor
+    private static func splitSourceText(
+        _ text: String
+    ) -> (lines: [String], verbatimLineIndices: Set<Int>, displayPrefixes: [Int: String]) {
+        var lines: [String] = []
+        var verbatimLineIndices: Set<Int> = []
+        var displayPrefixes: [Int: String] = [:]
+        var paragraph: [String] = []
+        var fencedMarker: (character: Character, length: Int)?
+
+        func flushParagraph() {
+            guard !paragraph.isEmpty else { return }
+            let resolved = TaggrInteractiveMarkdownText.translationText(
+                from: paragraph.joined(separator: "\n")
+            )
+            for resolvedLine in resolved.components(separatedBy: "\n") {
+                let split = structuralPrefixAndText(from: resolvedLine)
+                if !split.prefix.isEmpty { displayPrefixes[lines.count] = split.prefix }
+                lines.append(split.text)
+            }
+            paragraph.removeAll(keepingCapacity: true)
+        }
+
+        for line in displayLines(from: text) {
+            if let marker = fencedMarker {
+                if TaggrPostBodyParser.isClosingFence(line, for: marker) {
+                    fencedMarker = nil
+                } else {
+                    verbatimLineIndices.insert(lines.count)
+                    lines.append(line)
+                }
+                continue
+            }
+            if let marker = TaggrPostBodyParser.openingFenceMarker(in: line) {
+                flushParagraph()
+                fencedMarker = marker
+            } else if line.trimmingCharacters(in: .whitespaces).isEmpty {
+                flushParagraph()
+                lines.append("")
+            } else {
+                paragraph.append(line)
+            }
+        }
+        flushParagraph()
+        return (lines, verbatimLineIndices, displayPrefixes)
+    }
+
+    private static func structuralPrefixAndText(from line: String) -> (prefix: String, text: String) {
+        var remainder = line[...]
+        var prefix = ""
+        while remainder.hasPrefix("│ ") {
+            prefix += "│ "
+            remainder.removeFirst(2)
+        }
+        if remainder.hasPrefix("• ") {
+            prefix += "• "
+            remainder.removeFirst(2)
+        } else {
+            let digits = remainder.prefix(while: { $0.isNumber })
+            let orderedPrefix = "\(digits). "
+            if !digits.isEmpty, remainder.hasPrefix(orderedPrefix) {
+                prefix += orderedPrefix
+                remainder.removeFirst(orderedPrefix.count)
+            }
+        }
+        return (prefix, String(remainder))
+    }
+
+    private static func displayLines(from text: String) -> [String] {
+        text
+            .replacingOccurrences(of: "\r\n", with: "\n")
+            .replacingOccurrences(of: "\r", with: "\n")
+            .components(separatedBy: "\n")
+    }
+}
+
+@available(iOS 18.0, *)
 struct InlinePostTranslationTask: ViewModifier {
     let sourceText: String
     let requestID: Int
@@ -638,15 +782,17 @@ struct InlinePostTranslationTask: ViewModifier {
     @State private var configuration: TranslationSession.Configuration?
     @State private var handledRequestID = 0
     @State private var activeRequestID = 0
-    @State private var activeSourceText = ""
+    @State private var activeBatch: TaggrPostTranslationBatch?
 
     func body(content: Content) -> some View {
         content
             .onChange(of: requestID, initial: true) { _, newRequestID in
                 guard newRequestID > 0 else {
+                    // Keep the configuration: a discarded configuration would be
+                    // recreated with the same value on the next request, and an
+                    // unchanged configuration does not re-run the translation task.
                     activeRequestID = 0
-                    activeSourceText = ""
-                    configuration = nil
+                    activeBatch = nil
                     handledRequestID = 0
                     return
                 }
@@ -660,8 +806,10 @@ struct InlinePostTranslationTask: ViewModifier {
     }
 
     func startTranslation() {
-        let text = sourceText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !text.isEmpty else {
+        let batch = TaggrPostTranslationBatch(
+            sourceText: sourceText.trimmingCharacters(in: .whitespacesAndNewlines)
+        )
+        guard !batch.isEmpty else {
             isTranslating = false
             return
         }
@@ -669,27 +817,28 @@ struct InlinePostTranslationTask: ViewModifier {
         errorMessage = nil
         isTranslating = true
         activeRequestID = requestID
-        activeSourceText = text
+        activeBatch = batch
         if configuration == nil {
             configuration = TranslationSession.Configuration(source: nil, target: nil)
         } else {
+            // Invalidate to translate new content with the same language pair.
             configuration?.invalidate()
         }
     }
 
     func translate(using session: TranslationSession) async {
         let requestID = activeRequestID
-        let text = activeSourceText
+        guard requestID > 0, let batch = activeBatch, !batch.lines.isEmpty else { return }
+        var translated: String?
         do {
-            let response = try await session.translate(text)
-            guard activeRequestID == requestID, activeSourceText == text else { return }
-            translatedText = response.targetText
-            errorMessage = nil
+            let responses = try await session.translations(from: batch.requests)
+            translated = batch.translatedBody(from: responses)
         } catch {
-            guard activeRequestID == requestID, activeSourceText == text else { return }
-            translatedText = nil
-            errorMessage = "Translation unavailable"
+            translated = nil
         }
+        guard activeRequestID == requestID, activeBatch?.lines == batch.lines else { return }
+        translatedText = translated
+        errorMessage = translated == nil ? "Translation unavailable" : nil
         isTranslating = false
     }
 }
@@ -763,6 +912,8 @@ struct PostSafetyNotice: View {
 
 struct PostExtensionView: View {
     let post: TaggrPost
+    var isDetail = false
+    var openPost: () -> Void = {}
 
     var body: some View {
         switch post.extensionKind {
@@ -771,7 +922,7 @@ struct PostExtensionView: View {
         case .repost(let id):
             RepostExtensionView(postId: id)
         case .proposal(let id):
-            ProposalExtensionView(postId: post.id, proposalId: id)
+            ProposalExtensionView(postId: post.id, proposalId: id, isDetail: isDetail, openPost: openPost)
         case .feature, .none:
             EmptyView()
         case .unknown:
@@ -788,34 +939,14 @@ struct RepostExtensionView: View {
     var body: some View {
         Group {
             if let embeddedPost, state.canDisplayPost(embeddedPost), embeddedPost.contentRestriction(viewerID: state.currentUser?.id) == nil {
-                Button {
+                RepostEmbeddedBodyView(
+                    text: embeddedPost.displayBody,
+                    authorName: embeddedPost.meta.authorName ?? "@\(embeddedPost.user)",
+                    badges: TaggrUserBadge.decoded(from: embeddedPost.meta.authorBadges)
+                ) {
                     state.navigateToPost(embeddedPost.id)
-                } label: {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Label("Repost", systemImage: "arrow.2.squarepath")
-                            .font(.caption.weight(.bold))
-                            .foregroundStyle(TaggrTheme.secondaryText)
-                        Text(embeddedPost.meta.authorName ?? "@\(embeddedPost.user)")
-                            .font(.caption.weight(.bold))
-                            .foregroundStyle(TaggrTheme.clickable)
-                        UserAttributeBadgesView(
-                            badges: TaggrUserBadge.decoded(from: embeddedPost.meta.authorBadges)
-                        )
-                        TaggrPostBodyView(
-                            text: embeddedPost.displayBody,
-                            maximumLines: 4,
-                            textStyle: .subheadline,
-                            textColor: TaggrTheme.secondaryText,
-                            lineSpacing: 0
-                        )
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                    }
-                    .padding(12)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(TaggrTheme.panel)
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
                 }
-                .buttonStyle(.plain)
+                .frame(maxWidth: .infinity, alignment: .leading)
             } else if embeddedPost != nil {
                 CompactNoticeView(title: "Repost unavailable", systemImage: "eye.slash")
             } else {
@@ -828,15 +959,92 @@ struct RepostExtensionView: View {
     }
 }
 
+/// The embedded card of a repost. A reposted post often exceeds the four
+/// preview lines, so the card offers the same expansion the timeline rows do.
+/// The header and the preview body stay the navigation target; the expansion
+/// toggle sits outside them because SwiftUI does not render a Button nested in
+/// a Button label.
+struct RepostEmbeddedBodyView: View {
+    let text: String
+    var authorName: String
+    var badges: [TaggrUserBadge]
+    var maximumLines = 4
+    var openPost: (() -> Void)?
+
+    @State private var isExpanded = false
+    @State private var isTruncated = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            VStack(alignment: .leading, spacing: 8) {
+                Button(action: open) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Label("Repost", systemImage: "arrow.2.squarepath")
+                            .font(.caption.weight(.bold))
+                            .foregroundStyle(TaggrTheme.secondaryText)
+                        Text(authorName)
+                            .font(.caption.weight(.bold))
+                            .foregroundStyle(TaggrTheme.clickable)
+                        UserAttributeBadgesView(badges: badges)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                TaggrPostBodyView(
+                    text: text,
+                    maximumLines: isExpanded ? nil : maximumLines,
+                    textStyle: .subheadline,
+                    textColor: TaggrTheme.secondaryText,
+                    lineSpacing: 0,
+                    accessibilityIdentifier: "repost-embedded-body",
+                    openPost: openPost,
+                    onTruncationChange: updateTruncation
+                )
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .padding(12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(TaggrTheme.panel)
+            .clipShape(RoundedRectangle(cornerRadius: 8))
+            if !isExpanded, isTruncated {
+                Button(action: expand) {
+                    Label("Show full post", systemImage: "chevron.down")
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(TaggrTheme.clickable)
+                }
+                .buttonStyle(.plain)
+                .frame(minHeight: 44)
+                .contentShape(Rectangle())
+                .accessibilityIdentifier("repost-show-full-post")
+            }
+        }
+    }
+
+    private func open() {
+        openPost?()
+    }
+
+    private func expand() {
+        isExpanded = true
+        isTruncated = false
+    }
+
+    private func updateTruncation(_ value: Bool) {
+        guard isTruncated != value else { return }
+        isTruncated = value
+    }
+}
+
 struct ProposalExtensionView: View {
     @Environment(TaggrAppCoordinator.self) private var state
     let postId: Int
     let proposalId: Int
+    var isDetail = false
+    var openPost: () -> Void = {}
 
     var body: some View {
-        Button {
-            state.navigate(to: .proposal(proposalId))
-        } label: {
+        Button(action: open) {
             HStack(spacing: 10) {
                 Image(systemName: "checklist")
                     .font(.subheadline.weight(.bold))
@@ -856,6 +1064,16 @@ struct ProposalExtensionView: View {
             .clipShape(RoundedRectangle(cornerRadius: 8))
         }
         .buttonStyle(.plain)
+    }
+
+    // A timeline row opens the post like any other post. Only the post page itself, where the
+    // row is no longer the way into the replies, links on to the proposal.
+    private func open() {
+        if isDetail {
+            state.navigate(to: .proposal(proposalId))
+        } else {
+            openPost()
+        }
     }
 }
 

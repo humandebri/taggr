@@ -139,11 +139,23 @@ struct TaggrInteractiveMarkdownText: UIViewRepresentable {
         return attributedText.attribute(.link, at: offset, effectiveRange: nil) as? URL
     }
 
+    /// Plain text for translation, including the list and quote markers synthesized by the body renderer.
+    static func translationText(from markdown: String) -> String {
+        renderedBlock(
+            markdown,
+            textStyle: .body,
+            textColor: .label,
+            lineSpacing: 0,
+            includesQuoteMarkers: true
+        ).string
+    }
+
     private static func renderedBlock(
         _ markdown: String,
         textStyle: UIFont.TextStyle,
         textColor: UIColor,
-        lineSpacing: CGFloat
+        lineSpacing: CGFloat,
+        includesQuoteMarkers: Bool = false
     ) -> NSAttributedString {
         let source = TaggrMarkdownText.attributedMarkdown(from: markdown)
         let result = NSMutableAttributedString()
@@ -165,6 +177,12 @@ struct TaggrInteractiveMarkdownText: UIViewRepresentable {
                 )
             }
             if previousPresentationIdentity != presentationIdentity {
+                if includesQuoteMarkers {
+                    let quoteDepth = components.count(where: {
+                        if case .blockQuote = $0.kind { true } else { false }
+                    })
+                    result.append(NSAttributedString(string: String(repeating: "│ ", count: quoteDepth)))
+                }
                 result.append(
                     listPrefix(
                         for: components,
@@ -381,13 +399,20 @@ struct TaggrInteractiveMarkdownText: UIViewRepresentable {
 
         func reportTruncation() {
             guard let textView else { return }
-            textView.layoutManager.ensureLayout(for: textView.textContainer)
-            let visibleGlyphs = textView.layoutManager.glyphRange(for: textView.textContainer)
-            let isTruncated = NSMaxRange(visibleGlyphs) < textView.layoutManager.numberOfGlyphs
-            updateAccessibility(for: visibleGlyphs, isTruncated: isTruncated, in: textView)
+            // `maximumNumberOfLines` stops glyph generation at the limit, so comparing
+            // the visible glyph range with `numberOfGlyphs` never detects overflow.
+            // Measure how many lines the text needs in an unconstrained copy instead.
+            let maximumLines = textView.textContainer.maximumNumberOfLines
+            let isTruncated = maximumLines > 0 && (textView.lineCount() ?? 0) > maximumLines
+            updateAccessibility(for: textView.layoutManager.glyphRange(for: textView.textContainer), isTruncated: isTruncated, in: textView)
             guard lastReportedTruncation != isTruncated else { return }
             lastReportedTruncation = isTruncated
-            parent.onTruncationChange(isTruncated)
+            // This runs inside `updateUIView`/layout, so mutating the caller's
+            // SwiftUI state synchronously here is dropped as a stale update.
+            DispatchQueue.main.async {
+                [weak self] in
+                self?.parent.onTruncationChange(isTruncated)
+            }
         }
 
         @objc func openAccessibilityLink(_ action: UIAccessibilityCustomAction) -> Bool {
@@ -436,6 +461,7 @@ struct TaggrInteractiveMarkdownText: UIViewRepresentable {
         var minimumHeight: CGFloat = 0
         var accessibilityOpenPost: (() -> Void)?
         var onLayout: (() -> Void)?
+        private var lastMeasurement: (width: CGFloat, text: NSAttributedString, lines: Int)?
 
         override var intrinsicContentSize: CGSize {
             let size = super.intrinsicContentSize
@@ -446,6 +472,32 @@ struct TaggrInteractiveMarkdownText: UIViewRepresentable {
             super.layoutSubviews()
             setNeedsDisplay()
             onLayout?()
+        }
+
+        /// Number of lines the text needs at the current width, ignoring
+        /// `maximumNumberOfLines`. `nil` when the width is not laid out yet.
+        /// The result is memoized because truncation is reported on every
+        /// layout pass and the measurement lays the whole text out again.
+        func lineCount() -> Int? {
+            let width = bounds.width
+            guard width > 0, let text = attributedText, text.length > 0 else { return nil }
+            if let lastMeasurement, lastMeasurement.width == width, lastMeasurement.text.isEqual(to: text) {
+                return lastMeasurement.lines
+            }
+            let measurementContainer = NSTextContainer(size: CGSize(width: width, height: .greatestFiniteMagnitude))
+            measurementContainer.lineFragmentPadding = textContainer.lineFragmentPadding
+            let measurementManager = NSLayoutManager()
+            measurementManager.addTextContainer(measurementContainer)
+            let storage = NSTextStorage(attributedString: text)
+            storage.addLayoutManager(measurementManager)
+            measurementManager.ensureLayout(for: measurementContainer)
+            let glyphRange = measurementManager.glyphRange(for: measurementContainer)
+            var lines = 0
+            measurementManager.enumerateLineFragments(forGlyphRange: glyphRange) { _, _, _, _, _ in
+                lines += 1
+            }
+            lastMeasurement = (width, text, lines)
+            return lines
         }
 
         func quoteBarRects() -> [CGRect] {

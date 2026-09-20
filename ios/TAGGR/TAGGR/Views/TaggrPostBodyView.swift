@@ -167,7 +167,7 @@ enum TaggrPostBodyParser {
         current.removeAll(keepingCapacity: true)
     }
 
-    private static func openingFenceMarker(in line: String) -> (character: Character, length: Int)? {
+    static func openingFenceMarker(in line: String) -> (character: Character, length: Int)? {
         let indentation = line.prefix(while: { $0 == " " }).count
         guard indentation <= 3 else { return nil }
         let trimmed = line.dropFirst(indentation)
@@ -177,7 +177,7 @@ enum TaggrPostBodyParser {
         return (marker, length)
     }
 
-    private static func isClosingFence(
+    static func isClosingFence(
         _ line: String,
         for opening: (character: Character, length: Int)
     ) -> Bool {

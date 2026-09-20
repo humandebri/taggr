@@ -540,6 +540,7 @@ extension TaggrAppCoordinator {
         let previousPostThread = postThread
         let previousFocusedPost = focusedPost
         let previousReplies = repliesByPostID
+        let previousNotificationPost = feedStore.notificationPosts[postId]
         applyOptimisticReaction(postId: postId, reaction: reaction)
         let succeeded = await runBusy {
             _ = try await api.updateJSON("react", args: [postId, reaction], identity: authSession)
@@ -551,6 +552,7 @@ extension TaggrAppCoordinator {
             postThread = previousPostThread
             focusedPost = previousFocusedPost
             repliesByPostID = previousReplies
+            restoreNotificationPost(previousNotificationPost, for: postId)
         }
     }
 
@@ -567,6 +569,7 @@ extension TaggrAppCoordinator {
         let previousPostThread = postThread
         let previousFocusedPost = focusedPost
         let previousReplies = repliesByPostID
+        let previousNotificationPost = feedStore.notificationPosts[postId]
         if let userId = currentUser?.id {
             updatePost(postId) { post in
                 guard case .poll(let poll) = post.extensionKind else { return post }
@@ -582,6 +585,7 @@ extension TaggrAppCoordinator {
             postThread = previousPostThread
             focusedPost = previousFocusedPost
             repliesByPostID = previousReplies
+            restoreNotificationPost(previousNotificationPost, for: postId)
         }
     }
 
@@ -600,6 +604,7 @@ extension TaggrAppCoordinator {
         let previousPostThread = postThread
         let previousFocusedPost = focusedPost
         let previousReplies = repliesByPostID
+        let previousNotificationPost = feedStore.notificationPosts[postId]
         updatePost(postId) { post in
             var hidden = post.hiddenFor
             if hidden.contains(userId) {
@@ -617,6 +622,7 @@ extension TaggrAppCoordinator {
             postThread = previousPostThread
             focusedPost = previousFocusedPost
             repliesByPostID = previousReplies
+            restoreNotificationPost(previousNotificationPost, for: postId)
         }
     }
 
@@ -628,11 +634,12 @@ extension TaggrAppCoordinator {
     }
 
     func deletePost(_ post: TaggrPost) async {
-        await runBusy {
+        let succeeded = await runBusy {
             let versions = try post.deletionVersions()
             _ = try await api.updateJSON("delete_post", args: [post.id, versions], identity: authSession)
             await loadCurrentRoute()
         }
+        if succeeded { invalidateNotificationPost(post.id) }
     }
 
     func loadEmbeddedPost(_ id: Int) async -> TaggrPost? {
@@ -1460,6 +1467,7 @@ extension TaggrAppCoordinator {
 
     func updatePost(_ postId: Int, transform: (TaggrPost) -> TaggrPost) {
         if let post = featurePosts.posts[postId] { featurePosts.posts[postId] = transform(post) }
+        if let post = feedStore.notificationPosts[postId] { feedStore.notificationPosts[postId] = transform(post) }
         feed = feed.map { post in
             post.id == postId ? transform(post) : post
         }

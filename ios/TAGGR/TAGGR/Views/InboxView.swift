@@ -56,7 +56,10 @@ struct InboxView: View {
         .navigationTitle("Inbox")
         .taggrInlineNavigationChrome()
         .taggrBusyOverlay(state.isBusy)
-        .taggrRefreshable { postRefreshRevision += 1 }
+        .taggrRefreshable {
+            state.clearNotificationPostCache()
+            postRefreshRevision += 1
+        }
     }
 
     private var freshEntries: [(id: Int, entry: TaggrNotificationEntry)] {
@@ -141,10 +144,14 @@ private struct InboxNotificationCard: View {
     let entry: TaggrNotificationEntry
     let archive: Bool
     let refreshRevision: Int
-    @State private var associatedPost: TaggrPost?
-    @State private var isLoading = true
     @State private var loadFailed = false
     @State private var retryRevision = 0
+
+    private var postID: Int? { entry.notification.postId }
+
+    private var associatedPost: TaggrPost? {
+        postID.flatMap { state.notificationPosts[$0] }
+    }
 
     var body: some View {
         Group {
@@ -156,29 +163,34 @@ private struct InboxNotificationCard: View {
                 cardContent
             }
         }
-        .task(id: "\(state.safetyScope):\(entry.notification.postId.map(String.init) ?? "none"):\(refreshRevision):\(retryRevision)") {
+        .task(id: "\(state.safetyScope):\(postID.map(String.init) ?? "none"):\(refreshRevision):\(retryRevision)") {
             await loadPost()
         }
     }
 
     private func loadPost() async {
-        let scope = state.safetyScope
-        associatedPost = nil
-        isLoading = true
         loadFailed = false
-        guard let postID = entry.notification.postId else {
-            isLoading = false
-            return
-        }
+        guard let postID else { return }
+        guard associatedPost == nil else { return }
+        let scope = state.safetyScope
         do {
+            if let delay = state.notificationPostRetryDelay(postID), delay > 0 {
+                try await Task.sleep(for: .seconds(delay))
+            }
+            guard !Task.isCancelled, scope == state.safetyScope, associatedPost == nil else { return }
             let post = try await state.loadNotificationPost(postID)
             guard !Task.isCancelled, scope == state.safetyScope else { return }
-            associatedPost = post
-            isLoading = false
+            // A replica can briefly return no row. Retry once after the negative-cache TTL;
+            // a second empty result stays unavailable until refresh or view recreation.
+            if post == nil, let delay = state.notificationPostRetryDelay(postID), delay > 0 {
+                try await Task.sleep(for: .seconds(delay))
+                guard !Task.isCancelled, scope == state.safetyScope, associatedPost == nil else { return }
+                _ = try await state.loadNotificationPost(postID)
+                guard !Task.isCancelled, scope == state.safetyScope else { return }
+            }
         } catch {
             guard !Task.isCancelled, scope == state.safetyScope else { return }
             loadFailed = true
-            isLoading = false
         }
     }
 
@@ -211,17 +223,17 @@ private struct InboxNotificationCard: View {
                 PostRow(post: post) {
                     state.navigateToPost(post.id)
                 }
-            } else if entry.notification.postId != nil {
-                if isLoading {
-                    ProgressView("Loading notification")
-                } else if loadFailed {
+            } else if let postID = entry.notification.postId {
+                if loadFailed {
                     HStack {
                         Text("Could not load notification")
                         Button("Retry") { retryRevision += 1 }
                             .accessibilityIdentifier("notificationRetry-\(id)")
                     }
-                } else {
+                } else if state.isNotificationPostUnavailable(postID) {
                     Text("Post unavailable")
+                } else {
+                    ProgressView("Loading notification")
                 }
             }
         }

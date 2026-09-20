@@ -3,7 +3,9 @@ import ICNativeClient
 
 extension TaggrAppCoordinator {
     func returnFromFeature(fallback: TaggrRoute) {
-        route = navigationStore.featureReturnRoutes.removeValue(forKey: route) ?? fallback
+        let destination = navigationStore.featureReturnRoutes.removeValue(forKey: route) ?? fallback
+        route = destination
+        restoreLoadedFeed(for: destination)
     }
 }
 

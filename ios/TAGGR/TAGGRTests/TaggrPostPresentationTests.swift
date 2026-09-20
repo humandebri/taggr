@@ -5,6 +5,46 @@ import UIKit
 import UniformTypeIdentifiers
 @testable import TAGGR
 
+/// Collects truncation callbacks so an async test can assert on them after the
+/// view settles; the callback fires from the main queue during layout.
+final class ReportedTruncations: @unchecked Sendable {
+    private let lock = NSLock()
+    private var storage: [Bool] = []
+
+    var values: [Bool] {
+        lock.lock()
+        defer { lock.unlock() }
+        return storage
+    }
+
+    func append(_ value: Bool) {
+        lock.lock()
+        storage.append(value)
+        lock.unlock()
+    }
+}
+
+@MainActor
+struct TruncationProbeView: View {
+    let text: String
+    let maximumLines: Int
+    let onReport: (Bool) -> Void
+
+    init(text: String, maximumLines: Int, onReport: @escaping (Bool) -> Void) {
+        self.text = text
+        self.maximumLines = maximumLines
+        self.onReport = onReport
+    }
+
+    var body: some View {
+        TaggrPostBodyView(
+            text: text,
+            maximumLines: maximumLines,
+            onTruncationChange: onReport
+        )
+    }
+}
+
 final class ModerationFixture: @unchecked Sendable {
     private struct State {
         var statusCode = 200
@@ -328,6 +368,68 @@ extension TaggrTests {
         let attributed = TaggrInteractiveMarkdownText.attributedText(for: "- first\n- second")
 
         XCTAssertEqual(attributed.string, "• first\n• second")
+    }
+
+    func testRepostEmbeddedBodyCapsTheEmbeddedPreview() async throws {
+        let longBody = Array(
+            repeating: "This reposted post is long enough that the card has to truncate it.",
+            count: 12
+        ).joined(separator: " ")
+
+        let host = UIHostingController(
+            rootView: RepostEmbeddedBodyView(text: longBody, authorName: "@author", badges: [])
+        )
+        let scene = try XCTUnwrap(UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first)
+        let previous = scene.windows.first { $0.isKeyWindow }
+        let window = UIWindow(windowScene: scene)
+        window.frame = scene.coordinateSpace.bounds
+        window.rootViewController = host
+        window.makeKeyAndVisible()
+        defer { window.rootViewController = nil; window.isHidden = true; previous?.makeKeyAndVisible() }
+        try await settleLayout(window: window, host: host)
+
+        let textView = try XCTUnwrap(
+            findView(in: host.view, accessibilityIdentifier: "repost-embedded-body")
+                as? TaggrInteractiveMarkdownText.TextView
+        )
+        XCTAssertEqual(textView.textContainer.maximumNumberOfLines, 4)
+        XCTAssertGreaterThan(textView.lineCount() ?? 0, 4)
+    }
+
+    func testMarkdownReportsTruncationOnlyWhenTextExceedsTheLineLimit() async throws {
+        let reported = ReportedTruncations()
+        let longBody = Array(repeating: "A line long enough to wrap in the probe view.", count: 12)
+            .joined(separator: " ")
+        let host = UIHostingController(
+            rootView: TruncationProbeView(text: longBody, maximumLines: 4) { reported.append($0) }
+        )
+        let scene = try XCTUnwrap(UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first)
+        let previous = scene.windows.first { $0.isKeyWindow }
+        let window = UIWindow(windowScene: scene)
+        window.frame = scene.coordinateSpace.bounds
+        window.rootViewController = host
+        window.makeKeyAndVisible()
+        defer { window.rootViewController = nil; window.isHidden = true; previous?.makeKeyAndVisible() }
+        try await settleLayout(window: window, host: host)
+        try await settleLayout(window: window, host: host)
+
+        XCTAssertEqual(reported.values, [false, true])
+    }
+
+    func findView(in view: UIView, accessibilityIdentifier: String) -> UIView? {
+        if view.accessibilityIdentifier == accessibilityIdentifier { return view }
+        for subview in view.subviews {
+            if let match = findView(in: subview, accessibilityIdentifier: accessibilityIdentifier) {
+                return match
+            }
+        }
+        return nil
+    }
+
+    func settleLayout(window: UIWindow, host: UIHostingController<some View>) async throws {
+        try await Task.sleep(for: .milliseconds(300))
+        window.layoutIfNeeded()
+        host.view.layoutIfNeeded()
     }
 
     func testPostPresentationDerivesBodiesAndReplyCount() {

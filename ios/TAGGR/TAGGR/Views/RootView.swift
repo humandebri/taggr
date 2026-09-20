@@ -260,20 +260,14 @@ private struct FeedRouteView: View {
     @Environment(TaggrAppCoordinator.self) private var state
     let scrollToTopRevision: Int
 
-    private var retainsFeed: Bool {
-        if case .feed = state.route { return true }
-        if case .post = state.route, case .feed = state.currentPostReturnRoute { return true }
-        return false
-    }
-
     var body: some View {
         ZStack {
-            if retainsFeed {
-                FeedView(scrollToTopRevision: scrollToTopRevision)
-                    .opacity(isShowingFeed ? 1 : 0)
-                    .allowsHitTesting(isShowingFeed)
-                    .accessibilityHidden(!isShowingFeed)
-            }
+            // The timeline stays mounted for every route of this tab, so a post, profile or
+            // feature returns to the list the reader left instead of a rebuilt one.
+            FeedView(scrollToTopRevision: scrollToTopRevision)
+                .opacity(isShowingFeed ? 1 : 0)
+                .allowsHitTesting(isShowingFeed)
+                .accessibilityHidden(!isShowingFeed)
             destination
         }
     }
@@ -304,7 +298,8 @@ private struct FeedRouteView: View {
         case .feed:
             EmptyView()
         default:
-            FeedView(scrollToTopRevision: scrollToTopRevision)
+            // Routes of the other tabs leave the timeline in place.
+            EmptyView()
         }
     }
 }

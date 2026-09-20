@@ -109,6 +109,7 @@ final class TaggrAppCoordinator {
         set {
             if sessionStore.authSession?.principal != newValue?.principal {
                 featurePosts.reset()
+                clearNotificationPostCache()
                 restoredFeedMode = nil
                 postThread = []
                 loadedFeedMode = nil
@@ -122,6 +123,7 @@ final class TaggrAppCoordinator {
             if let previousUserID = sessionStore.currentUser?.id,
                previousUserID != newValue?.id {
                 featurePosts.reset()
+                clearNotificationPostCache()
                 restoredFeedMode = nil
                 postThread = []
                 loadedFeedMode = nil
@@ -190,6 +192,9 @@ final class TaggrAppCoordinator {
     var authorNamesByUserID: [Int: String] {
         get { feedStore.authorNamesByUserID }
         set { feedStore.authorNamesByUserID = newValue }
+    }
+    var notificationPosts: [Int: TaggrPost] {
+        get { feedStore.notificationPosts }
     }
     var focusedPost: TaggrPost? {
         get { contentStore.focusedPost }
@@ -277,6 +282,7 @@ final class TaggrAppCoordinator {
     var runtimeGeneration = 0 {
         didSet {
             featurePosts.reset()
+            clearNotificationPostCache()
             restoredFeedMode = nil
             postThread = []
             loadedFeedMode = nil
@@ -628,7 +634,7 @@ final class TaggrAppCoordinator {
         switch destination {
         case .feed(let mode):
             navigateToFeed(mode)
-            restoredFeedMode = loadedFeedMode == mode ? mode : nil
+            restoreLoadedFeed(for: destination)
         case .realm(let name):
             navigateToRealm(name)
         case .post:
@@ -669,6 +675,14 @@ final class TaggrAppCoordinator {
 
     func navigateBackFromProfile() {
         route = profileReturnRoute
+        restoreLoadedFeed(for: profileReturnRoute)
+    }
+
+    /// A back navigation into the timeline that is still loaded must not refetch its first page,
+    /// otherwise the reader loses the position they left.
+    func restoreLoadedFeed(for destination: TaggrRoute) {
+        guard case .feed(let mode) = destination else { return }
+        restoredFeedMode = loadedFeedMode == mode ? mode : nil
     }
 
     var unreadNotificationCount: Int {
@@ -683,8 +697,53 @@ final class TaggrAppCoordinator {
             .map { (id: $0.key, entry: $0.value) }
     }
 
-    func loadNotificationPost(_ id: Int) async throws -> TaggrPost? {
-        try await loadPostEnvelopes("posts", args: [[id]], identity: nil).first
+    private static let unavailableNotificationPostTTL: TimeInterval = 60
+
+    func loadNotificationPost(_ id: Int, useCache: Bool = true) async throws -> TaggrPost? {
+        if useCache {
+            if let cached = feedStore.notificationPosts[id] { return cached }
+            if isNotificationPostUnavailable(id) { return nil }
+        }
+        let post = try await loadPostEnvelopes("posts", args: [[id]], identity: nil).first
+        if let post {
+            feedStore.unavailableNotificationPostIDs.removeValue(forKey: id)
+            feedStore.notificationPosts[id] = post
+        } else if useCache {
+            feedStore.unavailableNotificationPostIDs[id] = Date()
+        }
+        return post
+    }
+
+    // An empty query result can come from a lagging replica, so a negative result expires
+    // instead of hiding the post until the next account change or pull-to-refresh.
+    func isNotificationPostUnavailable(_ id: Int) -> Bool {
+        (notificationPostRetryDelay(id) ?? 0) > 0
+    }
+
+    func notificationPostRetryDelay(_ id: Int, now: Date = .now) -> TimeInterval? {
+        guard let markedAt = feedStore.unavailableNotificationPostIDs[id] else { return nil }
+        return max(Self.unavailableNotificationPostTTL - now.timeIntervalSince(markedAt), 0)
+    }
+
+    // Inbox cards are recycled while scrolling, so retained posts are cleared only on account or explicit refresh.
+    func clearNotificationPostCache() {
+        feedStore.notificationPosts.removeAll()
+        feedStore.unavailableNotificationPostIDs.removeAll()
+    }
+
+    // Optimistic updates write through `updatePost`, so a failed action must restore the retained copy as well.
+    func restoreNotificationPost(_ post: TaggrPost?, for id: Int) {
+        if let post {
+            feedStore.notificationPosts[id] = post
+        } else {
+            feedStore.notificationPosts.removeValue(forKey: id)
+        }
+    }
+
+    // A post the backend no longer serves must stop rendering from the inbox cache.
+    func invalidateNotificationPost(_ id: Int) {
+        feedStore.notificationPosts.removeValue(forKey: id)
+        feedStore.unavailableNotificationPostIDs[id] = Date()
     }
 
     func markNotificationsRead(_ ids: [Int]) async {

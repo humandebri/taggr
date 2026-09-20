@@ -57,12 +57,12 @@ struct ProposalDetailView: View {
     @Environment(TaggrAppCoordinator.self) private var state
     let id: Int
     @State private var model: TaggrProposalDetailState
+    @State private var confirmingVote = false
     init(id: Int) { self.id = id; _model = State(initialValue: TaggrProposalDetailState(id: id)) }
     private var proposal: TaggrProposal? { model.proposal }
     private var post: TaggrPost? { model.post }
     private var busy: Bool { model.busy }
     private var error: String? { model.error }
-    private var uncertain: Bool { model.uncertain }
     private var decimals: Int { state.cache?.config?.tokenDecimals ?? 0 }
     private var canonical: Bool {
         state.runtimeConfig.apiBaseURL.scheme == "http" ||
@@ -103,22 +103,24 @@ struct ProposalDetailView: View {
                             if let maximum = state.cache?.config?.maxFundingAmount { Text("Maximum: \(amount(UInt64(max(0, maximum))))") }
                         }
                         HStack {
-                            Button("REJECT", role: .destructive) { model.prepareVote(adopted: false, state: state, canonical: canonical) }
-                            Button("ACCEPT") { model.prepareVote(adopted: true, state: state, canonical: canonical) }
-                        }.disabled(busy || uncertain)
+                            Button("REJECT", role: .destructive) { confirmingVote = model.prepareVote(adopted: false, state: state, canonical: canonical) }
+                            Button("ACCEPT") { confirmingVote = model.prepareVote(adopted: true, state: state, canonical: canonical) }
+                        }.disabled(busy)
                     } else if proposal.status == "Open", !canonical {
                         Text("Voting is unavailable on custom domains.")
                     } else if proposal.status == "Open", state.currentUser == nil {
                         Text("Sign in to vote.")
                     }
-                    if uncertain { Text("Vote result is unknown. Reload before retrying.") }
+                    if let voteError = model.voteError {
+                        Text(voteError).foregroundStyle(.red).textSelection(.enabled)
+                    }
                 } else if !busy && error == nil { Text("Proposal unavailable.") }
             }.padding()
         }
         .navigationTitle("Proposal #\(id)")
         .toolbar { ToolbarItem(placement: .topBarLeading) { Button("Back") { state.returnFromFeature(fallback: .proposals) } } }
-        .confirmationDialog(model.pendingVote?.adopted == true ? "Accept proposal?" : "Reject proposal?", isPresented: $model.confirmation, titleVisibility: .visible) {
-            Button(model.pendingVote?.adopted == true ? "ACCEPT" : "REJECT") { Task { await model.vote(state, canonical: canonical) } }
+        .confirmationDialog(model.pendingVote?.adopted == true ? "Accept proposal?" : "Reject proposal?", isPresented: $confirmingVote, titleVisibility: .visible) {
+            Button(model.pendingVote?.adopted == true ? "ACCEPT" : "REJECT") { Task { await model.vote(state) } }
         } message: { Text(model.pendingVote.map { "Proposal #\($0.proposalID) · \($0.data)" } ?? "Confirm your vote.") }
         .onDisappear { model.invalidate() }
         .task(id: id) { await model.load(state) }

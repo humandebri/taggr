@@ -3,6 +3,7 @@ import AuthenticationServices
 import CryptoKit
 import UIKit
 import ICNativeClient
+@preconcurrency import Translation
 @testable import TAGGR
 
 extension TaggrTests {
@@ -681,6 +682,94 @@ extension TaggrTests {
         let expected = "~~~swift\nlet value = 1\n~~~~\nafter  \nnext"
 
         XCTAssertEqual(TaggrMarkdownText.preservingUserLineBreaks(in: input), expected)
+    }
+
+    @available(iOS 18.0, *)
+    func testPostTranslationPreservesLineAndParagraphStructure() {
+        let batch = TaggrPostTranslationBatch(
+            sourceText: "First paragraph.\r\n\r\nSecond paragraph,\r\nline two."
+        )
+
+        XCTAssertEqual(batch.lines, ["First paragraph.", "", "Second paragraph,", "line two."])
+        XCTAssertEqual(batch.requests.map { $0.clientIdentifier ?? "" }, ["0", "2", "3"])
+
+        let responses = batch.requests.enumerated().map { index, request in
+            TranslationSession.Response(
+                sourceLanguage: Locale.Language(identifier: "en"),
+                targetLanguage: Locale.Language(identifier: "ja"),
+                sourceText: request.sourceText,
+                targetText: "訳\(index)",
+                clientIdentifier: request.clientIdentifier
+            )
+        }
+
+        XCTAssertEqual(batch.translatedBody(from: responses), "訳0\n\n訳1\n訳2")
+    }
+
+    @available(iOS 18.0, *)
+    func testPostTranslationSendsVisibleTextWithoutMarkdown() {
+        let batch = TaggrPostTranslationBatch(
+            sourceText: "ICRC-167 was [ratified on **July 15**](https://github.com/dfinity/pull/94) - see https://github.com/dfinity/ic/pull/1234"
+        )
+
+        XCTAssertEqual(
+            batch.lines,
+            ["ICRC-167 was ratified on July 15 - see GITHUB.COM"]
+        )
+    }
+
+    @available(iOS 18.0, *)
+    func testPostTranslationResolvesParagraphMarkdownAndKeepsCodeVerbatim() {
+        let batch = TaggrPostTranslationBatch(
+            sourceText: "Intro **bold\nacross lines**\n\n```swift\nlet value = 1\n```\nOutro"
+        )
+
+        XCTAssertEqual(batch.lines, ["Intro bold", "across lines", "", "let value = 1", "Outro"])
+        XCTAssertEqual(batch.requests.map(\.sourceText), ["Intro bold", "across lines", "Outro"])
+
+        let responses = batch.requests.enumerated().map { index, request in
+            TranslationSession.Response(
+                sourceLanguage: Locale.Language(identifier: "en"),
+                targetLanguage: Locale.Language(identifier: "ja"),
+                sourceText: request.sourceText,
+                targetText: "訳\(index)",
+                clientIdentifier: request.clientIdentifier
+            )
+        }
+
+        XCTAssertEqual(batch.translatedBody(from: responses), "訳0\n訳1\n\nlet value = 1\n訳2")
+    }
+
+    @available(iOS 18.0, *)
+    func testPostTranslationPreservesListAndQuoteMarkers() {
+        let batch = TaggrPostTranslationBatch(
+            sourceText: "- First\n- Second\n\n> Quoted"
+        )
+
+        XCTAssertEqual(batch.requests.map(\.sourceText), ["First", "Second", "Quoted"])
+        let responses = batch.requests.enumerated().map { index, request in
+            TranslationSession.Response(
+                sourceLanguage: Locale.Language(identifier: "en"),
+                targetLanguage: Locale.Language(identifier: "ja"),
+                sourceText: request.sourceText,
+                targetText: "訳\(index)",
+                clientIdentifier: request.clientIdentifier
+            )
+        }
+
+        XCTAssertEqual(batch.translatedBody(from: responses), "• 訳0\n• 訳1\n\n│ 訳2")
+    }
+
+    @available(iOS 18.0, *)
+    func testPostTranslationRejectsIncompleteResponses() {
+        let batch = TaggrPostTranslationBatch(sourceText: "First.\n\nSecond.")
+
+        XCTAssertNil(batch.translatedBody(from: []))
+    }
+
+    @available(iOS 18.0, *)
+    func testPostTranslationTreatsBlankSourceAsEmpty() {
+        XCTAssertTrue(TaggrPostTranslationBatch(sourceText: "   \n\n  ").isEmpty)
     }
 
     func testMarkdownTextRemovesUnsafeLinks() {

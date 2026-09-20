@@ -147,6 +147,11 @@ final class FeedStore {
     var canLoadMoreFeed = false
     var isLoadingMoreFeed = false
     var authorNamesByUserID: [Int: String] = [:]
+    // Inbox cards are recycled by the lazy list, so their posts must outlive the card view.
+    var notificationPosts: [Int: TaggrPost] = [:]
+    // Post id -> when the backend last failed to return it; exposed through
+    // `isNotificationPostUnavailable` so the mark can expire.
+    var unavailableNotificationPostIDs: [Int: Date] = [:]
 }
 
 @MainActor

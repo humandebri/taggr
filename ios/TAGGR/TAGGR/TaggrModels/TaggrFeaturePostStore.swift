@@ -69,7 +69,10 @@ extension TaggrAppCoordinator {
             guard store.generation == generation else { return }
             if let post = visible.first(where: { $0.id == id }) {
                 updatePost(id) { _ in post }
-            } else { store.posts[id] = nil }
+            } else {
+                store.posts[id] = nil
+                invalidateNotificationPost(id)
+            }
             // A query cannot prove that a timed-out update will never execute later.
             store.operations[id] = wasUncertain ? .uncertain : nil
             store.errors[id] = wasUncertain ? "Latest post loaded. The earlier update is still unconfirmed; resubmission remains disabled." : nil

@@ -183,6 +183,103 @@ extension TaggrTests {
     }
 
     @MainActor
+    func testNotificationPostIsFetchedOnceAndReused() async throws {
+        var postQueries = 0
+        let api = makeStubbedAPI { request in
+            let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
+            if self.requestMethodAndArg(from: request)?.method == "posts" {
+                postQueries += 1
+                let envelope = self.postEnvelopeFixture(id: 42, parent: 10)
+                return (response, Self.queryReply(Data("[\(String(data: envelope, encoding: .utf8)!)]".utf8)))
+            }
+            return (response, Self.queryReply(Data("null".utf8)))
+        }
+        let state = makeCoordinator(api: api)
+        state.authSession = makeAuthSession(privateKey: Curve25519.Signing.PrivateKey())
+
+        let first = try await state.loadNotificationPost(42)
+        let second = try await state.loadNotificationPost(42)
+
+        XCTAssertEqual(first?.id, 42)
+        XCTAssertEqual(second?.id, 42)
+        XCTAssertEqual(postQueries, 1)
+        XCTAssertEqual(state.notificationPosts[42]?.id, 42)
+    }
+
+    @MainActor
+    func testNotificationPostCacheClearsOnRefreshAndAccountChange() async throws {
+        var postQueries = 0
+        let api = makeStubbedAPI { request in
+            let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
+            if self.requestMethodAndArg(from: request)?.method == "posts" {
+                postQueries += 1
+                let envelope = self.postEnvelopeFixture(id: 42, parent: 10)
+                return (response, Self.queryReply(Data("[\(String(data: envelope, encoding: .utf8)!)]".utf8)))
+            }
+            return (response, Self.queryReply(Data("null".utf8)))
+        }
+        let state = makeCoordinator(api: api)
+        state.authSession = makeAuthSession(privateKey: Curve25519.Signing.PrivateKey())
+        _ = try await state.loadNotificationPost(42)
+
+        state.clearNotificationPostCache()
+        XCTAssertTrue(state.notificationPosts.isEmpty)
+        _ = try await state.loadNotificationPost(42)
+        XCTAssertEqual(postQueries, 2)
+
+        state.authSession = makeAuthSession(privateKey: Curve25519.Signing.PrivateKey())
+        XCTAssertTrue(state.notificationPosts.isEmpty)
+    }
+
+    @MainActor
+    func testUnavailableNotificationPostIsNotRefetched() async throws {
+        var postQueries = 0
+        let api = makeStubbedAPI { request in
+            let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
+            if self.requestMethodAndArg(from: request)?.method == "posts" { postQueries += 1 }
+            return (response, Self.queryReply(Data("[]".utf8)))
+        }
+        let state = makeCoordinator(api: api)
+        state.authSession = makeAuthSession(privateKey: Curve25519.Signing.PrivateKey())
+
+        let first = try await state.loadNotificationPost(42)
+        let second = try await state.loadNotificationPost(42)
+
+        XCTAssertNil(first)
+        XCTAssertNil(second)
+        XCTAssertEqual(postQueries, 1)
+        XCTAssertTrue(state.isNotificationPostUnavailable(42))
+    }
+
+    @MainActor
+    func testExpiredUnavailableNotificationPostIsFetchedAgain() async throws {
+        var postQueries = 0
+        let api = makeStubbedAPI { request in
+            let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
+            if self.requestMethodAndArg(from: request)?.method == "posts" { postQueries += 1 }
+            return (response, Self.queryReply(Data("[]".utf8)))
+        }
+        let state = makeCoordinator(api: api)
+        state.authSession = makeAuthSession(privateKey: Curve25519.Signing.PrivateKey())
+
+        let first = try await state.loadNotificationPost(42)
+        XCTAssertNil(first)
+        XCTAssertTrue(state.isNotificationPostUnavailable(42))
+        let markedAt = try XCTUnwrap(state.feedStore.unavailableNotificationPostIDs[42])
+        XCTAssertEqual(state.notificationPostRetryDelay(42, now: markedAt), 60)
+
+        // A single empty reply can come from a lagging replica, so the mark expires instead of
+        // hiding the post for the rest of the session.
+        state.feedStore.unavailableNotificationPostIDs[42] = Date().addingTimeInterval(-120)
+        XCTAssertFalse(state.isNotificationPostUnavailable(42))
+        XCTAssertEqual(state.notificationPostRetryDelay(42), 0)
+
+        let second = try await state.loadNotificationPost(42)
+        XCTAssertNil(second)
+        XCTAssertEqual(postQueries, 2)
+    }
+
+    @MainActor
     func testInboxRetryInteractiveUI() async throws {
         guard ProcessInfo.processInfo.arguments.contains("--inbox-ui-review") else {
             throw XCTSkip("Run with --inbox-ui-review and idb.")

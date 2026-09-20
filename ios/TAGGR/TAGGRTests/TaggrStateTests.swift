@@ -1447,6 +1447,7 @@ extension TaggrTests {
         state.postThread = [post]
         state.focusedPost = post
         state.repliesByPostID = [100: [post]]
+        state.feedStore.notificationPosts[42] = post
 
         await state.react(postId: 42, reaction: 53)
 
@@ -1455,6 +1456,37 @@ extension TaggrTests {
         XCTAssertNil(state.postThread.first?.reactions["53"])
         XCTAssertNil(state.focusedPost?.reactions["53"])
         XCTAssertNil(state.repliesByPostID[100]?.first?.reactions["53"])
+        XCTAssertNil(state.notificationPosts[42]?.reactions["53"])
+    }
+
+    @MainActor
+    func testDeletePostDropsRetainedNotificationPost() async throws {
+        var methods: [String] = []
+        let api = makeStubbedAPI { request in
+            if let method = self.requestMethodAndArg(from: request)?.method {
+                methods.append(method)
+            }
+            let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
+            if request.url?.path.hasSuffix("/query") == true {
+                if methods.last == "user" {
+                    return (response, Self.queryReply(Self.currentUserFixture()))
+                }
+                return (response, Self.queryReply(Data("[]".utf8)))
+            }
+            return (response, Self.queryReply(Data("null".utf8)))
+        }
+        let state = makeCoordinator(api: api)
+        let post = samplePost(id: 42, body: "hello", files: [:])
+        state.authSession = makeAuthSession(privateKey: Curve25519.Signing.PrivateKey())
+        state.currentUser = try JSONDecoder.taggr.decode(TaggrUser.self, from: Self.currentUserFixture())
+        state.feedStore.notificationPosts[42] = post
+
+        await state.deletePost(post)
+
+        XCTAssertNil(state.errorMessage)
+        XCTAssertTrue(methods.contains("delete_post"))
+        XCTAssertNil(state.notificationPosts[42])
+        XCTAssertTrue(state.isNotificationPostUnavailable(42))
     }
 
     @MainActor
@@ -1753,6 +1785,64 @@ extension TaggrTests {
         state.navigateBackFromPost()
         await state.loadCurrentRoute()
         XCTAssertEqual(calls, 1)
+    }
+
+    @MainActor
+    func testReturningFromProposalPreservesLoadedFeedPages() async throws {
+        var calls: [String] = []
+        var feedPage = 0
+        let api = makeStubbedAPI { request in
+            let method = try XCTUnwrap(self.requestMethodAndArg(from: request)?.method)
+            calls.append(method)
+            if method == "hot_posts" { feedPage += 1 }
+            let body = Data("[\(String(data: self.postEnvelopeFixture(id: feedPage), encoding: .utf8)!)]".utf8)
+            let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
+            return (response, Self.queryReply(body))
+        }
+        let state = makeCoordinator(api: api)
+        state.cache = TaggrBackendCache(stats: nil, config: try JSONDecoder.taggr.decode(
+            TaggrConfig.self, from: Data(#"{"feed_page_size":1}"#.utf8)))
+        state.navigateToFeed(.hot)
+        await state.loadCurrentRoute()
+        await state.loadMoreFeed(mode: .hot)
+        XCTAssertEqual(state.feed.map(\.id), [1, 2])
+
+        state.navigate(to: .proposal(7))
+        state.returnFromFeature(fallback: .proposals)
+        XCTAssertEqual(state.route, .feed(.hot))
+        await state.loadCurrentRoute()
+
+        XCTAssertEqual(calls, ["hot_posts", "hot_posts"])
+        XCTAssertEqual(state.feed.map(\.id), [1, 2])
+        XCTAssertTrue(state.canLoadMoreFeed)
+    }
+
+    @MainActor
+    func testReturningFromProfilePreservesLoadedFeedPages() async throws {
+        var calls: [String] = []
+        var feedPage = 0
+        let api = makeStubbedAPI { request in
+            let method = try XCTUnwrap(self.requestMethodAndArg(from: request)?.method)
+            calls.append(method)
+            if method == "hot_posts" { feedPage += 1 }
+            let body = Data("[\(String(data: self.postEnvelopeFixture(id: feedPage), encoding: .utf8)!)]".utf8)
+            let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
+            return (response, Self.queryReply(body))
+        }
+        let state = makeCoordinator(api: api)
+        state.cache = TaggrBackendCache(stats: nil, config: try JSONDecoder.taggr.decode(
+            TaggrConfig.self, from: Data(#"{"feed_page_size":1}"#.utf8)))
+        state.navigateToFeed(.hot)
+        await state.loadCurrentRoute()
+        await state.loadMoreFeed(mode: .hot)
+
+        state.navigateToProfile("alice")
+        state.navigateBackFromProfile()
+        XCTAssertEqual(state.route, .feed(.hot))
+        await state.loadCurrentRoute()
+
+        XCTAssertEqual(calls, ["hot_posts", "hot_posts"])
+        XCTAssertEqual(state.feed.map(\.id), [1, 2])
     }
 }
 

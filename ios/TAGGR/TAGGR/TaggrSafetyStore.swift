@@ -168,7 +168,7 @@ extension TaggrAppCoordinator {
         var destination = realm
         // Replies inherit the parent's realm even when a different realm was supplied.
         if let parentID {
-            guard let parent = try await loadNotificationPost(parentID), canDisplayPost(parent) else { throw TaggrSafetyError.unavailable }
+            guard let parent = try await loadNotificationPost(parentID, useCache: false), canDisplayPost(parent) else { throw TaggrSafetyError.unavailable }
             destination = parent.realm
         }
         if let destination, !destination.isEmpty {
