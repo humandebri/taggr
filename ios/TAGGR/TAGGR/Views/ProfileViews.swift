@@ -43,7 +43,7 @@ struct ProfileView: View {
                     }
                     .padding(16)
                     if let user = state.profile, !state.isUserRestricted(user.id) {
-                        journalSection()
+                        postsSection()
                     }
                 }
                 .padding(.bottom, 8)
@@ -275,16 +275,16 @@ struct ProfileView: View {
         }
     }
 
-    private func journalSection() -> some View {
-        let journal = state.contentStore
-        let isLoading = state.isBusy || journal.journalIsLoading
+    private func postsSection() -> some View {
+        let store = state.contentStore
+        let isLoading = state.isBusy || store.profilePostsIsLoading
         return VStack(alignment: .leading, spacing: 0) {
             HStack {
-                Text("Journal")
+                Text("Posts")
                     .font(.headline.weight(.black))
                     .foregroundStyle(TaggrTheme.text)
                 Spacer()
-                if Self.showsJournalHeaderSpinner(isLoading: isLoading, hasPosts: !journal.journalPosts.isEmpty) {
+                if Self.showsPostsHeaderSpinner(isLoading: isLoading, hasPosts: !store.profilePosts.isEmpty) {
                     ProgressView()
                         .tint(.white)
                 }
@@ -293,7 +293,7 @@ struct ProfileView: View {
             .padding(.top, 8)
             .padding(.bottom, 8)
             .background(TaggrTheme.panel)
-            if journal.journalPosts.isEmpty && !isLoading {
+            if store.profilePosts.isEmpty && !isLoading {
                 Text("No posts")
                     .font(.headline)
                     .foregroundStyle(TaggrTheme.secondaryText)
@@ -301,14 +301,14 @@ struct ProfileView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .background(TaggrTheme.background)
             } else {
-                ForEach(journal.journalPosts) { post in
+                ForEach(store.profilePosts) { post in
                     PostRow(post: post) {
                         state.navigateToPost(post.id, from: .latest)
                     }
                 }
-                if journal.journalCanLoadMore {
+                if store.profilePostsCanLoadMore {
                     TaggrLoadMoreView(loading: isLoading, height: 44) {
-                        Task { await state.loadMoreProfileJournal() }
+                        Task { await state.loadMoreProfilePosts() }
                     }
                 }
             }
@@ -381,7 +381,7 @@ struct ProfileView: View {
         state.isUserBlocked(user.id)
     }
 
-    static func showsJournalHeaderSpinner(isLoading: Bool, hasPosts: Bool) -> Bool {
+    static func showsPostsHeaderSpinner(isLoading: Bool, hasPosts: Bool) -> Bool {
         isLoading && !hasPosts
     }
 }

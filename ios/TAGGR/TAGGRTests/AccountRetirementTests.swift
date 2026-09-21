@@ -40,12 +40,12 @@ extension TaggrTests {
         try state.identityStore.save(try XCTUnwrap(state.authSession))
         let key = state.retirementKey
         state.feed = [samplePost(id: 42, body: "cached", files: [:])]
-        state.contentStore.journalPosts = state.feed
+        state.contentStore.profilePosts = state.feed
         await state.retireAccount()
         XCTAssertTrue(state.retirementCompleted, state.retirementMessage ?? "")
         XCTAssertNil(state.authSession)
         XCTAssertNil(try state.identityStore.load())
-        XCTAssertTrue(state.feed.isEmpty && state.contentStore.journalPosts.isEmpty)
+        XCTAssertTrue(state.feed.isEmpty && state.contentStore.profilePosts.isEmpty)
         XCTAssertEqual(state.retirementDefaults.string(forKey: key), "cleanup")
         let captured = calls.read { $0 }
         XCTAssertEqual(captured.map { $0.0 }, ["user", "config", "update_user", "update_user_settings", "crypt", "user"])

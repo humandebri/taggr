@@ -1656,7 +1656,7 @@ extension TaggrTests {
         let api = makeStubbedAPI { request in
             let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
             switch self.requestMethodAndArg(from: request)?.method {
-            case "thread":
+            case "posts":
                 postRequestStarted.fulfill()
                 _ = releasePostRequest.wait(timeout: .now() + 5)
                 let body = Data("[\(String(data: self.postEnvelopeFixture(id: 101), encoding: .utf8)!)]".utf8)
@@ -1784,19 +1784,19 @@ extension TaggrTests {
     }
 
     @MainActor
-    func testProfileRouteAndJournalLoadEachEndpointOnce() async throws {
+    func testProfileRouteAndPostsLoadEachEndpointOnce() async throws {
         var userQueryCount = 0
-        var journalQueryCount = 0
+        var postsQueryCount = 0
         let api = makeStubbedAPI { request in
             let method = self.requestMethodAndArg(from: request)?.method
             if method == "user" {
                 userQueryCount += 1
             }
-            if method == "journal" {
-                journalQueryCount += 1
+            if method == "user_posts" {
+                postsQueryCount += 1
             }
             let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
-            if method == "journal" {
+            if method == "user_posts" {
                 let body = Data("[\(String(data: self.postEnvelopeFixture(id: 303), encoding: .utf8)!)]".utf8)
                 return (response, Self.queryReply(body))
             }
@@ -1811,25 +1811,25 @@ extension TaggrTests {
         await state.loadCurrentRoute()
 
         XCTAssertEqual(userQueryCount, 1)
-        XCTAssertEqual(journalQueryCount, 1)
+        XCTAssertEqual(postsQueryCount, 1)
         XCTAssertEqual(state.profile?.name, "alice")
-        XCTAssertEqual(state.contentStore.journalPosts.map(\.id), [303])
+        XCTAssertEqual(state.contentStore.profilePosts.map(\.id), [303])
 
-        state.contentStore.journalPosts = []
+        state.contentStore.profilePosts = []
         await state.refreshVisibleRoute()
         XCTAssertEqual(userQueryCount, 2)
-        XCTAssertEqual(journalQueryCount, 2)
-        XCTAssertEqual(state.contentStore.journalPosts.map(\.id), [303])
+        XCTAssertEqual(postsQueryCount, 2)
+        XCTAssertEqual(state.contentStore.profilePosts.map(\.id), [303])
     }
 
-    func testProfileJournalUsesResolvedUserIDAndStablePaginationOffset() async throws {
-        var journalArgs: [Data] = []
+    func testProfilePostsUseResolvedUserIDAndStablePaginationOffset() async throws {
+        var postsArgs: [Data] = []
         let api = makeStubbedAPI { request in
             let call = self.requestMethodAndArg(from: request)
             let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
-            if call?.method == "journal" {
-                journalArgs.append(try XCTUnwrap(call).arg)
-                let id = journalArgs.count == 1 ? 303 : 302
+            if call?.method == "user_posts" {
+                postsArgs.append(try XCTUnwrap(call).arg)
+                let id = postsArgs.count == 1 ? 303 : 302
                 return (response, Self.queryReply(Data("[\(String(data: self.postEnvelopeFixture(id: id), encoding: .utf8)!)]".utf8)))
             }
             return (response, Self.queryReply(Self.userFixture()))
@@ -1840,18 +1840,18 @@ extension TaggrTests {
         ))
         state.navigateToProfile("alice")
         await state.loadCurrentRoute()
-        await state.loadMoreProfileJournal()
+        await state.loadMoreProfilePosts()
 
-        XCTAssertEqual(journalArgs, [
+        XCTAssertEqual(postsArgs, [
             try TaggrCandid.jsonArguments([TaggrRuntimeConfig.productionDomain, "7", 0, 0]),
             try TaggrCandid.jsonArguments([TaggrRuntimeConfig.productionDomain, "7", 1, 303]),
         ])
-        XCTAssertEqual(state.contentStore.journalPosts.map(\.id), [303, 302])
-        XCTAssertFalse(state.contentStore.journalIsLoading)
+        XCTAssertEqual(state.contentStore.profilePosts.map(\.id), [303, 302])
+        XCTAssertFalse(state.contentStore.profilePostsIsLoading)
     }
 
     @MainActor
-    func testProfileTransitionClearsPreviousJournalBeforeTheNextProfileLoads() async throws {
+    func testProfileTransitionClearsPreviousPostsBeforeTheNextProfileLoads() async throws {
         let secondProfileStarted = expectation(description: "second profile query started")
         let releaseSecondProfile = DispatchSemaphore(value: 0)
         var userQueries = 0
@@ -1876,26 +1876,26 @@ extension TaggrTests {
         let state = makeCoordinator(api: api)
         state.navigateToProfile("alice")
         await state.loadCurrentRoute()
-        XCTAssertEqual(state.contentStore.journalPosts.map(\.id), [303])
+        XCTAssertEqual(state.contentStore.profilePosts.map(\.id), [303])
 
         state.navigateToProfile("bob")
         let loadingProfile = Task { await state.loadCurrentRoute() }
         await fulfillment(of: [secondProfileStarted], timeout: 2)
-        XCTAssertTrue(state.contentStore.journalPosts.isEmpty)
-        XCTAssertTrue(state.contentStore.journalIsLoading)
+        XCTAssertTrue(state.contentStore.profilePosts.isEmpty)
+        XCTAssertTrue(state.contentStore.profilePostsIsLoading)
 
         releaseSecondProfile.signal()
         await loadingProfile.value
         XCTAssertEqual(state.profile?.name, "bob")
-        XCTAssertEqual(state.contentStore.journalPosts.map(\.id), [302])
-        XCTAssertFalse(state.contentStore.journalIsLoading)
+        XCTAssertEqual(state.contentStore.profilePosts.map(\.id), [302])
+        XCTAssertFalse(state.contentStore.profilePostsIsLoading)
     }
 
-    func testProfileJournalFailureCanBeRetriedByRefreshingRoute() async throws {
+    func testProfilePostsFailureCanBeRetriedByRefreshingRoute() async throws {
         var attempts = 0
         let api = makeStubbedAPI { request in
             let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
-            if self.requestMethodAndArg(from: request)?.method == "journal" {
+            if self.requestMethodAndArg(from: request)?.method == "user_posts" {
                 attempts += 1
                 if attempts == 1 { throw URLError(.notConnectedToInternet) }
                 return (response, Self.queryReply(Data("[\(String(data: self.postEnvelopeFixture(id: 303), encoding: .utf8)!)]".utf8)))
@@ -1911,7 +1911,7 @@ extension TaggrTests {
         await state.refreshVisibleRoute()
         XCTAssertEqual(attempts, 2)
         XCTAssertEqual(state.profile?.name, "alice")
-        XCTAssertEqual(state.contentStore.journalPosts.map(\.id), [303])
+        XCTAssertEqual(state.contentStore.profilePosts.map(\.id), [303])
     }
 }
 

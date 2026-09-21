@@ -93,7 +93,7 @@ extension TaggrAppCoordinator {
             guard isCurrentSession() else { return .applied }
             if route == originalRoute, let visibleProfileID, profile?.id == visibleProfileID {
                 let request = beginRequest(.profile)
-                contentStore.journalIsLoading = false
+                contentStore.profilePostsIsLoading = false
                 let refreshed = try await activeAPI.query(
                     "user", args: [activeAPI.domain, [String(visibleProfileID)]], as: TaggrUser.self
                 )

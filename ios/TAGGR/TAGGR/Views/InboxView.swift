@@ -208,7 +208,8 @@ private struct InboxNotificationCard: View {
                         .fixedSize(horizontal: false, vertical: true)
                     if associatedPost != nil && !entry.notification.watchedEntryIds.isEmpty {
                         ForEach(entry.notification.watchedEntryIds, id: \.self) { postID in
-                            Button("#\(postID)") { state.navigateToPost(postID) }
+                            // Watched-post entries open the thread chain, like the PWA `#/thread/<id>` links.
+                            Button("#\(postID)") { state.navigateToThread(postID) }
                                 .font(.caption.weight(.semibold))
                         }
                     }

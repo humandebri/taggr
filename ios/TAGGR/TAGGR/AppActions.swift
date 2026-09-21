@@ -375,7 +375,7 @@ extension TaggrAppCoordinator {
         switch context.route {
         case .feed:
             scope = .feed
-        case .post:
+        case .post, .thread:
             scope = .post
         case .realm:
             scope = .realm
@@ -391,6 +391,8 @@ extension TaggrAppCoordinator {
             await loadFeed(mode: mode, reset: true, showsBusyOverlay: false)
         case .post(let id):
             await loadPost(id, showsBusyOverlay: false)
+        case .thread(let id):
+            await loadThread(id, showsBusyOverlay: false)
         case .realm(let name) where !name.isEmpty:
             await loadRealm(name, showsBusyOverlay: false)
         default:

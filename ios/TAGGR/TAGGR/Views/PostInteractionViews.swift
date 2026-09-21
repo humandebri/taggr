@@ -4,6 +4,7 @@ import SwiftUI
 struct PostEngagementBar: View {
     @Environment(TaggrAppCoordinator.self) private var state
     let post: TaggrPost
+    let canExpandReplies: Bool
     let canTranslate: Bool
     let isTranslated: Bool
     let isTranslating: Bool
@@ -139,7 +140,7 @@ struct PostEngagementBar: View {
                     .accessibilityLabel(isTranslated ? "Hide translation" : "Translate post")
                 }
             }
-            if replyCount > 0 {
+            if canExpandReplies, replyCount > 0 {
                 Button(action: toggleReplies) {
                     PostActionIconLabel(kind: .comment, count: replyCount, selected: repliesExpanded)
                 }

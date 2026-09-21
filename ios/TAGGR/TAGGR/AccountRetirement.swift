@@ -160,7 +160,7 @@ extension TaggrAppCoordinator {
         focusedPost = nil
         postThread = []
         profile = nil
-        contentStore.journalPosts = []
+        contentStore.profilePosts = []
         featurePosts.reset()
         clearAuthorNameCache()
         URLCache.shared.removeAllCachedResponses()

@@ -336,8 +336,8 @@ extension TaggrTests {
     func testLoadMorePresentationUsesScopedLoadingState() {
         XCTAssertTrue(FeedView.showsBusyOverlay(isBusy: true, isLoadingMore: false))
         XCTAssertFalse(FeedView.showsBusyOverlay(isBusy: true, isLoadingMore: true))
-        XCTAssertTrue(ProfileView.showsJournalHeaderSpinner(isLoading: true, hasPosts: false))
-        XCTAssertFalse(ProfileView.showsJournalHeaderSpinner(isLoading: true, hasPosts: true))
+        XCTAssertTrue(ProfileView.showsPostsHeaderSpinner(isLoading: true, hasPosts: false))
+        XCTAssertFalse(ProfileView.showsPostsHeaderSpinner(isLoading: true, hasPosts: true))
     }
 
     func testLongLinkedPostKeepsPlainTextAndLinkTapTargetsSeparate() {
@@ -417,13 +417,15 @@ extension TaggrTests {
     }
 
     func findView(in view: UIView, accessibilityIdentifier: String) -> UIView? {
-        if view.accessibilityIdentifier == accessibilityIdentifier { return view }
+        findViews(in: view, accessibilityIdentifier: accessibilityIdentifier).first
+    }
+
+    func findViews(in view: UIView, accessibilityIdentifier: String) -> [UIView] {
+        var matches = view.accessibilityIdentifier == accessibilityIdentifier ? [view] : []
         for subview in view.subviews {
-            if let match = findView(in: subview, accessibilityIdentifier: accessibilityIdentifier) {
-                return match
-            }
+            matches.append(contentsOf: findViews(in: subview, accessibilityIdentifier: accessibilityIdentifier))
         }
-        return nil
+        return matches
     }
 
     func settleLayout(window: UIWindow, host: UIHostingController<some View>) async throws {
@@ -1301,5 +1303,108 @@ extension TaggrTests {
         let offset = (textView.text as NSString).range(of: "link").location
         XCTAssertEqual(TaggrInteractiveMarkdownText.link(atUTF16Offset: offset, in: textView.attributedText), URL(string: "https://example.com"))
         XCTAssertNotNil(textView.attributedText.attribute(TaggrInteractiveMarkdownText.quoteDepthAttribute, at: 0, effectiveRange: nil))
+    }
+
+    @MainActor
+    func testRepliesAccordionSkipsPostsAlreadyDrawnAsThreadRows() {
+        let threadRow = samplePost(id: 101, parent: 100, body: "thread row", files: [:])
+        let sibling = samplePost(id: 102, parent: 100, body: "other reply", files: [:])
+
+        let visible = PostRepliesAccordion.visibleReplies([threadRow, sibling], hiddenIDs: [100, 101])
+
+        XCTAssertEqual(visible.map(\.id), [102])
+    }
+
+    @MainActor
+    func testRepliesAccordionKeepsEveryReplyWithoutThreadRows() {
+        let reply = samplePost(id: 101, parent: 100, body: "reply", files: [:])
+
+        XCTAssertEqual(PostRepliesAccordion.visibleReplies([reply], hiddenIDs: []).map(\.id), [101])
+    }
+
+    @MainActor
+    func testPostRowOffersRepliesOnlyWhenOneIsNotAlreadyADrawnThreadRow() {
+        let post = samplePost(id: 100, body: "parent", children: [101, 102], files: [:])
+
+        XCTAssertTrue(PostRow(post: post) {}.hasVisibleReplies)
+        XCTAssertTrue(PostRow(post: post, hiddenReplyIDs: [100, 101]) {}.hasVisibleReplies)
+        XCTAssertFalse(PostRow(post: post, hiddenReplyIDs: [100, 101, 102]) {}.hasVisibleReplies)
+    }
+
+    @MainActor
+    func testRepliesAccordionDoesNotRenderPostsShownAsThreadRows() async throws {
+        let parent = samplePost(id: 100, body: "parent", children: [101, 102], files: [:])
+        let state = makeCoordinator()
+        state.safety.accept(scope: state.safetyScope)
+        state.repliesByPostID[parent.id] = [
+            samplePost(id: 101, parent: 100, body: "thread row", files: [:]),
+            samplePost(id: 102, parent: 100, body: "sibling reply", files: [:])
+        ]
+        let host = UIHostingController(
+            rootView: PostRepliesAccordion(parent: parent, hiddenReplyIDs: [100, 101]).environment(state)
+        )
+        let scene = try XCTUnwrap(UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first)
+        let previous = scene.windows.first { $0.isKeyWindow }
+        let window = UIWindow(windowScene: scene)
+        window.frame = scene.coordinateSpace.bounds
+        window.rootViewController = host
+        window.makeKeyAndVisible()
+        defer { window.rootViewController = nil; window.isHidden = true; previous?.makeKeyAndVisible() }
+        try await settleLayout(window: window, host: host)
+
+        XCTAssertTrue(
+            findViews(in: host.view, accessibilityIdentifier: "post-101-body").isEmpty,
+            "A post rendered as its own thread row must not be drawn again as a reply"
+        )
+        XCTAssertEqual(findViews(in: host.view, accessibilityIdentifier: "post-102-body").count, 1)
+    }
+
+    @MainActor
+    func testPostDetailOffersTheThreadEntryOnlyForReplies() async throws {
+        let state = makeCoordinator()
+        state.safety.accept(scope: state.safetyScope)
+        let root = samplePost(id: 100, body: "root body", children: [101], files: [:])
+        let reply = samplePost(id: 101, parent: 100, body: "reply body", files: [:])
+
+        var cleanup: [() -> Void] = []
+        defer { cleanup.forEach { $0() } }
+
+        func render(_ view: some View) async throws -> UIView {
+            let host = UIHostingController(rootView: view)
+            let scene = try XCTUnwrap(UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first)
+            let previous = scene.windows.first { $0.isKeyWindow }
+            let window = UIWindow(windowScene: scene)
+            window.frame = scene.coordinateSpace.bounds
+            window.rootViewController = host
+            window.makeKeyAndVisible()
+            cleanup.append {
+                window.rootViewController = nil
+                window.isHidden = true
+                previous?.makeKeyAndVisible()
+            }
+            try await settleLayout(window: window, host: host)
+            return host.view
+        }
+
+        state.focusedPost = reply
+        state.repliesByPostID[reply.id] = []
+        let replyView = try await render(PostDetailView(mode: .post).environment(state))
+        XCTAssertEqual(findViews(in: replyView, accessibilityIdentifier: "post-101-body").count, 1)
+        XCTAssertNil(findView(in: replyView, accessibilityIdentifier: "post-100-body"))
+
+        state.focusedPost = root
+        let rootView = try await render(PostDetailView(mode: .post).environment(state))
+        XCTAssertEqual(findViews(in: rootView, accessibilityIdentifier: "post-100-body").count, 1)
+        XCTAssertNil(findView(in: rootView, accessibilityIdentifier: "post-101-body"))
+
+        state.postThread = [root, reply]
+        let threadView = try await render(PostDetailView(mode: .thread).environment(state))
+        XCTAssertEqual(findViews(in: threadView, accessibilityIdentifier: "post-100-body").count, 1)
+        XCTAssertEqual(findViews(in: threadView, accessibilityIdentifier: "post-101-body").count, 1)
+
+        // SwiftUI buttons carry the identifier only in the accessibility tree, so the
+        // entry rule itself is asserted directly.
+        XCTAssertTrue(PostDetailView.showsThreadEntry(for: reply))
+        XCTAssertFalse(PostDetailView.showsThreadEntry(for: root))
     }
 }

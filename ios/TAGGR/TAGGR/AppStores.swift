@@ -161,11 +161,11 @@ final class ContentStore {
     var focusedPost: TaggrPost?
     var profile: TaggrUser?
     var profileActionInFlight = false
-    var journalPosts: [TaggrPost] = []
-    var journalPage = 0
-    var journalOffset = 0
-    var journalCanLoadMore = false
-    var journalIsLoading = false
+    var profilePosts: [TaggrPost] = []
+    var profilePostsPage = 0
+    var profilePostsOffset = 0
+    var profilePostsCanLoadMore = false
+    var profilePostsIsLoading = false
     var realms: [TaggrRealm] = []
     var nextAllRealmsPage = 0
     var canLoadMoreRealms = false

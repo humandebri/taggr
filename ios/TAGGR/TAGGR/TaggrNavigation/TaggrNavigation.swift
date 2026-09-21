@@ -3,6 +3,7 @@ import Foundation
 enum TaggrRoute: Hashable, Sendable {
     case feed(TaggrFeedMode)
     case post(Int)
+    case thread(Int)
     case profile(String)
     case userPhotos(String)
     case realm(String)
@@ -53,6 +54,8 @@ enum TaggrNavigation {
             return "/feed/\(tokens.map(pathComponent).joined(separator: "+"))"
         case .post(let id):
             return "/post/\(id)"
+        case .thread(let id):
+            return "/thread/\(id)"
         case .profile(let handle):
             return "/user/\(handle)"
         case .userPhotos(let handle):
@@ -88,8 +91,10 @@ enum TaggrNavigation {
             return .feed(.hot)
         }
         switch first {
-        case "post", "thread":
+        case "post":
             return parts.dropFirst().first.flatMap(Int.init).map(TaggrRoute.post)
+        case "thread":
+            return parts.dropFirst().first.flatMap(Int.init).map(TaggrRoute.thread)
         case "user", "journal":
             guard let handle = parts.dropFirst().first else { return nil }
             if parts.dropFirst(2).first == "photos" {

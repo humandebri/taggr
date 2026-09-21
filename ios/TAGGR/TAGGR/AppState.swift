@@ -428,9 +428,12 @@ final class TaggrAppCoordinator {
     }
 
     func navigate(to destination: TaggrRoute) {
-        if case .post(let id) = destination {
+        switch destination {
+        case .post(let id):
             navigateToPost(id)
-        } else {
+        case .thread(let id):
+            navigateToThread(id)
+        default:
             switch destination {
             case .bookmarks, .invites, .proposals, .proposal, .search, .transactions:
                 if destination != route { navigationStore.featureReturnRoutes[destination] = route }
@@ -451,6 +454,8 @@ final class TaggrAppCoordinator {
             }
         case .post(let id):
             await loadPost(id)
+        case .thread(let id):
+            await loadThread(id)
         case .profile(let handle):
             await loadProfile(handle)
         case .userPhotos, .search, .transactions, .bookmarks, .invites, .proposals, .proposal:
@@ -574,19 +579,43 @@ final class TaggrAppCoordinator {
     }
 
     func navigateToPost(_ id: Int, from mode: TaggrFeedMode? = nil) {
+        navigate(toPostScreen: .post(id), from: mode)
+    }
+
+    func navigateToThread(_ id: Int) {
+        navigate(toPostScreen: .thread(id))
+    }
+
+    private func navigate(toPostScreen destination: TaggrRoute, from mode: TaggrFeedMode? = nil) {
         restoredFeedMode = nil
         if let mode {
             returnFeedMode = mode
         }
         let returnRoute: TaggrRoute
-        if case .post(let currentPostID) = route {
+        if let currentPostID = currentPostScreenID {
             returnRoute = postReturnRoute(for: currentPostID)
             postReturnRoutesByPostID.removeValue(forKey: currentPostID)
         } else {
             returnRoute = route
         }
-        postReturnRoutesByPostID[id] = returnRoute
-        route = .post(id)
+        if let postID = Self.postScreenID(destination) {
+            postReturnRoutesByPostID[postID] = returnRoute
+        }
+        route = destination
+    }
+
+    /// Both post screens (a single post and its thread) keep the same return route.
+    private static func postScreenID(_ route: TaggrRoute) -> Int? {
+        switch route {
+        case .post(let id), .thread(let id):
+            return id
+        default:
+            return nil
+        }
+    }
+
+    private var currentPostScreenID: Int? {
+        Self.postScreenID(route)
     }
 
     func postReturnRoute(for postID: Int) -> TaggrRoute {
@@ -594,7 +623,7 @@ final class TaggrAppCoordinator {
     }
 
     var currentPostReturnRoute: TaggrRoute {
-        guard case .post(let postID) = route else {
+        guard let postID = currentPostScreenID else {
             return .feed(effectiveHomeFeedMode)
         }
         return postReturnRoute(for: postID)
@@ -621,11 +650,13 @@ final class TaggrAppCoordinator {
         case .proposals, .proposal: return "Proposals"
         case .post:
             return "Timeline"
+        case .thread:
+            return "Post"
         }
     }
 
     func navigateBackFromPost() {
-        guard case .post(let postID) = route else {
+        guard let postID = currentPostScreenID else {
             navigateToHomeFeed()
             return
         }
@@ -767,7 +798,50 @@ final class TaggrAppCoordinator {
         }
     }
 
+    /// Opens a single post together with its direct replies, like the PWA post page.
+    /// The post is shown as soon as it arrives; its replies follow without holding
+    /// the busy overlay, so a large thread cannot delay the first paint.
     func loadPost(_ id: Int, showsBusyOverlay: Bool = true) async {
+        let request = beginRequest(.post)
+        let activeAPI = api
+        await executeRequest(request) {
+            let load = {
+                let post = try await self.loadPostEnvelopes(
+                    "posts", args: [[id]], identity: nil, api: activeAPI
+                ).first
+                guard self.isCurrentRequest(request) else { return }
+                self.focusedPost = post
+                self.postThread = []
+                self.repliesByPostID[id] = nil
+            }
+            if showsBusyOverlay {
+                await self.runBusy(validWhile: { self.isCurrentRequest(request) }, load)
+            } else {
+                do {
+                    try await load()
+                } catch {
+                    guard self.isCurrentRequest(request), !self.isCancellation(error) else { return }
+                    NSLog("TAGGR background post refresh failed: %@", error.localizedDescription)
+                    return
+                }
+            }
+            guard self.isCurrentRequest(request), let post = self.focusedPost, post.id == id else { return }
+            let generation = self.runtimeGeneration
+            self.loadingReplyPostIDs.insert(id)
+            defer { self.loadingReplyPostIDs.remove(id) }
+            do {
+                let replies = try await self.loadDirectReplies(for: post, api: activeAPI)
+                guard self.isCurrentRuntimeGeneration(generation), self.isCurrentRequest(request) else { return }
+                self.repliesByPostID[id] = replies
+            } catch {
+                guard self.isCurrentRuntimeGeneration(generation), !self.isCancellation(error) else { return }
+                NSLog("TAGGR replies load after post open failed: %@", error.localizedDescription)
+            }
+        }
+    }
+
+    /// Opens a post inside its ancestor chain, like the PWA thread page.
+    func loadThread(_ id: Int, showsBusyOverlay: Bool = true) async {
         let request = beginRequest(.post)
         let activeAPI = api
         await executeRequest(request) {
@@ -779,7 +853,7 @@ final class TaggrAppCoordinator {
                         refreshedReplies = try await self.loadDirectReplies(for: post, api: activeAPI)
                     } catch {
                         guard !self.isCancellation(error) else { return }
-                        NSLog("TAGGR replies refresh during post load failed: %@", error.localizedDescription)
+                        NSLog("TAGGR replies refresh during thread load failed: %@", error.localizedDescription)
                     }
                 }
                 guard self.isCurrentRequest(request) else { return }
@@ -796,7 +870,7 @@ final class TaggrAppCoordinator {
                     try await load()
                 } catch {
                     guard self.isCurrentRequest(request), !self.isCancellation(error) else { return }
-                    NSLog("TAGGR background post refresh failed: %@", error.localizedDescription)
+                    NSLog("TAGGR background thread refresh failed: %@", error.localizedDescription)
                 }
             }
         }
@@ -866,15 +940,15 @@ final class TaggrAppCoordinator {
     func loadProfile(_ handle: String) async {
         let request = beginRequest(.profile)
         let activeAPI = api
-        contentStore.journalPosts = []
-        contentStore.journalPage = 0
-        contentStore.journalOffset = 0
-        contentStore.journalCanLoadMore = false
-        contentStore.journalIsLoading = true
+        contentStore.profilePosts = []
+        contentStore.profilePostsPage = 0
+        contentStore.profilePostsOffset = 0
+        contentStore.profilePostsCanLoadMore = false
+        contentStore.profilePostsIsLoading = true
         await executeRequest(request) {
             defer {
                 if self.isCurrentRequest(request) {
-                    self.contentStore.journalIsLoading = false
+                    self.contentStore.profilePostsIsLoading = false
                 }
             }
             await self.runBusy(validWhile: { self.isCurrentRequest(request) }) {
@@ -882,8 +956,9 @@ final class TaggrAppCoordinator {
                 guard self.isCurrentRequest(request) else { return }
                 let posts: [TaggrPost]
                 if let loadedProfile {
+                    // Matches the PWA profile list, which keeps the user's replies.
                     posts = try await self.loadPostEnvelopes(
-                        "journal", args: [activeAPI.domain, String(loadedProfile.id), 0, 0],
+                        "user_posts", args: [activeAPI.domain, String(loadedProfile.id), 0, 0],
                         identity: nil, api: activeAPI
                     )
                 } else {
@@ -891,10 +966,10 @@ final class TaggrAppCoordinator {
                 }
                 guard self.isCurrentRequest(request) else { return }
                 self.profile = loadedProfile
-                self.contentStore.journalPosts = posts
-                self.contentStore.journalPage = 0
-                self.contentStore.journalOffset = posts.first?.id ?? 0
-                self.contentStore.journalCanLoadMore = posts.count >= (self.cache?.config?.feedPageSize ?? 30)
+                self.contentStore.profilePosts = posts
+                self.contentStore.profilePostsPage = 0
+                self.contentStore.profilePostsOffset = posts.first?.id ?? 0
+                self.contentStore.profilePostsCanLoadMore = posts.count >= (self.cache?.config?.feedPageSize ?? 30)
                 if let loadedProfile {
                     self.cacheAuthorName(loadedProfile.name, userID: loadedProfile.id)
                 }
@@ -902,29 +977,31 @@ final class TaggrAppCoordinator {
         }
     }
 
-    func loadMoreProfileJournal() async {
+    func loadMoreProfilePosts() async {
         guard case .profile = route, let profile,
-              !isBusy, !contentStore.journalIsLoading, contentStore.journalCanLoadMore else { return }
+              !isBusy, !contentStore.profilePostsIsLoading, contentStore.profilePostsCanLoadMore else { return }
         let request = beginRequest(.profile)
         let activeAPI = api
-        let page = contentStore.journalPage + 1
-        let offset = contentStore.journalOffset
-        contentStore.journalIsLoading = true
+        let page = contentStore.profilePostsPage + 1
+        let offset = contentStore.profilePostsOffset
+        contentStore.profilePostsIsLoading = true
         await executeRequest(request) {
             defer {
                 if self.requestSequences[request.scope] == request.sequence {
-                    self.contentStore.journalIsLoading = false
+                    self.contentStore.profilePostsIsLoading = false
                 }
             }
             do {
                 let posts = try await self.loadPostEnvelopes(
-                    "journal", args: [activeAPI.domain, String(profile.id), page, offset],
+                    // `user_posts` is the PWA profile list: it keeps the user's replies,
+                    // while `journal` drops every post with a parent.
+                    "user_posts", args: [activeAPI.domain, String(profile.id), page, offset],
                     identity: nil, api: activeAPI
                 )
                 guard self.isCurrentRequest(request) else { return }
-                self.contentStore.journalPosts += posts
-                self.contentStore.journalPage = page
-                self.contentStore.journalCanLoadMore = posts.count >= (self.cache?.config?.feedPageSize ?? 30)
+                self.contentStore.profilePosts += posts
+                self.contentStore.profilePostsPage = page
+                self.contentStore.profilePostsCanLoadMore = posts.count >= (self.cache?.config?.feedPageSize ?? 30)
             } catch {
                 guard self.isCurrentRequest(request), !self.isCancellation(error) else { return }
                 self.errorMessage = error.localizedDescription

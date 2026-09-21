@@ -160,6 +160,37 @@ extension TaggrTests {
         XCTAssertEqual(state.route, .feed(.personal))
     }
 
+    @MainActor
+    func testThreadURLUsesCurrentRouteAsReturnDestination() {
+        let state = makeCoordinator()
+        state.navigateToFeed(.personal)
+
+        state.open(URL(string: "https://6qfxa-ryaaa-aaaai-qbhsq-cai.icp0.io/thread/42")!)
+
+        XCTAssertEqual(state.route, .thread(42))
+        XCTAssertEqual(state.postReturnRoute(for: 42), .feed(.personal))
+        XCTAssertEqual(state.postReturnTitle, "Timeline")
+        state.navigateBackFromPost()
+        XCTAssertEqual(state.route, .feed(.personal))
+    }
+
+    @MainActor
+    func testOpeningAPostFromAThreadKeepsTheOriginalListAsReturnRoute() {
+        let state = makeCoordinator()
+        state.route = .inbox
+        state.navigateToThread(42)
+
+        state.navigateToPost(43)
+
+        XCTAssertEqual(state.route, .post(43))
+        XCTAssertEqual(state.postReturnRoute(for: 43), .inbox)
+        XCTAssertEqual(state.postReturnTitle, "Inbox")
+
+        state.navigateBackFromPost()
+
+        XCTAssertEqual(state.route, .inbox)
+    }
+
     func testFeedTabReselectionActions() {
         XCTAssertEqual(RootView.feedTabReselectionAction(for: .feed(.hot)), .scrollToTop)
         XCTAssertEqual(RootView.feedTabReselectionAction(for: .feed(.latest)), .scrollToTop)

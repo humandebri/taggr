@@ -325,8 +325,11 @@ struct PostRow: View {
     let post: TaggrPost
     let open: () -> Void
     let onVisible: () -> Void
+    // Posts already rendered as their own row on the same screen (a thread chain),
+    // so an expanded reply list must not draw them a second time.
+    let hiddenReplyIDs: Set<Int>
     @State private var previewImage: TaggrPostImageAttachment?
-    @State private var repliesExpanded = false
+    @State private var repliesExpanded: Bool
     @State private var revealSensitive = false
     @State private var showFullBody = false
     @State private var translatedDisplayBody: String?
@@ -335,11 +338,20 @@ struct PostRow: View {
     @State private var translationRequestID = 0
     @State private var bodyIsTruncated = false
 
-    init(post: TaggrPost, isDetail: Bool = false, onVisible: @escaping () -> Void = {}, open: @escaping () -> Void) {
+    init(
+        post: TaggrPost,
+        isDetail: Bool = false,
+        hiddenReplyIDs: Set<Int> = [],
+        startsWithRepliesExpanded: Bool = false,
+        onVisible: @escaping () -> Void = {},
+        open: @escaping () -> Void
+    ) {
         self.isDetail = isDetail
         self.post = post
+        self.hiddenReplyIDs = hiddenReplyIDs
         self.onVisible = onVisible
         self.open = open
+        _repliesExpanded = State(initialValue: startsWithRepliesExpanded)
     }
 
     @ViewBuilder
@@ -475,7 +487,7 @@ struct PostRow: View {
                 .padding(.top, 8)
                 .padding(.bottom, TimelineLayout.rowVerticalPadding)
             if repliesExpanded {
-                PostRepliesAccordion(parent: post)
+                PostRepliesAccordion(parent: post, hiddenReplyIDs: hiddenReplyIDs)
                     .transition(.opacity.combined(with: .move(edge: .top)))
             }
         }
@@ -517,6 +529,7 @@ struct PostRow: View {
     var postEngagementBar: some View {
         PostEngagementBar(
             post: post,
+            canExpandReplies: hasVisibleReplies,
             canTranslate: !visibleDisplayBody.isEmpty,
             isTranslated: translatedDisplayBody != nil,
             isTranslating: isTranslating,
@@ -556,12 +569,18 @@ struct PostRow: View {
         post.replyCount
     }
 
+    /// True when expanding this row can reveal a reply that the screen does not
+    /// already draw as its own row, so the reply toggle is not offered otherwise.
+    var hasVisibleReplies: Bool {
+        post.children.contains { !hiddenReplyIDs.contains($0) }
+    }
+
     var authorLabel: String {
         state.authorDisplayName(for: post)
     }
 
     func toggleReplies() {
-        guard replyCount > 0 else { return }
+        guard hasVisibleReplies else { return }
         withAnimation(.easeInOut(duration: 0.18)) {
             repliesExpanded.toggle()
         }
@@ -620,10 +639,11 @@ struct PostRow: View {
 struct ReplyPostRow: View {
     let post: TaggrPost
     var isDetail = false
+    var hiddenReplyIDs: Set<Int> = []
     let open: () -> Void
 
     var body: some View {
-        PostRow(post: post, isDetail: isDetail, open: open)
+        PostRow(post: post, isDetail: isDetail, hiddenReplyIDs: hiddenReplyIDs, open: open)
             .padding(.leading, 24)
     }
 }
@@ -1154,6 +1174,7 @@ struct CompactNoticeView: View {
 struct PostRepliesAccordion: View {
     @Environment(TaggrAppCoordinator.self) private var state
     let parent: TaggrPost
+    var hiddenReplyIDs: Set<Int> = []
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -1169,13 +1190,21 @@ struct PostRepliesAccordion: View {
                 .padding(.vertical, 12)
                 .padding(.leading, 46)
             } else if let replies = state.repliesByPostID[parent.id] {
-                ForEach(replies) { reply in
-                    ReplyPostRow(post: reply) {
+                ForEach(Self.visibleReplies(replies, hiddenIDs: hiddenReplyIDs)) { reply in
+                    ReplyPostRow(post: reply, hiddenReplyIDs: hiddenReplyIDs) {
                         state.navigateToPost(reply.id)
                     }
                 }
             }
         }
+    }
+
+    /// Replies that are already displayed as their own row by the enclosing screen
+    /// are dropped here, so opening a reply list cannot render a post twice. A parent
+    /// whose only replies are thread rows therefore expands to an empty list.
+    static func visibleReplies(_ replies: [TaggrPost], hiddenIDs: Set<Int>) -> [TaggrPost] {
+        guard !hiddenIDs.isEmpty else { return replies }
+        return replies.filter { !hiddenIDs.contains($0.id) }
     }
 }
 

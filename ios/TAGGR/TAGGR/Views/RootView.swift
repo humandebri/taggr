@@ -286,7 +286,9 @@ private struct FeedRouteView: View {
             ScrollView { TransactionsView(account: account).padding() }.navigationTitle("Transactions")
                 .toolbar { ToolbarItem(placement: .topBarLeading) { Button("Back") { state.returnFromFeature(fallback: .search("")) } } }
         case .post:
-            PostDetailView()
+            PostDetailView(mode: .post)
+        case .thread:
+            PostDetailView(mode: .thread)
         case .profile:
             ProfileView()
         case .userPhotos(let handle):
