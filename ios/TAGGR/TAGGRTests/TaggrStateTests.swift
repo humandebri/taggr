@@ -1151,7 +1151,7 @@ extension TaggrTests {
         let patch = "@@ -1,13 +1,5 @@\n-    updated%0A%0A\n+hello\n"
         XCTAssertNil(state.errorMessage)
         XCTAssertEqual(calls.first?.method, "edit_post")
-        XCTAssertEqual(Set(calls.dropFirst().map(\.method)), Set(["user", "posts"]))
+        XCTAssertEqual(Set(calls.dropFirst().map(\.method)), Set(["user", "thread"]))
         try assertEditPostRequest(calls.first?.arg, id: 42, text: "    updated\n\n", refs: [], patch: patch, realm: "ART")
         XCTAssertEqual(preferences.recentDestinations(scope: postingScope), ["ART"])
     }
@@ -1207,7 +1207,7 @@ extension TaggrTests {
         XCTAssertNil(state.errorMessage)
         let functionalCalls = calls.filter { $0.method != "realms" }
         XCTAssertEqual(functionalCalls.prefix(2).map(\.method), ["write", "edit_post"])
-        XCTAssertEqual(Set(functionalCalls.dropFirst(2).map(\.method)), Set(["user", "posts"]))
+        XCTAssertEqual(Set(functionalCalls.dropFirst(2).map(\.method)), Set(["user", "thread"]))
         XCTAssertEqual(functionalCalls.first?.arg, Data([1, 2, 3]))
         try assertEditPostRequest(functionalCalls.dropFirst().first?.arg, id: 42,
                 text: body,
@@ -1538,36 +1538,31 @@ extension TaggrTests {
     }
 
     @MainActor
-    func testLoadPostLoadsThePostAndItsRepliesWithoutAncestors() async {
+    func testLoadPostOpensAReplyInsideItsThread() async {
         var calls: [(method: String, arg: Data)] = []
+        let rootEnvelope = try! JSONSerialization.jsonObject(with: postEnvelopeFixture(id: 100)) as! [Any]
+        let replyEnvelope = try! JSONSerialization.jsonObject(
+            with: postEnvelopeFixture(id: 101, parent: 100, children: [102])
+        ) as! [Any]
+        let threadBody = try! JSONSerialization.data(withJSONObject: [rootEnvelope, replyEnvelope])
         let api = makeStubbedAPI { request in
-            let call = try XCTUnwrap(self.requestMethodAndArg(from: request))
-            calls.append(call)
+            calls.append(try XCTUnwrap(self.requestMethodAndArg(from: request)))
             let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
-            let fixture: Data
-            if call.arg == (try TaggrCandid.jsonArguments([[101]])) {
-                fixture = self.postEnvelopeFixture(id: 101, parent: 100, children: [102])
-            } else {
-                fixture = self.postEnvelopeFixture(id: 102, parent: 101)
-            }
-            let body = Data("[\(String(data: fixture, encoding: .utf8)!)]".utf8)
-            return (response, Self.queryReply(body))
+            return (response, Self.queryReply(threadBody))
         }
         let state = makeCoordinator(api: api)
         state.navigateToPost(101)
 
         await state.loadPost(101)
 
-        XCTAssertEqual(calls.map(\.method), ["posts", "posts"])
-        XCTAssertEqual(calls.map(\.arg), [
-            try TaggrCandid.jsonArguments([[101]]),
-            try TaggrCandid.jsonArguments([[102]]),
-        ])
-        XCTAssertTrue(state.postThread.isEmpty)
-        XCTAssertTrue(state.feed.isEmpty)
+        XCTAssertEqual(calls.map(\.method), ["thread"])
+        XCTAssertEqual(calls.map(\.arg), [try TaggrCandid.jsonArguments([101])])
+        XCTAssertEqual(state.postThread.map(\.id), [100, 101])
         XCTAssertEqual(state.focusedPost?.id, 101)
         XCTAssertEqual(state.focusedPost?.parent, 100)
-        XCTAssertEqual(state.repliesByPostID[101]?.map(\.id), [102])
+        // A thread keeps the focused post's replies behind the reply toggle.
+        XCTAssertNil(state.repliesByPostID[101])
+        XCTAssertTrue(state.feed.isEmpty)
     }
 
     @MainActor
@@ -1593,40 +1588,14 @@ extension TaggrTests {
     }
 
     @MainActor
-    func testLoadPostLoadsDirectReplies() async throws {
-        var calls: [(method: String, arg: Data)] = []
-        let api = makeStubbedAPI { request in
-            let call = try XCTUnwrap(self.requestMethodAndArg(from: request))
-            calls.append(call)
-            let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
-            let fixture: Data
-            if call.arg == (try TaggrCandid.jsonArguments([[42]])) {
-                fixture = self.postEnvelopeFixture(id: 42, children: [43])
-            } else {
-                fixture = self.postEnvelopeFixture(id: 43, parent: 42)
-            }
-            let body = Data("[\(String(data: fixture, encoding: .utf8)!)]".utf8)
-            return (response, Self.queryReply(body))
-        }
-        let state = makeCoordinator(api: api)
-
-        await state.loadPost(42)
-
-        XCTAssertEqual(calls.map(\.method), ["posts", "posts"])
-        XCTAssertEqual(state.focusedPost?.children, [43])
-        XCTAssertEqual(state.repliesByPostID[42]?.map(\.id), [43])
-        XCTAssertNil(state.errorMessage)
-    }
-
-    @MainActor
-    func testLoadPostShowsThePostBeforeItsRepliesArrive() async throws {
+    func testLoadPostShowsTheRootPostBeforeItsRepliesArrive() async throws {
         let repliesStarted = expectation(description: "replies query started")
         let releaseReplies = DispatchSemaphore(value: 0)
         let api = makeStubbedAPI { request in
             let call = try XCTUnwrap(self.requestMethodAndArg(from: request))
             let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
             let fixture: Data
-            if call.arg == (try TaggrCandid.jsonArguments([[42]])) {
+            if call.method == "thread" {
                 fixture = self.postEnvelopeFixture(id: 42, children: [43])
             } else {
                 repliesStarted.fulfill()
@@ -1813,7 +1782,7 @@ extension TaggrTests {
             let method = try XCTUnwrap(self.requestMethodAndArg(from: request)?.method)
             calls.append(method)
             if method == "hot_posts" { feedPage += 1 }
-            let id = method == "posts" ? 999 : feedPage
+            let id = method == "thread" ? 999 : feedPage
             let body = Data("[\(String(data: self.postEnvelopeFixture(id: id), encoding: .utf8)!)]".utf8)
             let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
             return (response, Self.queryReply(body))
@@ -1834,7 +1803,7 @@ extension TaggrTests {
         await state.loadCurrentRoute()
         XCTAssertEqual(state.feed.map(\.id), [1, 2])
         XCTAssertTrue(state.canLoadMoreFeed)
-        XCTAssertEqual(calls, ["hot_posts", "hot_posts", "posts"])
+        XCTAssertEqual(calls, ["hot_posts", "hot_posts", "thread"])
         await state.refreshVisibleRoute()
         XCTAssertEqual(state.feed.map(\.id), [3])
         XCTAssertEqual(calls.last, "hot_posts")

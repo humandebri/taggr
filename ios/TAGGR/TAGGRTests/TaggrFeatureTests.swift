@@ -1656,7 +1656,7 @@ extension TaggrTests {
         let api = makeStubbedAPI { request in
             let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
             switch self.requestMethodAndArg(from: request)?.method {
-            case "posts":
+            case "thread":
                 postRequestStarted.fulfill()
                 _ = releasePostRequest.wait(timeout: .now() + 5)
                 let body = Data("[\(String(data: self.postEnvelopeFixture(id: 101), encoding: .utf8)!)]".utf8)

@@ -1,8 +1,9 @@
 import SwiftUI
 
 struct PostDetailView: View {
-    /// `.post` mirrors the PWA post page (the post first, its replies below);
-    /// `.thread` mirrors the PWA thread page (the ancestor chain, post last).
+    /// `.post` mirrors the PWA post page: a root post keeps its replies below it,
+    /// while a reply opens inside its ancestor thread;
+    /// `.thread` always shows the ancestor chain with the post last.
     enum Mode {
         case post
         case thread
@@ -20,29 +21,17 @@ struct PostDetailView: View {
                 LazyVStack(alignment: .leading, spacing: 0) {
                     FeedHeader(selectedMode: selectedMode, changeMode: changeMode, backAction: nil)
                     if let focusedPost = state.focusedPost {
-                        let posts = threadPosts(focusedPost: focusedPost)
+                        // A reply arrives with its ancestor chain loaded, so the Post route
+                        // starts in the thread state instead of offering an entry into it.
+                        let threadLayout = mode == .thread || state.postThread.count > 1
+                        let posts = threadLayout
+                            ? (state.postThread.isEmpty ? [focusedPost] : state.postThread)
+                            : [focusedPost]
                         // Every thread post is drawn as its own row below, so an expanded
                         // reply list must skip it instead of drawing the post twice.
                         let threadPostIDs = Set(posts.map(\.id))
                         ForEach(posts) { post in
-                            switch mode {
-                            case .post:
-                                // The PWA post page keeps a `◀ REPLY` link into the ancestor
-                                // thread; a reply opened here needs the same way back.
-                                if Self.showsThreadEntry(for: post) {
-                                    Button {
-                                        state.navigateToThread(post.id)
-                                    } label: {
-                                        Label("Show thread", systemImage: "arrow.turn.up.left")
-                                            .font(.caption.weight(.bold))
-                                            .foregroundStyle(TaggrTheme.clickable)
-                                            .frame(minHeight: 44, alignment: .leading)
-                                    }
-                                    .buttonStyle(.plain)
-                                    .padding(.horizontal, TimelineLayout.rowHorizontalPadding)
-                                    .accessibilityIdentifier("postThreadEntry")
-                                    .accessibilityHint("Opens the whole thread this reply belongs to")
-                                }
+                            if !threadLayout {
                                 PostRow(
                                     post: post,
                                     isDetail: true,
@@ -50,7 +39,7 @@ struct PostDetailView: View {
                                 ) {
                                     state.navigateToPost(post.id)
                                 }
-                            case .thread where post.parent == nil:
+                            } else if post.parent == nil {
                                 PostRow(
                                     post: post,
                                     isDetail: post.id == focusedPost.id,
@@ -58,7 +47,7 @@ struct PostDetailView: View {
                                 ) {
                                     state.navigateToPost(post.id)
                                 }
-                            case .thread:
+                            } else {
                                 ReplyPostRow(
                                     post: post,
                                     isDetail: post.id == focusedPost.id,
@@ -96,20 +85,6 @@ struct PostDetailView: View {
     private func changeMode(_ mode: TaggrFeedMode) {
         selectedMode = mode
         state.navigateToFeed(mode)
-    }
-
-    /// A reply opened as a single post keeps the PWA's `◀ REPLY` link into its thread.
-    static func showsThreadEntry(for post: TaggrPost) -> Bool {
-        post.parent != nil
-    }
-
-    private func threadPosts(focusedPost: TaggrPost) -> [TaggrPost] {
-        switch mode {
-        case .post:
-            return [focusedPost]
-        case .thread:
-            return state.postThread.isEmpty ? [focusedPost] : state.postThread
-        }
     }
 }
 

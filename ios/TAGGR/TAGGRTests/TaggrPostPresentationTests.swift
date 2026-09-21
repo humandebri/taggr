@@ -1360,7 +1360,7 @@ extension TaggrTests {
     }
 
     @MainActor
-    func testPostDetailOffersTheThreadEntryOnlyForReplies() async throws {
+    func testPostDetailRendersTheChainForRepliesAndThePostForRoots() async throws {
         let state = makeCoordinator()
         state.safety.accept(scope: state.safetyScope)
         let root = samplePost(id: 100, body: "root body", children: [101], files: [:])
@@ -1386,25 +1386,24 @@ extension TaggrTests {
             return host.view
         }
 
-        state.focusedPost = reply
-        state.repliesByPostID[reply.id] = []
-        let replyView = try await render(PostDetailView(mode: .post).environment(state))
-        XCTAssertEqual(findViews(in: replyView, accessibilityIdentifier: "post-101-body").count, 1)
-        XCTAssertNil(findView(in: replyView, accessibilityIdentifier: "post-100-body"))
-
+        // A root post keeps its own row; its replies live behind the row's reply toggle.
         state.focusedPost = root
+        state.postThread = []
+        state.repliesByPostID[root.id] = []
         let rootView = try await render(PostDetailView(mode: .post).environment(state))
         XCTAssertEqual(findViews(in: rootView, accessibilityIdentifier: "post-100-body").count, 1)
         XCTAssertNil(findView(in: rootView, accessibilityIdentifier: "post-101-body"))
 
+        // A reply arrives with its chain loaded and starts in the thread layout.
+        state.focusedPost = reply
         state.postThread = [root, reply]
-        let threadView = try await render(PostDetailView(mode: .thread).environment(state))
-        XCTAssertEqual(findViews(in: threadView, accessibilityIdentifier: "post-100-body").count, 1)
-        XCTAssertEqual(findViews(in: threadView, accessibilityIdentifier: "post-101-body").count, 1)
+        let replyView = try await render(PostDetailView(mode: .post).environment(state))
+        XCTAssertEqual(findViews(in: replyView, accessibilityIdentifier: "post-100-body").count, 1)
+        XCTAssertEqual(findViews(in: replyView, accessibilityIdentifier: "post-101-body").count, 1)
 
-        // SwiftUI buttons carry the identifier only in the accessibility tree, so the
-        // entry rule itself is asserted directly.
-        XCTAssertTrue(PostDetailView.showsThreadEntry(for: reply))
-        XCTAssertFalse(PostDetailView.showsThreadEntry(for: root))
+        // The thread route shows the same chain even without loaded thread state.
+        state.postThread = []
+        let threadView = try await render(PostDetailView(mode: .thread).environment(state))
+        XCTAssertEqual(findViews(in: threadView, accessibilityIdentifier: "post-101-body").count, 1)
     }
 }

@@ -798,19 +798,23 @@ final class TaggrAppCoordinator {
         }
     }
 
-    /// Opens a single post together with its direct replies, like the PWA post page.
-    /// The post is shown as soon as it arrives; its replies follow without holding
-    /// the busy overlay, so a large thread cannot delay the first paint.
+    /// Opens a post like the PWA post page. A root post shows its direct replies
+    /// below the post; a reply keeps its ancestor thread visible instead, which is
+    /// the state the separate thread entry used to reach. The post is shown as soon
+    /// as it arrives and its replies follow without holding the busy overlay, so a
+    /// large thread cannot delay the first paint.
     func loadPost(_ id: Int, showsBusyOverlay: Bool = true) async {
         let request = beginRequest(.post)
         let activeAPI = api
         await executeRequest(request) {
             let load = {
-                let post = try await self.loadPostEnvelopes(
-                    "posts", args: [[id]], identity: nil, api: activeAPI
-                ).first
+                let thread = try await self.loadPostEnvelopes("thread", args: [id], identity: nil, api: activeAPI)
                 guard self.isCurrentRequest(request) else { return }
-                self.focusedPost = post
+                self.focusedPost = thread.last
+                if thread.count > 1 {
+                    self.postThread = thread
+                    return
+                }
                 self.postThread = []
                 self.repliesByPostID[id] = nil
             }
@@ -825,7 +829,8 @@ final class TaggrAppCoordinator {
                     return
                 }
             }
-            guard self.isCurrentRequest(request), let post = self.focusedPost, post.id == id else { return }
+            guard self.isCurrentRequest(request), self.postThread.isEmpty,
+                  let post = self.focusedPost, post.id == id else { return }
             let generation = self.runtimeGeneration
             self.loadingReplyPostIDs.insert(id)
             defer { self.loadingReplyPostIDs.remove(id) }
