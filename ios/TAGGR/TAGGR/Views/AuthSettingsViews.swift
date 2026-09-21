@@ -36,25 +36,13 @@ struct SettingsView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 18) {
                     if let user = state.currentUser {
-                        Button {
-                            state.navigateToProfile(user.name)
-                        } label: {
-                            VStack(alignment: .leading, spacing: 8) {
-                                Text(user.name)
-                                    .font(.largeTitle.bold())
-                                    .foregroundStyle(TaggrTheme.clickable)
-                                UserAttributeBadgesView(
-                                    badges: TaggrUserBadge.badges(
-                                        for: user,
-                                        viewerID: user.id,
-                                        votingPowerActivityWeeks: state.cache?.config?.votingPowerActivityWeeks
-                                    )
-                                )
-                            }
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityHint("Opens your profile")
+                        UserAttributeBadgesView(
+                            badges: TaggrUserBadge.badges(
+                                for: user,
+                                viewerID: user.id,
+                                votingPowerActivityWeeks: state.cache?.config?.votingPowerActivityWeeks
+                            )
+                        )
                     }
                     SettingsPanel(title: "Identity") {
                         if let message = state.errorMessage {
@@ -176,6 +164,7 @@ struct SettingsView: View {
                 .padding(.bottom, 16)
             }
             .taggrRefreshable()
+            .navigationBarTitleDisplayMode(.inline)
         }
         .confirmationDialog("Delete this account?", isPresented: $retirementConfirmationPresented, titleVisibility: .visible) {
             Button("Yes", role: .destructive) { Task { await state.retireAccount() } }
@@ -185,9 +174,23 @@ struct SettingsView: View {
         }
         .taggrNavigationChrome()
         .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                accountMenu
+            if let user = state.currentUser {
+                ToolbarItem(placement: .principal) {
+                    Button {
+                        state.navigateToProfile(user.name)
+                    } label: {
+                        Text(user.name)
+                            .font(.headline.bold())
+                            .foregroundStyle(TaggrTheme.clickable)
+                            .lineLimit(1)
+                            .frame(minWidth: 44, minHeight: 44)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityHint("Opens your profile")
+                }
             }
+            accountMenuToolbarItem
         }
         .sheet(isPresented: $profileEditingPresented) {
             ProfileEditView().id("\(state.safetyScope):\(state.runtimeGeneration)")
@@ -227,6 +230,20 @@ struct SettingsView: View {
         }
     }
 
+    @ToolbarContentBuilder
+    private var accountMenuToolbarItem: some ToolbarContent {
+        if #available(iOS 26.0, *) {
+            ToolbarItem(placement: .topBarTrailing) {
+                accountMenu
+            }
+            .sharedBackgroundVisibility(.hidden)
+        } else {
+            ToolbarItem(placement: .topBarTrailing) {
+                accountMenu
+            }
+        }
+    }
+
     private var accountMenu: some View {
         Menu("Account menu", systemImage: "line.3.horizontal") {
             if state.currentUser != nil {
@@ -251,6 +268,8 @@ struct SettingsView: View {
             }
         }
         .labelStyle(.iconOnly)
+        .buttonStyle(.plain)
+        .foregroundStyle(TaggrTheme.text)
         .confirmationDialog(
             "Sign out?",
             isPresented: $signOutConfirmationPresented,
