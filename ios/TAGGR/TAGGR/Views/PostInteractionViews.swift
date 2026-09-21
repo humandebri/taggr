@@ -1315,7 +1315,7 @@ struct ContentReportSheet: View {
                     .disabled(!canSubmit || isSubmitting)
                     .accessibilityIdentifier("sendContentReport")
             }
-            Text("Send a report to the iOS operator. No tokens or credits are required. Reports are reviewed manually; they do not automatically hide content.")
+            Text("Send a report to the iOS operator. No tokens or credits are required. Reports are reviewed manually; they do not automatically hide content. Describe the problem only — do not include the content itself, links to it, or other people's personal details.")
                 .font(.footnote)
             TextEditor(text: $reason)
                 .accessibilityIdentifier("contentReportReason")
