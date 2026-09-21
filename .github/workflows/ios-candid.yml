@@ -12,6 +12,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # The runner image defaults to Xcode 16.4 (iOS 18.5 SDK), but the app uses
+      # iOS 26 APIs such as ToolbarItem.sharedBackgroundVisibility, so the newest
+      # Xcode 26 installation is selected for the iOS build below.
+      - name: Select the newest Xcode 26
+        run: |
+          APP="$(ls -d /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -1)"
+          if [ -z "$APP" ]; then
+            APP="$(ls -d /Applications/Xcode_*.app 2>/dev/null | sort -V | tail -1)"
+          fi
+          sudo xcode-select -s "$APP"
+          xcodebuild -version
+
       - name: Install pinned Rust toolchain
         run: rustup toolchain install 1.90.0 --profile minimal --component rustfmt,clippy --target wasm32-unknown-unknown
 
