@@ -837,7 +837,7 @@ extension TaggrTests {
         return try CandidArguments([CandidTypedValue(status)]).encode()
     }
 
-    nonisolated static func managementCanisterStatus(cycles: CandidNat) throws -> ManagementCanisterStatus {
+    nonisolated static func managementCanisterStatus(cycles: CandidNat, moduleHash: Data? = nil) throws -> ManagementCanisterStatus {
         let zero = try CandidNat("0")
         return ManagementCanisterStatus(
             memoryMetrics: ManagementMemoryMetrics(
@@ -874,7 +874,7 @@ extension TaggrTests {
                 requestPayloadBytesTotal: zero
             ),
             idleCyclesBurnedPerDay: try CandidNat("3"),
-            moduleHash: nil,
+            moduleHash: moduleHash,
             reservedCycles: zero
         )
     }
@@ -1643,5 +1643,114 @@ extension TaggrTests {
             XCTAssertEqual(state.storageExpectedWasmHash, "new account hash")
             XCTAssertEqual(state.errorMessage, "new account notice")
         }
+    }
+}
+
+
+extension TaggrTests {
+    @MainActor
+    func testStorageCreationRecoversAfterProgressSaveFailure() async throws {
+        try await verifyStorageResume(failure: "update_user_settings")
+    }
+
+    @MainActor
+    func testStorageCreationRecoversAfterInstallResponseLoss() async throws {
+        try await verifyStorageResume(failure: "install_code")
+    }
+
+    @MainActor
+    func testStorageCreationInstallsEmptyCanister() async throws {
+        try await verifyStorageResume(failure: nil)
+    }
+
+    @MainActor
+    func testStorageCreationRejectsUnexpectedModuleAndReadFailures() async throws {
+        for failure in ["mismatch", "canister_status", "bucket_wasm_hash"] {
+            try await verifyStorageResume(failure: failure)
+        }
+    }
+
+    @MainActor
+    private func verifyStorageResume(failure: String?) async throws {
+        let bucket = "bkyz2-fmaaa-aaaaa-qaaaq-cai"
+        let hash = Data(repeating: 1, count: 32)
+        let created = TaggrStorageCreationState(stage: .created, blockIndex: 12, canisterId: bucket)
+        var settings = [TaggrStorageCreationState.settingKey: String(decoding: try JSONEncoder().encode(created), as: UTF8.self)]
+        let initiallyInstalled = ["mismatch", "canister_status", "bucket_wasm_hash"].contains(failure ?? "")
+        var installed = initiallyInstalled
+        var registered = false
+        var injectedFailure = false
+        var calls: [String] = []
+        let api = makeStubbedAPI { request in
+            let call = try XCTUnwrap(self.requestMethodAndArg(from: request))
+            calls.append(call.method)
+            let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
+            let reply: Data
+            switch call.method {
+            case "user":
+                var user = try JSONSerialization.jsonObject(with: Self.currentUserFixture()) as! [String: Any]
+                user["settings"] = settings
+                if registered { user["bucket"] = bucket }
+                reply = try JSONSerialization.data(withJSONObject: user)
+            case "canister_status":
+                if failure == call.method { throw URLError(.notConnectedToInternet) }
+                let status = try Self.managementCanisterStatus(cycles: CandidNat("2"), moduleHash: installed ? hash : nil)
+                reply = try CandidArguments([CandidTypedValue(status)]).encode()
+            case "bucket_wasm_hash":
+                if failure == call.method { throw URLError(.notConnectedToInternet) }
+                reply = try JSONEncoder().encode(failure == "mismatch" ? "ff" : hash.icHexString)
+            case "bucket_wasm":
+                reply = try CandidArguments([CandidTypedValue(type: .vector(.nat8), value: .blob(Data([0, 1, 2])))]).encode()
+            case "install_code":
+                XCTAssertFalse(installed, "Must not reinstall an existing module")
+                installed = true
+                if failure == call.method && !injectedFailure {
+                    injectedFailure = true
+                    throw URLError(.networkConnectionLost)
+                }
+                reply = try CandidArguments().encode()
+            case "update_user_settings":
+                if failure == call.method && !injectedFailure {
+                    injectedFailure = true
+                    throw URLError(.networkConnectionLost)
+                }
+                settings = try XCTUnwrap((JSONSerialization.jsonObject(with: call.arg) as? [[String: String]])?.first)
+                reply = Data(#"{"Ok":null}"#.utf8)
+            case "set_bucket":
+                registered = true
+                reply = Data(#"{"Ok":null}"#.utf8)
+            case "account_balance":
+                reply = Self.candidTokens(100_000_000)
+            default:
+                XCTFail("Unexpected request: \(call.method)")
+                throw URLError(.badServerResponse)
+            }
+            return (response, Self.queryReply(reply))
+        }
+        let state = makeCoordinator(api: api)
+        state.authSession = makeAuthSession(privateKey: Curve25519.Signing.PrivateKey())
+        state.cache = TaggrBackendCache(stats: TaggrStats(users: nil, posts: nil, comments: nil, realms: nil, canisterId: nil, e8sForOneXdr: 100_000_000), config: nil)
+        await state.createStorageCanister()
+        if injectedFailure {
+            XCTAssertNotNil(state.errorMessage)
+            XCTAssertFalse(registered)
+            XCTAssertEqual(TaggrAppCoordinator.storageCreationState(from: settings), created)
+            await state.createStorageCanister()
+        }
+        if initiallyInstalled {
+            XCTAssertNotNil(state.errorMessage, "Failure: \(failure ?? "")")
+            XCTAssertFalse(registered)
+            XCTAssertEqual(TaggrAppCoordinator.storageCreationState(from: settings), created)
+            XCTAssertFalse(calls.contains("install_code"))
+            XCTAssertFalse(calls.contains("update_user_settings"))
+        } else {
+            XCTAssertNil(state.errorMessage)
+            XCTAssertTrue(registered)
+            XCTAssertNil(settings[TaggrStorageCreationState.settingKey])
+            XCTAssertEqual(calls.filter { $0 == "install_code" }.count, 1)
+            XCTAssertEqual(calls.filter { $0 == "set_bucket" }.count, 1)
+        }
+        XCTAssertFalse(calls.contains("transfer"))
+        XCTAssertFalse(calls.contains("notify_create_canister"))
     }
 }

@@ -18,13 +18,13 @@ enum TaggrEditPatch {
 
     static func apply(_ patchText: String, to text: String) throws -> String {
         var result = text
-        var delta = 0
         let patches = try parse(patchText)
         guard !patches.isEmpty else {
             throw TaggrEditPatchError.malformedPatch
         }
         for patch in patches {
-            let sourceOffset = patch.sourceStart + delta
+            // diff-match-patch coordinates already include preceding edits.
+            let sourceOffset = patch.destinationStart
             guard let lowerBound = stringIndex(in: result, utf16Offset: sourceOffset),
                   let upperBound = stringIndex(in: result, utf16Offset: sourceOffset + patch.sourceLength) else {
                 throw TaggrEditPatchError.sourceMismatch
@@ -34,7 +34,6 @@ enum TaggrEditPatch {
                 throw TaggrEditPatchError.sourceMismatch
             }
             result.replaceSubrange(range, with: patch.replacementText)
-            delta += patch.replacementText.utf16.count - patch.sourceLength
         }
         return result
     }
@@ -88,7 +87,7 @@ enum TaggrEditPatch {
                 throw TaggrEditPatchError.malformedPatch
             }
             patches.append(Patch(
-                sourceStart: header.start,
+                destinationStart: header.start,
                 sourceLength: header.length,
                 sourceText: sourceText,
                 replacementText: replacementText
@@ -106,8 +105,9 @@ enum TaggrEditPatch {
         guard parts.count == 2, parts[1].hasPrefix("+") else {
             throw TaggrEditPatchError.malformedPatch
         }
-        _ = try parseRange(String(parts[1].dropFirst()))
-        return try parseRange(String(parts[0]))
+        let source = try parseRange(String(parts[0]))
+        let destination = try parseRange(String(parts[1].dropFirst()))
+        return (destination.start, source.length)
     }
 
     private static func parseRange(_ text: String) throws -> (start: Int, length: Int) {
@@ -140,7 +140,7 @@ enum TaggrEditPatch {
     }
 
     private struct Patch {
-        let sourceStart: Int
+        let destinationStart: Int
         let sourceLength: Int
         let sourceText: String
         let replacementText: String

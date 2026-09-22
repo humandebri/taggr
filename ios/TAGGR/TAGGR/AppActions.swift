@@ -903,14 +903,22 @@ extension TaggrAppCoordinator {
                 creation.stage = .installing
                 storageCreationState = creation
                 do {
-                    let wasm = try await api.bucketWasm()
-                    try await api.installBucketCode(
-                        canisterId: canisterId,
-                        wasm: wasm,
-                        userPrincipal: principal,
-                        mode: "install",
-                        identity: authSession
-                    )
+                    let status = try await api.storageCanisterStatus(canisterId, identity: authSession)
+                    if let moduleHash = status.moduleHash {
+                        let expectedHash = try await api.bucketWasmHash()
+                        guard !expectedHash.isEmpty, moduleHash.icHexString.lowercased() == expectedHash.lowercased() else {
+                            throw TaggrAPIError.rejected("Storage already contains a different module. Creation progress was kept; no code was replaced.")
+                        }
+                    } else {
+                        let wasm = try await api.bucketWasm()
+                        try await api.installBucketCode(
+                            canisterId: canisterId,
+                            wasm: wasm,
+                            userPrincipal: principal,
+                            mode: "install",
+                            identity: authSession
+                        )
+                    }
                 } catch {
                     storageCreationState = createdState
                     throw error
