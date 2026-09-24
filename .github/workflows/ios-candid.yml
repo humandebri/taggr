@@ -1,0 +1,66 @@
+name: iOS Candid
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+
+jobs:
+  verify:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      # The runner image defaults to Xcode 16.4 (iOS 18.5 SDK), but the app uses
+      # iOS 26 APIs such as ToolbarItem.sharedBackgroundVisibility, so the newest
+      # Xcode 26 installation is selected for the iOS build below.
+      - name: Select the newest Xcode 26
+        run: |
+          APP="$(ls -d /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -1)"
+          if [ -z "$APP" ]; then
+            APP="$(ls -d /Applications/Xcode_*.app 2>/dev/null | sort -V | tail -1)"
+          fi
+          sudo xcode-select -s "$APP"
+          xcodebuild -version
+
+      - name: Install pinned Rust toolchain
+        run: rustup toolchain install 1.90.0 --profile minimal --component rustfmt,clippy --target wasm32-unknown-unknown
+
+      - name: Install pinned didc
+        run: |
+          mkdir -p "$HOME/.local/bin"
+          curl --proto '=https' --tlsv1.2 -LsSf \
+            https://github.com/dfinity/candid/releases/download/2025-12-18/didc-macos \
+            -o "$HOME/.local/bin/didc"
+          echo "e7c4f2450ea7eb7535a9fe8853102f6068b2787d6197f6a6587dd96c7f5110bb  $HOME/.local/bin/didc" | shasum -a 256 -c -
+          chmod +x "$HOME/.local/bin/didc"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Check generated Candid bindings
+        run: bash scripts/check_candid_bindings.sh
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+          cache: npm
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Build assets embedded by Rust
+        run: |
+          NODE_ENV=production npm run build
+          cargo build --locked --release --target wasm32-unknown-unknown --package bucket
+          gzip -n -c target/wasm32-unknown-unknown/release/bucket.wasm > target/wasm32-unknown-unknown/release/bucket.wasm.gz
+
+      - name: Check Rust formatting and types
+        run: |
+          cargo fmt --all -- --check
+          cargo check --workspace
+
+      - name: Test bucket interface export
+        run: cargo test --package bucket
+
+      - name: Build and test iOS Candid bindings
+        run: bash scripts/test_ios_candid.sh
