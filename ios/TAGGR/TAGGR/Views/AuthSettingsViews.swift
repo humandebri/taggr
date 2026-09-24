@@ -174,21 +174,10 @@ struct SettingsView: View {
         }
         .taggrNavigationChrome()
         .toolbar {
-            if let user = state.currentUser {
-                ToolbarItem(placement: .principal) {
-                    Button {
-                        state.navigateToProfile(user.name)
-                    } label: {
-                        Text(user.name)
-                            .font(.headline.bold())
-                            .foregroundStyle(TaggrTheme.clickable)
-                            .lineLimit(1)
-                            .frame(minWidth: 44, minHeight: 44)
-                            .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityHint("Opens your profile")
-                }
+            if #available(iOS 26.0, *) {
+                accountNameToolbarItem.sharedBackgroundVisibility(.hidden)
+            } else {
+                accountNameToolbarItem
             }
             accountMenuToolbarItem
         }
@@ -227,6 +216,27 @@ struct SettingsView: View {
             try? await Task.sleep(for: .seconds(1.5))
             guard !Task.isCancelled else { return }
             principalCopied = false
+        }
+    }
+
+    @ToolbarContentBuilder
+    private var accountNameToolbarItem: some ToolbarContent {
+        if let user = state.currentUser {
+            ToolbarItem(placement: .topBarLeading) {
+                Button {
+                    state.navigateToProfile(user.name)
+                } label: {
+                    Text(user.name)
+                        .font(.title2.bold())
+                        .foregroundStyle(TaggrTheme.clickable)
+                        .lineLimit(1)
+                        .fixedSize(horizontal: true, vertical: false)
+                        .frame(minWidth: 44, minHeight: 44, alignment: .leading)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityHint("Opens your profile")
+            }
         }
     }
 
