@@ -884,7 +884,7 @@ struct PostRealmBadge: View {
     var body: some View {
         Text("#\(name.lowercased())")
             .font(.caption.weight(.bold))
-            .foregroundStyle(.white)
+            .foregroundStyle(background.contrastingTextColor)
             .lineLimit(1)
             .padding(.horizontal, 8)
             .padding(.vertical, 5)
@@ -1209,7 +1209,7 @@ struct PostRepliesAccordion: View {
 }
 
 enum TaggrReactionIcon {
-    static let defaultOrder = [11, 10, 50, 51, 52, 53, 100, 12, 1]
+    static let defaultOrder = [11, 10, 50, 51, 52, 53, 100, 101, 12, 1]
 
     static func emoji(for id: Int) -> String? {
         switch id {

@@ -447,7 +447,7 @@ struct RealmBadgeView: View {
     var body: some View {
         ZStack {
             RoundedRectangle(cornerRadius: 10)
-                .fill(Color(hex: realm.labelColor) ?? TaggrTheme.accent)
+                .fill(background)
             if let image = realmLogo {
                 Image(uiImage: image)
                     .resizable()
@@ -457,10 +457,14 @@ struct RealmBadgeView: View {
             } else {
                 Text(initials)
                     .font(.subheadline.weight(.black))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(background.contrastingTextColor)
             }
         }
         .frame(width: size, height: size)
+    }
+
+    private var background: Color {
+        Color(hex: realm.labelColor) ?? TaggrTheme.accent
     }
 
     private var initials: String {
@@ -486,6 +490,26 @@ struct RealmBadgeView: View {
 }
 
 extension Color {
+    var contrastingTextColor: Color {
+        var red: CGFloat = 0
+        var green: CGFloat = 0
+        var blue: CGFloat = 0
+        var alpha: CGFloat = 0
+        guard UIColor(self).getRed(&red, green: &green, blue: &blue, alpha: &alpha) else {
+            return .white
+        }
+        func linearized(_ component: CGFloat) -> Double {
+            let value = Double(component)
+            return value <= 0.04045 ? value / 12.92 : pow((value + 0.055) / 1.055, 2.4)
+        }
+        let luminance = 0.2126 * linearized(red)
+            + 0.7152 * linearized(green)
+            + 0.0722 * linearized(blue)
+        let blackContrast = (luminance + 0.05) / 0.05
+        let whiteContrast = 1.05 / (luminance + 0.05)
+        return blackContrast >= whiteContrast ? .black : .white
+    }
+
     init?(hex: String?) {
         guard let hex else { return nil }
         let value = hex.trimmingCharacters(in: CharacterSet(charactersIn: "#"))
