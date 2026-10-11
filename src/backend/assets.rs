@@ -54,7 +54,7 @@ pub fn load(domains: &HashMap<String, DomainConfig>) {
     );
 
     add_asset(
-        &["/ios-auth-callback"],
+        &["/ios-auth-callback", "/android-auth-callback"],
         vec![("Content-Type".into(), "text/html; charset=UTF-8".into())],
         b"<!doctype html><meta charset=\"utf-8\"><title>TAGGR sign-in</title><p>Authentication complete. You can return to TAGGR.</p>".to_vec(),
     );
@@ -126,6 +126,12 @@ pub fn load(domains: &HashMap<String, DomainConfig>) {
         ii_auth_callbacks().into_bytes(),
     );
 
+    add_asset(
+        &["/.well-known/assetlinks.json"],
+        vec![("Content-Type".into(), "application/json".into())],
+        include_bytes!("../../src/frontend/assets/.well-known/assetlinks.json").to_vec(),
+    );
+
     add_domains(domains);
 
     certify();
@@ -133,7 +139,10 @@ pub fn load(domains: &HashMap<String, DomainConfig>) {
 
 fn ii_auth_callbacks() -> String {
     serde_json::json!({
-        "callbacks": [format!("https://{}.icp0.io/ios-auth-callback", id())]
+        "callbacks": [
+            format!("https://{}.icp0.io/ios-auth-callback", id()),
+            format!("https://{}.icp0.io/android-auth-callback", id())
+        ]
     })
     .to_string()
 }
@@ -242,7 +251,8 @@ mod tests {
             value,
             serde_json::json!({
                 "callbacks": [
-                    "https://6qfxa-ryaaa-aaaai-qbhsq-cai.icp0.io/ios-auth-callback"
+                    "https://6qfxa-ryaaa-aaaai-qbhsq-cai.icp0.io/ios-auth-callback",
+                    "https://6qfxa-ryaaa-aaaai-qbhsq-cai.icp0.io/android-auth-callback"
                 ]
             })
         );
@@ -253,6 +263,13 @@ mod tests {
         assert!(String::from_utf8_lossy(&body).contains("Authentication complete"));
         assert_ne!(asset_hashes().get(b"/.well-known/ii-auth-callbacks"), None);
         assert_ne!(asset_hashes().get(b"/ios-auth-callback"), None);
+        let (_, android_page) = asset("/android-auth-callback").expect("Android callback");
+        assert!(String::from_utf8_lossy(&android_page).contains("Authentication complete"));
+        assert_ne!(asset_hashes().get(b"/android-auth-callback"), None);
+        let (_, links) = asset("/.well-known/assetlinks.json").expect("Android links");
+        let links: serde_json::Value = serde_json::from_slice(&links).expect("valid links JSON");
+        assert!(links.is_array());
+        assert_ne!(asset_hashes().get(b"/.well-known/assetlinks.json"), None);
         let (_, body) = asset("/.well-known/apple-app-site-association").expect("AASA");
         let value: serde_json::Value = serde_json::from_slice(&body).expect("valid AASA JSON");
         assert_eq!(

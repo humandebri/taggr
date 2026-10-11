@@ -129,7 +129,12 @@ function serveAuthCallbacks(request, response) {
         return true;
     }
     const body = JSON.stringify({
-        callbacks: [`${publicOrigin(request)}/ios-auth-callback`],
+        callbacks: [
+            `${publicOrigin(request)}/ios-auth-callback`,
+            ...(process.env.TAGGR_ANDROID_AUTH === "1"
+                ? [`${publicOrigin(request)}/android-auth-callback`]
+                : []),
+        ],
     });
     response.writeHead(200, {
         "access-control-allow-origin": "*",
@@ -143,7 +148,14 @@ function serveAuthCallbacks(request, response) {
 
 function serveAuthCallbackTerminal(request, response) {
     const url = new URL(request.url, "http://127.0.0.1");
-    if (url.pathname !== "/ios-auth-callback") return false;
+    if (
+        url.pathname !== "/ios-auth-callback" &&
+        !(
+            process.env.TAGGR_ANDROID_AUTH === "1" &&
+            url.pathname === "/android-auth-callback"
+        )
+    )
+        return false;
     if (request.method !== "GET" && request.method !== "HEAD") {
         response.writeHead(405, { "content-type": "text/plain" });
         response.end("Method not allowed.");
@@ -188,6 +200,14 @@ function rewriteLocalhostOrigins(body, request) {
             const [config] = IDL.decode([frontendCanisterConfig], arrayBuffer);
             config.backend_origin = origin;
             config.related_origins = [[origin]];
+            if (process.env.TAGGR_II_DUMMY_AUTH === "1") {
+                if (!upstreamHost.endsWith(".localhost")) {
+                    throw new Error(
+                        "Dummy authentication is limited to local Internet Identity.",
+                    );
+                }
+                config.dummy_auth = [[{ prompt_for_index: true }]];
+            }
             const nextConfig = Buffer.from(
                 IDL.encode([frontendCanisterConfig], [config]),
             ).toString("base64");
@@ -200,6 +220,11 @@ const server = http.createServer((request, response) => {
     if (serveAuthCallbacks(request, response)) return;
     if (serveAuthCallbackTerminal(request, response)) return;
     if (serveStatic(request, response)) return;
+    if (process.env.TAGGR_STATIC_ONLY === "1") {
+        response.writeHead(404, { "content-type": "text/plain" });
+        response.end("Not found.");
+        return;
+    }
 
     const headers = { ...request.headers };
     delete headers["accept-encoding"];

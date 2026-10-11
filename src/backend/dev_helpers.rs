@@ -141,3 +141,29 @@ fn mint_tokens(principal: String, amount: u64) {
         state.minting_mode = false;
     });
 }
+
+// Seed disposable native-client users with credits on a dev-only canister.
+// This module is not linked into production builds.
+#[update]
+fn create_test_user(principal: Principal, name: String, credits: u64) -> Result<UserId, String> {
+    mutate(|state| {
+        if let Some(user) = state.principal_to_user(principal) {
+            return Ok(user.id);
+        }
+        state.validate_username(&name)?;
+        state.new_test_user(principal, time(), name, Some(credits))
+    })
+}
+
+// Seed withdrawable rewards without running real revenue distribution.
+// Only the dev-only module exports this fixture method; fund its ledger subaccount separately.
+#[update]
+fn set_test_treasury(principal: Principal, e8s: u64) -> Result<(), String> {
+    mutate(|state| {
+        let user = state
+            .principal_to_user_mut(principal)
+            .ok_or("test user not found")?;
+        user.treasury_e8s = e8s;
+        Ok(())
+    })
+}

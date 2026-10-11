@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" xmlns:tools="http://schemas.android.com/tools">
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.RUN_USER_INITIATED_JOBS" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <application
+        android:allowBackup="false"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:icon="@drawable/ic_taggr"
+        android:label="TAGGR"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.Taggr"
+        android:usesCleartextTraffic="false">
+        <service android:name=".data.YouTubeUploadJobService" android:permission="android.permission.BIND_JOB_SERVICE" android:exported="false" android:enabled="@bool/youtube_uidt_enabled" tools:targetApi="34" />
+        <service android:name=".data.YouTubeUploadFallbackService" android:foregroundServiceType="dataSync" android:exported="false" />
+        <receiver android:name=".data.YouTubeUploadPauseReceiver" android:exported="false" />
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.images"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/image_share_paths" />
+        </provider>
+        <activity
+            android:name=".MainActivity"
+            android:launchMode="singleTop"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <intent-filter android:autoVerify="${taggrAutoVerify}">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" android:host="${taggrLinkHost}" />
+                <data android:path="/" />
+                <data android:pathPrefix="/post/" />
+                <data android:pathPrefix="/thread/" />
+                <data android:pathPrefix="/user/" />
+                <data android:pathPrefix="/journal/" />
+                <data android:pathPrefix="/realm/" />
+                <data android:pathPrefix="/feed" />
+                <data android:pathPrefix="/search" />
+                <data android:pathPrefix="/transactions" />
+                <data android:pathPrefix="/proposal" />
+                <data android:path="/inbox" />
+                <data android:path="/bookmarks" />
+                <data android:path="/invites" />
+                <data android:path="/settings" />
+                <data android:path="/wallet" />
+                <data android:path="/tokens" />
+                <data android:path="/auction" />
+                <data android:pathPrefix="/transaction/" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>

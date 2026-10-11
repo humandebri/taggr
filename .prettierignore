@@ -24,3 +24,6 @@ dist/
 # e2e tests
 test-results/
 playwright-report/
+android/.gradle/
+android/.kotlin/
+android/**/build/
