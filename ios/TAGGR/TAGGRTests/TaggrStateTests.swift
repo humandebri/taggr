@@ -1671,6 +1671,7 @@ extension TaggrTests {
         }
         let state = makeCoordinator(api: api)
         state.canLoadMoreFeed = true
+        state.loadedFeedMode = .hot
 
         let firstRequest = Task { await state.loadMoreFeed(mode: .hot) }
         await fulfillment(of: [requestStarted], timeout: 1)
@@ -1727,6 +1728,7 @@ extension TaggrTests {
         }
         let failedFeedState = makeCoordinator(api: failureAPI)
         failedFeedState.canLoadMoreFeed = true
+        failedFeedState.loadedFeedMode = .hot
         await failedFeedState.loadMoreFeed(mode: .hot)
         XCTAssertFalse(failedFeedState.isLoadingMoreFeed)
 

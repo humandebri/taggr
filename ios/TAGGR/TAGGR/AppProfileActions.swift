@@ -23,7 +23,7 @@ extension TaggrAppCoordinator {
     @discardableResult
     func setFollowingUser(_ userID: Int, following: Bool) async -> ProfileUpdateResult {
         guard isFollowingUser(userID) != following else { return .applied }
-        return await performProfileUserUpdate(userID: userID) { api, identity in
+        return await performProfileUserUpdate(userID: userID, invalidatesFeed: true) { api, identity in
             let data = try await api.updateJSON("toggle_following_user", args: [userID], identity: identity)
             guard try JSONDecoder().decode(Bool.self, from: data) == following else {
                 throw TaggrAPIError.invalidResponse("Follow status did not match the requested change. Refresh before trying again.")
@@ -34,7 +34,7 @@ extension TaggrAppCoordinator {
     @discardableResult
     func setMutedUser(_ userID: Int, muted: Bool) async -> ProfileUpdateResult {
         guard isMutedUser(userID) != muted else { return .applied }
-        return await performProfileUserUpdate(userID: userID) { api, identity in
+        return await performProfileUserUpdate(userID: userID, invalidatesFeed: true) { api, identity in
             let data = try await api.updateJSON("toggle_filter", args: ["user", String(userID)], identity: identity)
             try Self.validateProfileUpdateResult(data)
         }
@@ -62,6 +62,7 @@ extension TaggrAppCoordinator {
 
     private func performProfileUserUpdate(
         userID: Int,
+        invalidatesFeed: Bool = false,
         operation: (TaggrAPI, ICAuthSession) async throws -> Void
     ) async -> ProfileUpdateResult {
         guard !contentStore.profileActionInFlight else { return .rejected }
@@ -84,6 +85,14 @@ extension TaggrAppCoordinator {
             try await operation(activeAPI, identity)
             applied = true
             guard isCurrentSession() else { return .applied }
+            if invalidatesFeed {
+                // Invalidate before profile refresh, which can fail after the update succeeds.
+                _ = beginRequest(.feed)
+                loadedFeedMode = nil
+                restoredFeedMode = nil
+                feed = []
+                canLoadMoreFeed = false
+            }
             // A query started before the update must not restore the old follow/mute state.
             userRefreshTask?.cancel()
             userRefreshTask = nil
