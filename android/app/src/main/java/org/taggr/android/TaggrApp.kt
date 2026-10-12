@@ -274,6 +274,7 @@ fun TaggrApp(
             },
         org.taggr.android.ui.LocalPostOpen provides openPost,
         org.taggr.android.ui.LocalPostViewer provides state.user?.path("id")?.asLong(-1),
+        LocalProfileChanged provides model::refresh,
         LocalPollAccount provides account,
         LocalPollProfile provides { id -> profile = id.toString() },
     ) {
