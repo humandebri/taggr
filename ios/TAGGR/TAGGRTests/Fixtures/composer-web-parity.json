@@ -1,0 +1,160 @@
+{
+    "markdown": [
+        {
+            "action": "bold",
+            "text": "前半 TAGGR 後半",
+            "start": 3,
+            "length": 5,
+            "expected": "前半 **TAGGR** 後半",
+            "cursor": 5,
+            "selectedLength": 5
+        },
+        {
+            "action": "italic",
+            "text": "日本語😀",
+            "start": 3,
+            "length": 2,
+            "expected": "日本語_😀_",
+            "cursor": 4,
+            "selectedLength": 2
+        },
+        {
+            "action": "bold",
+            "text": "abc",
+            "start": 1,
+            "length": 0,
+            "expected": "a****bc",
+            "cursor": 3,
+            "selectedLength": 0
+        },
+        {
+            "action": "italic",
+            "text": "",
+            "start": 0,
+            "length": 0,
+            "expected": "__",
+            "cursor": 1,
+            "selectedLength": 0
+        },
+        {
+            "action": "list",
+            "text": "one\ntwo\n",
+            "start": 0,
+            "length": 8,
+            "expected": "- one\n- two\n- ",
+            "cursor": 14,
+            "selectedLength": 0
+        },
+        {
+            "action": "list",
+            "text": "abcd",
+            "start": 1,
+            "length": 2,
+            "expected": "a- bcd",
+            "cursor": 5,
+            "selectedLength": 0
+        },
+        {
+            "action": "quote",
+            "text": "one\ntwo\nthree",
+            "start": 1,
+            "length": 7,
+            "expected": "o> ne\ntwo\nthree",
+            "cursor": 10,
+            "selectedLength": 0
+        },
+        {
+            "action": "quote",
+            "text": "> existing",
+            "start": 0,
+            "length": 10,
+            "expected": "> > existing",
+            "cursor": 12,
+            "selectedLength": 0
+        },
+        {
+            "action": "link",
+            "text": "前半 TAGGR 後半",
+            "start": 3,
+            "length": 5,
+            "url": "https://example.com",
+            "expected": "前半 [TAGGR](https://example.com) 後半",
+            "cursor": 31,
+            "selectedLength": 0
+        },
+        {
+            "action": "link",
+            "text": "ab",
+            "start": 1,
+            "length": 0,
+            "url": "https://example.com",
+            "expected": "a[](https://example.com)b",
+            "cursor": 2,
+            "selectedLength": 0
+        },
+        {
+            "action": "link",
+            "text": "keep",
+            "start": 0,
+            "length": 4,
+            "url": "",
+            "expected": "keep",
+            "cursor": 0,
+            "selectedLength": 4
+        },
+        {
+            "action": "link",
+            "text": "x",
+            "start": 0,
+            "length": 1,
+            "url": " /path?q=a ",
+            "expected": "[x]( /path?q=a )",
+            "cursor": 16,
+            "selectedLength": 0
+        },
+        {
+            "action": "bold",
+            "text": "é😀",
+            "start": 0,
+            "length": 2,
+            "expected": "**é**😀",
+            "cursor": 2,
+            "selectedLength": 2
+        },
+        {
+            "action": "bold",
+            "text": "**x**",
+            "start": 0,
+            "length": 5,
+            "expected": "****x****",
+            "cursor": 2,
+            "selectedLength": 5
+        }
+    ],
+    "images": [
+        {
+            "text": "",
+            "start": 0,
+            "markers": ["![a](/blob/a)"],
+            "expected": "![a](/blob/a)\n"
+        },
+        {
+            "text": "abcd",
+            "start": 2,
+            "markers": ["![a](/blob/a)", "![b](/blob/b)"],
+            "expected": "ab\n\n![a](/blob/a)\n![b](/blob/b)\ncd"
+        },
+        {
+            "text": "a\nb",
+            "start": 2,
+            "markers": ["![a](/blob/a)"],
+            "expected": "a\n![a](/blob/a)\nb"
+        },
+        {
+            "text": "![a](/blob/a)",
+            "start": 13,
+            "markers": ["![b](/blob/b)"],
+            "expected": "![a](/blob/a)![b](/blob/b)\n"
+        }
+    ]
+}

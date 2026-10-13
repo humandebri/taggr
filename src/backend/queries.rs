@@ -259,13 +259,13 @@ fn user_tags() {
 fn user() {
     let (domain, input): (String, Vec<String>) = parse(&arg_data_raw());
     let own_profile_fetch = input.is_empty();
-    mutate(|state| {
+    read(|state| {
         let handle = input.into_iter().next();
         let user_id = match resolve_handle(state, handle.as_ref()) {
             Some(value) => value.id,
             _ => return reply(None as Option<User>),
         };
-        let user = state.users.get_mut(&user_id).expect("user not found");
+        let mut user = state.users.get(&user_id).expect("user not found").clone();
         user.num_posts = user.posts.len();
         user.posts.clear();
         if own_profile_fetch {

@@ -1,0 +1,12 @@
+canisters:
+  - name: taggr
+    build:
+      steps:
+        - type: script
+          commands:
+            - FEATURES=dev ./build.sh taggr
+            - cp target/wasm32-unknown-unknown/release/taggr.wasm.gz "$ICP_WASM_OUTPUT_PATH"
+networks:
+  - name: local
+    mode: managed
+    ii: true

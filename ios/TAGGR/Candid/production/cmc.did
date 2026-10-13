@@ -1,0 +1,44 @@
+type Cycles = nat;
+type BlockIndex = nat64;
+type LogVisibility = variant { controllers; public; allowed_viewers : vec principal };
+type SnapshotVisibility = variant { controllers; public; allowed_viewers : vec principal };
+type EnvironmentVariable = record { name : text; value : text };
+type CanisterSettings = record {
+  controllers : opt vec principal;
+  compute_allocation : opt nat;
+  memory_allocation : opt nat;
+  freezing_threshold : opt nat;
+  reserved_cycles_limit : opt nat;
+  log_visibility : opt LogVisibility;
+  snapshot_visibility : opt SnapshotVisibility;
+  log_memory_limit : opt nat;
+  wasm_memory_limit : opt nat;
+  wasm_memory_threshold : opt nat;
+  environment_variables : opt vec EnvironmentVariable;
+};
+type SubnetFilter = record { subnet_type : opt text };
+type SubnetSelection = variant {
+  Subnet : record { subnet : principal };
+  Filter : SubnetFilter;
+};
+type NotifyCreateCanisterArgs = record {
+  block_index : BlockIndex;
+  controller : principal;
+  subnet_type : opt text;
+  subnet_selection : opt SubnetSelection;
+  settings : opt CanisterSettings;
+};
+type NotifyTopUpArgs = record { block_index : BlockIndex; canister_id : principal };
+type NotifyError = variant {
+  Refunded : record { reason : text; block_index : opt BlockIndex };
+  Processing;
+  TransactionTooOld : BlockIndex;
+  InvalidTransaction : text;
+  Other : record { error_code : nat64; error_message : text };
+};
+type NotifyCreateResult = variant { Ok : principal; Err : NotifyError };
+type NotifyTopUpResult = variant { Ok : Cycles; Err : NotifyError };
+service : {
+  notify_create_canister : (NotifyCreateCanisterArgs) -> (NotifyCreateResult);
+  notify_top_up : (NotifyTopUpArgs) -> (NotifyTopUpResult);
+};
