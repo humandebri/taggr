@@ -115,7 +115,8 @@ enum ImageDrafts {
     static let maxImagePixels = 16_777_216
     static let maxImageBytes = 460_800
     static let maxPostImagePixels = 3_000_000
-    static let maxPostImageBytes = 200 * 1_024
+    static let maxPostImageBytes = 150 * 1_024
+    static let postImageWebPQuality = 50
 
     static func postImageMaximumBytes(serverLimit: Int?) -> Int {
         guard let serverLimit, serverLimit > 0 else {
@@ -380,39 +381,20 @@ enum ImageDrafts {
         height: Int,
         maxBytes: Int
     ) -> WebPEncodingAttempt {
-        highestQualityWebP(maxBytes: maxBytes) { quality in
+        postWebP(maxBytes: maxBytes) { quality in
             encodeWebP(rgba: rgba, width: width, height: height, quality: quality)
         }
     }
 
-    static func highestQualityWebP(
+    static func postWebP(
         maxBytes: Int,
         encode: (Int) -> Data?
     ) -> WebPEncodingAttempt {
-        guard let minimumQuality = encode(0) else { return .failed }
-        guard minimumQuality.count <= maxBytes else {
-            return .tooLarge(minimumQuality.count)
+        guard let encoded = encode(postImageWebPQuality) else { return .failed }
+        guard encoded.count <= maxBytes else {
+            return .tooLarge(encoded.count)
         }
-
-        guard let maximumQuality = encode(100) else { return .failed }
-        guard maximumQuality.count > maxBytes else {
-            return .fit(maximumQuality)
-        }
-
-        var best = minimumQuality
-        var low = 1
-        var high = 99
-        while low <= high {
-            let quality = (low + high) / 2
-            guard let encoded = encode(quality) else { return .failed }
-            if encoded.count <= maxBytes {
-                best = encoded
-                low = quality + 1
-            } else {
-                high = quality - 1
-            }
-        }
-        return .fit(best)
+        return .fit(encoded)
     }
 
     private static func encodeWebP(

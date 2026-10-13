@@ -32,14 +32,20 @@ ios/**/SourcePackages/
 /archive/
 *.mobileprovision
 *.p12
+/.srl
 
 # rust
 target/
 release-artifacts/
 
 # frontend code
-node_modules/
+node_modules
 dist/
+
+# Python tooling caches
+__pycache__/
+*.pyc
+*.pyo
 
 # e2e tests
 .playwright-cli/

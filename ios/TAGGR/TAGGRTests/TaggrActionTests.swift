@@ -1714,7 +1714,7 @@ extension TaggrTests {
                     injectedFailure = true
                     throw URLError(.networkConnectionLost)
                 }
-                settings = try XCTUnwrap((JSONSerialization.jsonObject(with: call.arg) as? [[String: String]])?.first)
+                settings = try XCTUnwrap(JSONSerialization.jsonObject(with: call.arg) as? [String: String])
                 reply = Data(#"{"Ok":null}"#.utf8)
             case "set_bucket":
                 registered = true

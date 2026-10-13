@@ -234,3 +234,85 @@ extension TaggrTests {
         return try JSONSerialization.data(withJSONObject: user)
     }
 }
+
+extension TaggrTests {
+    func testFailedPersonalSwitchClearsOldFeedAndRetriesFirstPage() async throws {
+        var failPersonal = true
+        var personalArgs: [[Any]] = []
+        let api = makeStubbedAPI { request in
+            let call = try XCTUnwrap(self.requestMethodAndArg(from: request))
+            if call.method == "personal_feed" {
+                personalArgs.append(try JSONSerialization.jsonObject(with: call.arg) as! [Any])
+                if failPersonal { throw URLError(.timedOut) }
+            }
+            let id = call.method == "personal_feed" ? 43 : 42
+            let body = Data("[\(String(data: self.postEnvelopeFixture(id: id), encoding: .utf8)!)]".utf8)
+            return (HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!, Self.queryReply(body))
+        }
+        let state = try profileTestState(api: api)
+        state.cache = TaggrBackendCache(stats: nil, config: try JSONDecoder.taggr.decode(TaggrConfig.self, from: Data(#"{"feed_page_size":1}"#.utf8)))
+        state.navigateToFeed(.hot)
+        await state.loadCurrentRoute()
+        XCTAssertEqual(state.feed.map(\.id), [42])
+        state.navigateToFeed(.personal)
+        await state.loadCurrentRoute()
+        XCTAssertEqual(state.route, .feed(.personal))
+        XCTAssertTrue(state.feed.isEmpty)
+        XCTAssertNil(state.loadedFeedMode)
+        XCTAssertNotNil(state.errorMessage)
+        XCTAssertFalse(state.canLoadMoreFeed)
+        failPersonal = false
+        await state.loadMoreFeed(mode: .personal)
+        XCTAssertTrue(state.feed.isEmpty)
+        XCTAssertEqual(personalArgs.count, 1, "Pagination must not run for an unloaded mode")
+        await state.loadCurrentRoute(forceFeedReload: true)
+        XCTAssertEqual(state.feed.map(\.id), [43])
+        XCTAssertEqual(personalArgs.last?[1] as? Int, 0)
+        XCTAssertEqual(personalArgs.last?[2] as? Int, 0)
+    }
+
+    func testPersonalReloadsAfterProfileMuteAndFollowChanges() async throws {
+        for (mute, initiallyFollowing, refreshFails) in [(true, true, false), (false, true, false), (false, false, false), (true, true, true)] {
+            var changed = false
+            var personalQueries = 0
+            var envelope = try JSONSerialization.jsonObject(with: postEnvelopeFixture(id: 42)) as! [Any]
+            var post = envelope[0] as! [String: Any]
+            post["user"] = 8
+            envelope[0] = post
+            let feedBody = try JSONSerialization.data(withJSONObject: [envelope])
+            let api = makeStubbedAPI { request in
+                let call = try XCTUnwrap(self.requestMethodAndArg(from: request))
+                let body: Data
+                switch call.method {
+                case "personal_feed":
+                    personalQueries += 1
+                    body = (changed ? !initiallyFollowing : initiallyFollowing) ? feedBody : Data("[]".utf8)
+                case "toggle_filter":
+                    changed = true; body = Data(#"{"Ok":null}"#.utf8)
+                case "toggle_following_user":
+                    changed = true; body = Data((initiallyFollowing ? "false" : "true").utf8)
+                default:
+                    if changed && refreshFails { throw URLError(.timedOut) }
+                    let args = try JSONSerialization.jsonObject(with: call.arg) as? [Any]
+                    let isPublic = ((args?.last as? [String])?.isEmpty == false)
+                    body = try Self.profileUserFixture(id: isPublic ? 8 : 7, follows: (changed ? !initiallyFollowing : initiallyFollowing) ? [7, 8] : [7], muted: changed && mute ? [8] : [])
+                }
+                return (HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!, Self.queryReply(body))
+            }
+            let state = try profileTestState(api: api, follows: initiallyFollowing ? [7, 8] : [7])
+            state.safety.accept(scope: state.safetyScope)
+            state.navigateToFeed(.personal)
+            await state.loadCurrentRoute()
+            XCTAssertEqual(state.feed.map(\.id), initiallyFollowing ? [42] : [])
+            state.navigateToProfile("8")
+            state.profile = try JSONDecoder.taggr.decode(TaggrUser.self, from: Self.profileUserFixture(id: 8))
+            let result = mute ? await state.setMutedUser(8, muted: true) : await state.setFollowingUser(8, following: !initiallyFollowing)
+            XCTAssertEqual(result, .applied)
+            state.navigateBackFromProfile()
+            await state.loadCurrentRoute()
+            XCTAssertEqual(state.route, .feed(.personal))
+            XCTAssertEqual(personalQueries, 2, "Returning must reload the changed Personal feed")
+            XCTAssertEqual(state.feed.map(\.id), initiallyFollowing ? [] : [42])
+        }
+    }
+}

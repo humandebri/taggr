@@ -77,42 +77,36 @@ extension TaggrTests {
         _ = await task.value
     }
 
-    func testWebPQualitySearchShortCircuitsAndFindsHighestFit() {
+    func testPostWebPUsesQuality50AndRequestsResizingInsteadOfLoweringQuality() {
         var qualities: [Int] = []
-        let maximumFits = ImageDrafts.highestQualityWebP(maxBytes: 101) { quality in
+        let fits = ImageDrafts.postWebP(maxBytes: 51) { quality in
             qualities.append(quality)
             return Data(count: quality + 1)
         }
-        guard case .fit(let maximumData) = maximumFits else {
-            return XCTFail("Quality 100 should fit.")
+        guard case .fit(let data) = fits else {
+            return XCTFail("Quality 50 should fit at the exact size limit.")
         }
-        XCTAssertEqual(maximumData.count, 101)
-        XCTAssertLessThanOrEqual(qualities.count, 2)
+        XCTAssertEqual(data.count, 51)
+        XCTAssertEqual(qualities, [50])
 
         qualities = []
-        let bounded = ImageDrafts.highestQualityWebP(maxBytes: 73) { quality in
+        let oversized = ImageDrafts.postWebP(maxBytes: 50) { quality in
             qualities.append(quality)
             return Data(count: quality + 1)
         }
-        guard case .fit(let boundedData) = bounded else {
-            return XCTFail("A bounded quality should fit.")
+        guard case .tooLarge(51) = oversized else {
+            return XCTFail("Oversize quality 50 output should request resizing.")
         }
-        XCTAssertEqual(boundedData.count, 73)
-        XCTAssertLessThanOrEqual(qualities.count, 10)
+        XCTAssertEqual(qualities, [50])
 
-        qualities = []
-        let impossible = ImageDrafts.highestQualityWebP(maxBytes: 0) { quality in
-            qualities.append(quality)
-            return Data(count: 1)
+        let failed = ImageDrafts.postWebP(maxBytes: 51) { _ in nil }
+        guard case .failed = failed else {
+            return XCTFail("Encoding failure should be preserved.")
         }
-        guard case .tooLarge(1) = impossible else {
-            return XCTFail("Quality zero should report the oversize payload.")
-        }
-        XCTAssertLessThanOrEqual(qualities.count, 2)
     }
 
     func testPostImagesNormalizeHighResolutionFixturesToWebP() throws {
-        for fixture in ["taggr-48mp"] {
+        for fixture in ["taggr-12mp", "taggr-24mp", "taggr-48mp"] {
             let input = try fixtureData(named: fixture)
             let draft = try ImageDrafts.postImageResult(from: input, maxBytes: ImageDrafts.maxPostImageBytes).get()
 
@@ -134,8 +128,8 @@ extension TaggrTests {
             ImageDrafts.maxPostImageBytes
         )
         XCTAssertEqual(
-            ImageDrafts.postImageMaximumBytes(serverLimit: 150 * 1_024),
-            150 * 1_024
+            ImageDrafts.postImageMaximumBytes(serverLimit: 100 * 1_024),
+            100 * 1_024
         )
     }
 
@@ -153,7 +147,7 @@ extension TaggrTests {
         }
     }
 
-    func testPostImageShrinksDimensionsWhenQualityZeroStillExceedsLimit() throws {
+    func testPostImageShrinksDimensionsWhenQuality50ExceedsLimit() throws {
         let source = try noisyPNG(width: 128, height: 128)
         let draft = try ImageDrafts.postImageResult(from: source, maxBytes: 800).get()
 

@@ -526,7 +526,12 @@ final class TaggrAppCoordinator {
     }
 
     func loadFeed(mode: TaggrFeedMode, reset: Bool, showsBusyOverlay: Bool = true) async {
-        if reset { loadedFeedMode = nil }
+        let reset = reset || loadedFeedMode != mode
+        if loadedFeedMode != mode { feed = [] }
+        if reset {
+            loadedFeedMode = nil
+            canLoadMoreFeed = false
+        }
         let request = beginRequest(.feed)
         let activeAPI = api
         returnFeedMode = mode
@@ -572,7 +577,7 @@ final class TaggrAppCoordinator {
     }
 
     func loadMoreFeed(mode: TaggrFeedMode) async {
-        guard canLoadMoreFeed, !isLoadingMoreFeed else { return }
+        guard loadedFeedMode == mode, canLoadMoreFeed, !isLoadingMoreFeed else { return }
         isLoadingMoreFeed = true
         defer { isLoadingMoreFeed = false }
         await loadFeed(mode: mode, reset: false)
