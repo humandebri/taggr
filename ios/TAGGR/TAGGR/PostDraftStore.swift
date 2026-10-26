@@ -46,6 +46,37 @@ struct StoredDraftImage: Codable, Equatable {
     let byteCount: Int
 }
 
+struct TaggrPollDraft: Codable, Equatable, Sendable {
+    var optionsText = ""
+    var deadlineHours = 24
+
+    var options: [String] {
+        optionsText.components(separatedBy: .newlines)
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+    }
+
+    var optionBytes: Int { options.reduce(0) { $0 + $1.utf8.count } }
+
+    var validationError: String? {
+        if options.count < 2 { return "Enter at least two options, one per line." }
+        if optionBytes > 300 { return "Poll options must total 300 bytes or less." }
+        if !(1...7).contains(deadlineHours / 24) || deadlineHours % 24 != 0 {
+            return "Choose a deadline between 1 and 7 days."
+        }
+        return nil
+    }
+
+    func extensionBlob() throws -> Data {
+        if let validationError { throw TaggrAPIError.rejected(validationError) }
+        return try JSONSerialization.data(withJSONObject: ["Poll": [
+            "options": options, "deadline": deadlineHours,
+            "votes": [String: [Int]](), "voters": [Int](),
+            "weighted_by_karma": [String: Int](), "weighted_by_tokens": [String: Int](),
+        ]])
+    }
+}
+
 struct StoredPostDraft: Codable, Equatable {
     static let currentSchemaVersion = 1
 
@@ -53,6 +84,7 @@ struct StoredPostDraft: Codable, Equatable {
     let text: String
     let realm: String
     let images: [StoredDraftImage]
+    var poll: TaggrPollDraft? = nil
     let submissionNeedsVerification: Bool?
     let updatedAt: Date
 }
@@ -61,6 +93,7 @@ struct RestoredPostDraft {
     let text: String?
     let realm: String?
     let images: [TaggrDraftImage]
+    var poll: TaggrPollDraft? = nil
     let submissionNeedsVerification: Bool
     let warning: String?
 }
@@ -368,6 +401,7 @@ actor PostDraftStore {
             text: removingImageMarkers(missingIDs, from: stored.text),
             realm: stored.realm,
             images: images,
+            poll: stored.poll,
             submissionNeedsVerification: stored.submissionNeedsVerification ?? false,
             warning: missingIDs.isEmpty
                 ? nil
@@ -381,6 +415,7 @@ actor PostDraftStore {
         text: String,
         realm: String,
         images: [TaggrDraftImage],
+        poll: TaggrPollDraft? = nil,
         submissionNeedsVerification: Bool = false
     ) throws {
         let directory = draftDirectory(namespace: namespace, context: context)
@@ -412,6 +447,7 @@ actor PostDraftStore {
             text: text,
             realm: realm,
             images: storedImages,
+            poll: poll,
             submissionNeedsVerification: submissionNeedsVerification,
             updatedAt: Date()
         )
@@ -512,6 +548,7 @@ final class PostDraftSession: ObservableObject {
 
     @Published var text: String
     @Published var realm: String
+    @Published var poll: TaggrPollDraft?
     @Published private(set) var images: [TaggrDraftImage] = []
     @Published private(set) var submissionNeedsVerification = false
     @Published private(set) var restorationWarning: String?
@@ -537,12 +574,12 @@ final class PostDraftSession: ObservableObject {
     }
 
     var hasChanges: Bool {
-        text != initialText || realm != initialRealm || !images.isEmpty || submissionNeedsVerification
+        text != initialText || realm != initialRealm || !images.isEmpty || poll != nil || submissionNeedsVerification
     }
 
     private var hasContent: Bool {
         !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
-            !images.isEmpty ||
+            !images.isEmpty || poll != nil ||
             (context.kind == .repost && submissionNeedsVerification)
     }
 
@@ -560,6 +597,7 @@ final class PostDraftSession: ObservableObject {
         text = restored.text ?? initialText
         realm = restored.realm ?? initialRealm
         images = restored.images
+        poll = context.kind == .newPost ? restored.poll : nil
         submissionNeedsVerification = restored.submissionNeedsVerification
         restorationWarning = restored.warning
         isLoaded = true
@@ -583,6 +621,13 @@ final class PostDraftSession: ObservableObject {
         return restorationWarning != Self.saveFailureWarning
     }
 
+    func setPoll(_ poll: TaggrPollDraft?) {
+        guard context.kind == .newPost else { return }
+        self.poll = poll
+        contentDidChange()
+        scheduleSave()
+    }
+
     func restoreEditorImages(_ images: [TaggrDraftImage]) {
         self.images = images
         contentDidChange()
@@ -601,6 +646,7 @@ final class PostDraftSession: ObservableObject {
         text = initialText
         realm = initialRealm
         images = []
+        poll = nil
         submissionNeedsVerification = false
         restorationWarning = nil
         if let store, let namespace {
@@ -621,6 +667,7 @@ final class PostDraftSession: ObservableObject {
                 text: text,
                 realm: realm,
                 images: images,
+                poll: poll,
                 submissionNeedsVerification: submissionNeedsVerification
             )
             if restorationWarning == Self.saveFailureWarning {

@@ -23,6 +23,7 @@ struct ComposePostView: View {
     @State private var creditCostUnavailable = false
     @State private var realmColors: [String: String] = [:]
     @State private var isSubmitting = false
+    @State private var pollRemovalPresented = false
     @State private var discardConfirmationPresented = false
     @State private var focusedTextSegmentID: Int?
 
@@ -78,6 +79,10 @@ struct ComposePostView: View {
                             pasteImages: loadPastedImages
                         )
                         .disabled(!draft.isLoaded || imageImport.isImporting || isSubmitting)
+                        if draft.poll != nil {
+                            pollEditor
+                                .disabled(!draft.isLoaded || imageImport.isImporting || isSubmitting)
+                        }
                         if let realmWarning {
                             ComposePostImageWarning(
                                 text: realmWarning,
@@ -132,7 +137,9 @@ struct ComposePostView: View {
                     youtubeTarget: youtubeDraftTarget,
                     insertYouTubeURL: insertYouTubeURL,
                     isSubmitting: state.isBusy || isSubmitting || imageImport.isImporting,
-                    isImagePickerDisabled: state.isBusy || isSubmitting || imageImport.isImporting || !draft.isLoaded
+                    isImagePickerDisabled: state.isBusy || isSubmitting || imageImport.isImporting || !draft.isLoaded,
+                    hasPoll: draft.poll != nil,
+                    addPoll: mode.draftContext.kind == .newPost && draft.poll == nil ? { draft.setPoll(TaggrPollDraft()) } : nil
                 )
             }
         }
@@ -198,6 +205,53 @@ struct ComposePostView: View {
         }
     }
 
+    private var pollEditor: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Label("Poll", systemImage: "chart.bar.xaxis").font(.headline)
+                Spacer()
+                Button("Remove poll", role: .destructive) { pollRemovalPresented = true }
+            }
+            Text("Options (one per line)").font(.subheadline)
+            TextField("Option 1\nOption 2", text: Binding(
+                get: { draft.poll?.optionsText ?? "" },
+                set: { value in
+                    guard var poll = draft.poll else { return }
+                    poll.optionsText = value
+                    draft.setPoll(poll)
+                }
+            ), axis: .vertical)
+            .lineLimit(3...8)
+            .padding(10)
+            .background(TaggrTheme.panelRaised)
+            .clipShape(RoundedRectangle(cornerRadius: 8))
+            .accessibilityIdentifier("poll-options")
+            Picker("Expires in", selection: Binding(
+                get: { draft.poll?.deadlineHours ?? 24 },
+                set: { value in
+                    guard var poll = draft.poll else { return }
+                    poll.deadlineHours = value
+                    draft.setPoll(poll)
+                }
+            )) {
+                ForEach(1...7, id: \.self) { day in
+                    Text("\(day) day\(day == 1 ? "" : "s")").tag(day * 24)
+                }
+            }
+            Text("\(draft.poll?.optionBytes ?? 0)/300 bytes")
+                .font(.caption).foregroundStyle(TaggrTheme.secondaryText)
+            if let error = draft.poll?.validationError {
+                Text(error).font(.caption).foregroundStyle(TaggrTheme.secondaryText)
+            }
+        }
+        .padding(12)
+        .background(TaggrTheme.panel)
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .confirmationDialog("Remove this poll?", isPresented: $pollRemovalPresented, titleVisibility: .visible) {
+            Button("Remove poll", role: .destructive) { draft.setPoll(nil) }
+        }
+    }
+
     private var canSubmit: Bool {
         guard draft.isLoaded, state.currentUser != nil else { return false }
         guard !imageImport.isImporting,
@@ -207,7 +261,7 @@ struct ComposePostView: View {
         let body = composedBody
         guard !body.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return false }
         guard imageWarning == nil else { return false }
-        guard realmWarning == nil else { return false }
+        guard realmWarning == nil, draft.poll?.validationError == nil else { return false }
         guard let editingPost = mode.editingPost else { return true }
         return body != editingPost.body || selectedTargetRealm != editingPost.realm
     }
@@ -224,6 +278,7 @@ struct ComposePostView: View {
         [
             mode.editingPost == nil ? "create" : "edit",
             composedBody,
+            draft.poll == nil ? "no-poll" : "poll",
             creditCostTags.joined(separator: ","),
             String((composedBody.utf8.count / 1024) + 1),
             state.runtimeConfig.canisterId,
@@ -311,6 +366,7 @@ struct ComposePostView: View {
         let body = composedBody
         guard canSubmit, !isSubmitting else { return }
         let images = draft.images
+        let poll = draft.poll
         isSubmitting = true
         Task {
             guard await draft.markSubmissionNeedsVerification() else {
@@ -333,6 +389,7 @@ struct ComposePostView: View {
                     parent: mode.parentPostID,
                     realm: selectedTargetRealm,
                     images: images,
+                    poll: poll,
 
                     draft: draft
                 )
@@ -490,8 +547,9 @@ struct ComposePostView: View {
         } catch {
             return
         }
-        let cost = await state.postCreditCost(for: body, editing: mode.editingPost)
-        if body == composedBody {
+        let hasPoll = draft.poll != nil
+        let cost = await state.postCreditCost(for: body, editing: mode.editingPost, hasPoll: hasPoll)
+        if body == composedBody, hasPoll == (draft.poll != nil) {
             creditCost = cost
             creditCostUnavailable = cost == nil
         }

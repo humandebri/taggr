@@ -40,15 +40,23 @@ struct TaggrPollPresentation: Equatable {
     }
 
     var showsVotingControls: Bool {
-        userID != nil && (!hasVoted || changingVote) && !isExpired
+        userID != nil && (!hasVoted || isChangingVote) && !isExpired
     }
 
     var canChangeVote: Bool {
-        !changingVote && hasVisibleVote && !votedAnonymously && remainingHours > revoteDeadlineHours
+        !changingVote && permitsChangingVote
+    }
+
+    private var permitsChangingVote: Bool {
+        hasVisibleVote && !votedAnonymously && !isExpired && remainingHours > revoteDeadlineHours
+    }
+
+    private var isChangingVote: Bool {
+        changingVote && permitsChangingVote
     }
 
     var displayedVotes: [Int: [Int]] {
-        guard changingVote, let userID else { return poll.votes }
+        guard isChangingVote, let userID else { return poll.votes }
         return poll.votes.mapValues { voters in
             voters.filter { $0 != userID }
         }

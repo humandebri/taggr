@@ -9,6 +9,7 @@ final class TaggrProposalDetailState {
         let postID: Int
         let adopted: Bool
         let data: String
+        let followsDiscussion: Bool
     }
 
     let id: Int
@@ -37,11 +38,12 @@ final class TaggrProposalDetailState {
     /// user saw, and reports validation failures instead of failing silently.
     @discardableResult
     func prepareVote(adopted: Bool, state: TaggrAppCoordinator, canonical: Bool) -> Bool {
-        guard canVote(state, canonical: canonical), let proposal else { return false }
+        guard canVote(state, canonical: canonical), let proposal, let post, let userID = state.currentUser?.id else { return false }
         do {
             let value = try proposal.voteData(adopted: adopted, input: data,
                 decimals: state.cache?.config?.tokenDecimals ?? 0, maximum: state.cache?.config?.maxFundingAmount)
-            pendingVote = Vote(proposalID: id, postID: proposal.postId, adopted: adopted, data: value)
+            pendingVote = Vote(proposalID: id, postID: proposal.postId, adopted: adopted, data: value,
+                followsDiscussion: post.watchers.contains(userID))
             voteError = nil
             return true
         } catch {
@@ -93,11 +95,13 @@ final class TaggrProposalDetailState {
             try await context.api.voteOnProposal(id: vote.proposalID, adopted: vote.adopted, data: vote.data, identity: identity)
             saved = true
             try context.requireCurrent(state)
-            // The PWA starts following the discussion immediately after a saved vote.
+            // Follow the discussion after a saved vote without toggling off an existing follow.
             // Keep this independent of the proposal refresh so a transient read failure
             // cannot leave a successful voter without discussion notifications.
             do {
-                _ = try await context.api.toggleFollowingPost(postId: vote.postID, identity: identity)
+                if !vote.followsDiscussion {
+                    _ = try await context.api.toggleFollowingPost(postId: vote.postID, identity: identity)
+                }
                 try await context.refreshUser(state)
             } catch {
                 if requestID == request, context.matches(state) {

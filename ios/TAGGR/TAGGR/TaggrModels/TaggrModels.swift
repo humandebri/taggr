@@ -42,6 +42,11 @@ struct TaggrPost: Identifiable, Equatable, Sendable {
         TaggrPostExtension(value: extensionValue)
     }
 
+    var originalTimestamp: LosslessInt {
+        patches.compactMap { $0.first?.intValue }.min()
+            .map { LosslessInt(Int64($0)) } ?? timestamp
+    }
+
     var effectiveBody: String {
         effBody ?? body
     }

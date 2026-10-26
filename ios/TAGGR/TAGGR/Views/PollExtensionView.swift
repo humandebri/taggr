@@ -126,7 +126,7 @@ struct PollExtensionView: View {
     private func presentation(at now: Date) -> TaggrPollPresentation {
         TaggrPollPresentation(
             poll: poll,
-            postTimestamp: post.timestamp,
+            postTimestamp: post.originalTimestamp,
             userID: state.currentUser?.id,
             revoteDeadlineHours: state.cache?.config?.pollRevoteDeadlineHours ?? 0,
             changingVote: changingVote,
@@ -140,7 +140,7 @@ struct PollExtensionView: View {
     }
 
     private func vote(anonymously: Bool) {
-        guard let selectedOption else { return }
+        guard let selectedOption, presentation(at: .now).showsVotingControls else { return }
         changingVote = false
         self.selectedOption = nil
         Task {

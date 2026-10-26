@@ -613,6 +613,74 @@ extension TaggrTests {
         )
     }
 
+    func testPollDraftValidatesOptionsAndEncodesBackendExtension() throws {
+        let poll = TaggrPollDraft(optionsText: " Yes \n\n No ", deadlineHours: 48)
+        XCTAssertNil(poll.validationError)
+        let json = try JSONDecoder().decode(JSONValue.self, from: poll.extensionBlob())
+        let decoded = try XCTUnwrap(TaggrPoll(value: json.objectValue?["Poll"] ?? .null))
+        XCTAssertEqual(decoded.options, ["Yes", "No"])
+        XCTAssertEqual(decoded.deadline, 48)
+        XCTAssertTrue(decoded.votes.isEmpty)
+        XCTAssertTrue(decoded.voters.isEmpty)
+        XCTAssertNotNil(TaggrPollDraft(optionsText: "One").validationError)
+        XCTAssertNotNil(TaggrPollDraft(optionsText: String(repeating: "あ", count: 100) + "\nx").validationError)
+        XCTAssertNotNil(TaggrPollDraft(optionsText: "a\nb", deadlineHours: 0).validationError)
+    }
+
+    func testPollOnlyDraftRestoresAndDiscards() async throws {
+        let root = URL.temporaryDirectory.appending(path: "PollDraft-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let store = PostDraftStore(rootURL: root)
+        let namespace = PostDraftNamespace(canisterID: "test", userID: 7)
+        let draft = PostDraftSession(context: .newPost, initialText: "", initialRealm: "")
+        await draft.load(store: store, namespace: namespace)
+        draft.setPoll(TaggrPollDraft(optionsText: "Yes\nNo", deadlineHours: 72))
+        await draft.flush()
+        let restored = PostDraftSession(context: .newPost, initialText: "", initialRealm: "")
+        await restored.load(store: store, namespace: namespace)
+        XCTAssertEqual(restored.poll, draft.poll)
+        XCTAssertTrue(restored.hasChanges)
+        await restored.markSubmissionNeedsVerification()
+        let pending = PostDraftSession(context: .newPost, initialText: "", initialRealm: "")
+        await pending.load(store: store, namespace: namespace)
+        XCTAssertTrue(pending.submissionNeedsVerification)
+        XCTAssertEqual(pending.poll, draft.poll)
+        pending.setPoll(nil)
+        XCTAssertFalse(pending.submissionNeedsVerification)
+        await restored.discard()
+        let empty = await store.load(namespace: namespace, context: .newPost)
+        XCTAssertNil(empty.poll)
+        XCTAssertNil(empty.text)
+    }
+
+    func testEditedPollUsesOriginalTimestampForDeadline() throws {
+        for patches in ["[]", #"[[3600000000000,"newer"],[0,"original"]]"#] {
+            let json = #"[{"id":42,"user":7,"body":"edited","timestamp":7200000000000,"patches":PATCHES,"extension":{"Poll":{"options":["yes"],"votes":{},"voters":[],"deadline":24}}},{}]"#
+                .replacingOccurrences(of: "PATCHES", with: patches)
+            let post = try JSONDecoder.taggr.decode(TaggrPostEnvelope.self, from: Data(json.utf8)).post
+            guard case .poll(let poll) = post.extensionKind else { return XCTFail("Missing poll") }
+            let presentation = TaggrPollPresentation(poll: poll, postTimestamp: post.originalTimestamp,
+                userID: 7, revoteDeadlineHours: 4, changingVote: false,
+                now: Date(timeIntervalSince1970: 24 * 3_600))
+            XCTAssertEqual(presentation.isExpired, patches != "[]")
+            XCTAssertEqual(presentation.showsVotingControls, patches == "[]")
+        }
+    }
+
+    func testPollChangeModeStopsAtRevoteDeadline() throws {
+        let now = Date(timeIntervalSince1970: 1_000_000)
+        for age in [67.99, 68.0, 71.0, 72.0] {
+            let presentation = try pollPresentation(now: now, ageHours: age,
+                votes: [0: [7], 1: [8]], voters: [7, 8], changingVote: true)
+            XCTAssertEqual(presentation.showsVotingControls, age < 68)
+            XCTAssertEqual(presentation.displayedVotes[0], age < 68 ? [] : [7])
+            XCTAssertEqual(presentation.totalVotes, age < 68 ? 1 : 2)
+        }
+        let anonymous = try pollPresentation(now: now, ageHours: 1,
+            votes: [0: [TaggrPollPresentation.maximumSafeUserID - 1]], voters: [7], changingVote: true)
+        XCTAssertFalse(anonymous.showsVotingControls)
+    }
+
     private func pollPresentation(
         now: Date,
         ageHours: Double,

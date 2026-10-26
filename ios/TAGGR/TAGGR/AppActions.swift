@@ -59,6 +59,7 @@ extension TaggrAppCoordinator {
         parent: Int? = nil,
         realm: String? = nil,
         images: [TaggrDraftImage] = [],
+        poll: TaggrPollDraft? = nil,
         draft: PostDraftSession,
         onSubmitted: (() -> Void)? = nil
     ) -> Bool {
@@ -77,6 +78,7 @@ extension TaggrAppCoordinator {
                 parent: parent,
                 realm: realm,
                 images: images,
+                poll: poll,
                 context: context
             )
         }
@@ -87,9 +89,12 @@ extension TaggrAppCoordinator {
         parent: Int?,
         realm: String?,
         images: [TaggrDraftImage],
+        poll: TaggrPollDraft?,
         context: TaggrPostSubmissionContext
     ) async -> TaggrPostSubmissionResult {
         do {
+            if poll != nil, parent != nil { throw TaggrAPIError.rejected("Polls are only available on new posts.") }
+            let extensionBlob = try poll?.extensionBlob()
             try await requireSafePublishing(text: text, realm: realm, parentID: parent)
             guard context.runtimeGeneration == runtimeGeneration, context.userID == currentUser?.id else { throw TaggrSafetyError.unavailable }
             let body = text
@@ -105,6 +110,7 @@ extension TaggrAppCoordinator {
                     refs: refs,
                     parent: parent,
                     realm: realm,
+                    extensionBlob: extensionBlob,
                     identity: context.authSession
                 )
             } catch {
@@ -128,7 +134,7 @@ extension TaggrAppCoordinator {
         }
     }
 
-    func postCreditCost(for body: String, editing post: TaggrPost? = nil) async -> Int? {
+    func postCreditCost(for body: String, editing post: TaggrPost? = nil, hasPoll: Bool = false) async -> Int? {
         guard let config = cache?.config,
               let baseCost = config.postCost else {
             return nil
@@ -178,7 +184,12 @@ extension TaggrAppCoordinator {
                 pollCost: config.pollCost
             )
         }
-        return TaggrPostCreditCost.estimate(body: body, baseCost: baseCost, tagCost: tagCost)
+        let estimate = TaggrPostCreditCost.estimate(body: body, baseCost: baseCost, tagCost: tagCost)
+        if hasPoll {
+            guard let pollCost = config.pollCost else { return nil }
+            return estimate + pollCost
+        }
+        return estimate
     }
 
     private func isUncertainPostSubmissionError(_ error: Error) -> Bool {

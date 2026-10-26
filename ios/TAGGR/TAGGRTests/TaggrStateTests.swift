@@ -480,6 +480,45 @@ extension TaggrTests {
     }
 
     @MainActor
+    func testEnqueuedPollIncludesExtensionAndClearsDraft() async throws {
+        let sent = LockedTestValue<Data?>(nil)
+        let api = makeStubbedAPI { request in
+            let call = self.requestMethodAndArg(from: request)
+            let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
+            if call?.method == "add_post" {
+                sent.mutate { $0 = call?.arg }
+                return (response, Self.queryReply(Self.candidAddPostResultOk(42)))
+            }
+            return (response, Self.queryReply(call?.method == "user" ? Self.currentUserFixture() : Data("[]".utf8)))
+        }
+        let root = URL.temporaryDirectory.appending(path: "PollSubmission-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let store = PostDraftStore(rootURL: root)
+        let state = makeCoordinator(safety: makeSafetyStore(), api: api, postDraftStore: store)
+        state.authSession = makeAuthSession(privateKey: Curve25519.Signing.PrivateKey())
+        state.currentUser = try JSONDecoder.taggr.decode(TaggrUser.self, from: Self.currentUserFixture())
+        state.safety.accept(scope: state.safetyScope)
+        let draft = PostDraftSession(context: .newPost, initialText: "", initialRealm: "")
+        await draft.load(store: store, namespace: PostDraftNamespace(canisterID: state.runtimeConfig.canisterId, userID: 7))
+        draft.text = "Question"
+        draft.poll = TaggrPollDraft(optionsText: "Yes\nNo", deadlineHours: 48)
+        let poll = try XCTUnwrap(draft.poll)
+        XCTAssertTrue(state.enqueuePostSubmission(text: draft.text, poll: poll, draft: draft))
+        await state.postSubmissionTasks[.newPost]?.value
+        XCTAssertEqual(state.postSubmissionNotice?.phase, .succeeded)
+        let wire = try CandidDecoder().decode(XCTUnwrap(sent.read { $0 }))
+        let blob = try XCTUnwrap(wire.decode(Data?.self, at: 4))
+        let extensionValue = try JSONDecoder().decode(JSONValue.self, from: blob)
+        XCTAssertEqual(extensionValue, try JSONDecoder().decode(JSONValue.self, from: poll.extensionBlob()))
+        XCTAssertNil(draft.poll)
+        await waitForPostReconciliation(state)
+        state.cache = TaggrBackendCache(stats: nil, config: try JSONDecoder.taggr.decode(TaggrConfig.self, from: Data(#"{"post_cost":10,"poll_cost":4}"#.utf8)))
+        let plainCost = await state.postCreditCost(for: "Question")
+        let pollCost = await state.postCreditCost(for: "Question", hasPoll: true)
+        XCTAssertEqual(plainCost, 10)
+        XCTAssertEqual(pollCost, 14)
+    }
+
     func testEnqueuedPostReturnsBeforeUpdateReplyAndRejectsDuplicateDraft() async throws {
         let requestStarted = expectation(description: "add_post started")
         let releaseRequest = DispatchSemaphore(value: 0)

@@ -12,6 +12,8 @@ struct ComposePostAttachmentBar: View {
     let insertYouTubeURL: (URL) -> Void
     let isSubmitting: Bool
     let isImagePickerDisabled: Bool
+    var hasPoll = false
+    var addPoll: (() -> Void)? = nil
     var horizontalPadding: CGFloat = 18
     var verticalPadding: CGFloat = 8
     var itemSpacing: CGFloat = 8
@@ -73,6 +75,18 @@ struct ComposePostAttachmentBar: View {
                         .buttonStyle(.plain)
                         .disabled(isSubmitting || isImagePickerDisabled)
                         .accessibilityLabel(action.accessibilityLabel)
+                    }
+                    if let addPoll {
+                        Button(action: addPoll) {
+                            ComposeMarkdownButtonLabel(kind: .poll)
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(isSubmitting || isImagePickerDisabled)
+                        .accessibilityLabel("Attach poll")
+                        .accessibilityIdentifier("attach-poll")
+                    } else if hasPoll {
+                        ComposeMarkdownButtonLabel(kind: .poll)
+                            .accessibilityLabel("Poll attached")
                     }
                 }
             }
@@ -154,6 +168,7 @@ fileprivate enum ComposeMarkdownIconKind {
     case list
     case quote
     case video
+    case poll
 }
 
 private struct ComposeMarkdownButtonLabel: View {
@@ -199,9 +214,11 @@ private struct ComposeMarkdownIcon: View {
                 }
             case .video:
                 Image(systemName: "play.rectangle.fill").font(.title3.weight(.semibold))
+            case .poll:
+                Image(systemName: "chart.bar.xaxis").font(.title3.weight(.semibold))
             }
         }
-        .foregroundStyle(kind == .image || kind == .link || kind == .video ? TaggrTheme.clickable : TaggrTheme.text)
+        .foregroundStyle(kind == .image || kind == .link || kind == .video || kind == .poll ? TaggrTheme.clickable : TaggrTheme.text)
     }
 
     private func markdownListRow(width: CGFloat) -> some View {

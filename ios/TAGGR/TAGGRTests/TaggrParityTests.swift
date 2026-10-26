@@ -68,6 +68,37 @@ extension TaggrTests {
         XCTAssertNil(other.proposal)
     }
 
+    func testProposalVotePreservesExistingDiscussionFollow() async throws {
+        let calls = LockedTestValue<[String]>([])
+        let api = makeStubbedAPI { request in
+            let method = try XCTUnwrap(self.requestMethodAndArg(from: request)).method
+            calls.mutate { $0.append(method) }
+            let data: Data
+            switch method {
+            case "proposal": data = self.regressionProposal()
+            case "posts":
+                let post = String(decoding: self.postEnvelopeFixture(), as: UTF8.self)
+                    .replacingOccurrences(of: "\"watchers\": []", with: "\"watchers\": [7]")
+                data = Data("[\(post)]".utf8)
+            case "users_data": data = Data("{}".utf8)
+            case "user": data = Self.currentUserFixture()
+            default: data = Data("null".utf8)
+            }
+            return (HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!, Self.queryReply(data))
+        }
+        let state = try regressionState(api: api)
+        let model = TaggrProposalDetailState(id: 1)
+        await model.load(state)
+        XCTAssertEqual(model.post?.watchers, [7])
+        XCTAssertTrue(model.prepareVote(adopted: false, state: state, canonical: true))
+        model.invalidate()
+        await model.vote(state)
+        XCTAssertNil(model.voteError)
+        XCTAssertEqual(calls.read { $0.filter { $0 == "vote_on_proposal" }.count }, 1)
+        XCTAssertFalse(calls.read { $0.contains("toggle_following_post") })
+        XCTAssertEqual(model.post?.watchers, [7])
+    }
+
     func testProposalRewardVoteRequiresAmountAndSurfacesValidationError() async throws {
         let calls = LockedTestValue<[String]>([])
         let api = makeStubbedAPI { request in
