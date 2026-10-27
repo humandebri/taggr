@@ -342,7 +342,7 @@ pub(crate) mod tests {
 
     #[test]
     fn test_realm_change() {
-        mutate(|state| {
+        let (post_id, source_revenue, destination_revenue, credits_before_edit) = mutate(|state| {
             state.init();
 
             state.realms.insert("TEST".into(), Realm::default());
@@ -397,11 +397,113 @@ pub(crate) mod tests {
 
             assert_eq!(realm_posts(state, "TEST").len(), 3);
             assert_eq!(realm_posts(state, "TEST2").len(), 0);
+            assert!(state.toggle_realm_membership(pr(0), "TEST2".into()));
+            (
+                post_id,
+                state.realms.get("TEST").unwrap().revenue,
+                state.realms.get("TEST2").unwrap().revenue,
+                state.principal_to_user(pr(0)).unwrap().credits(),
+            )
+        });
 
-            crate::post::change_realm(state, post_id, Some("TEST2".into()));
+        assert_eq!(
+            Post::edit(
+                post_id,
+                "Root".to_string(),
+                vec![],
+                "must not be stored".to_string(),
+                Some("TEST2".to_string()),
+                pr(0),
+                1,
+            ),
+            Ok(())
+        );
 
+        read(|state| {
             assert_eq!(realm_posts(state, "TEST").len(), 0);
             assert_eq!(realm_posts(state, "TEST2").len(), 3);
+            assert!(Post::get(state, &post_id).unwrap().patches.is_empty());
+            let credits_after_edit = state.principal_to_user(pr(0)).unwrap().credits();
+            let edit_cost = credits_before_edit - credits_after_edit;
+            assert_eq!(state.realms.get("TEST").unwrap().revenue, source_revenue);
+            assert_eq!(
+                state.realms.get("TEST2").unwrap().revenue,
+                destination_revenue + edit_cost
+            );
+        });
+
+        let (credits_before_global, destination_revenue) = read(|state| {
+            (
+                state.principal_to_user(pr(0)).unwrap().credits(),
+                state.realms.get("TEST2").unwrap().revenue,
+            )
+        });
+        assert_eq!(
+            Post::edit(
+                post_id,
+                "Root".to_string(),
+                vec![],
+                "must not be stored".to_string(),
+                None,
+                pr(0),
+                2,
+            ),
+            Ok(())
+        );
+        read(|state| {
+            assert_eq!(realm_posts(state, "TEST2").len(), 0);
+            assert!(state.principal_to_user(pr(0)).unwrap().credits() < credits_before_global);
+            assert_eq!(
+                state.realms.get("TEST2").unwrap().revenue,
+                destination_revenue
+            );
+        });
+    }
+
+    #[test]
+    fn test_global_to_realm_edit_credits_destination_realm() {
+        let (post_id, revenue_before, credits_before) = mutate(|state| {
+            state.init();
+            state.realms.insert("TEST".into(), Realm::default());
+            create_user(state, pr(0));
+            assert!(state.toggle_realm_membership(pr(0), "TEST".into()));
+            let post_id = Post::create(
+                state,
+                "Global root".to_string(),
+                &[],
+                pr(0),
+                0,
+                None,
+                None,
+                None,
+            )
+            .unwrap();
+            (
+                post_id,
+                state.realms.get("TEST").unwrap().revenue,
+                state.principal_to_user(pr(0)).unwrap().credits(),
+            )
+        });
+
+        assert_eq!(
+            Post::edit(
+                post_id,
+                "Global root".to_string(),
+                vec![],
+                "must not be stored".to_string(),
+                Some("TEST".to_string()),
+                pr(0),
+                1,
+            ),
+            Ok(())
+        );
+
+        read(|state| {
+            let credits_after = state.principal_to_user(pr(0)).unwrap().credits();
+            assert_eq!(
+                state.realms.get("TEST").unwrap().revenue,
+                revenue_before + (credits_before - credits_after)
+            );
         });
     }
 

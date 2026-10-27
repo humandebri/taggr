@@ -1,0 +1,7 @@
+interface:
+  display_name: "TAGGR TestFlight"
+  short_description: "Archive and publish TAGGR iOS TestFlight builds safely"
+  default_prompt: "Use $taggr-testflight to prepare and publish the current committed TAGGR iOS build to TestFlight."
+
+policy:
+  allow_implicit_invocation: true

@@ -1,0 +1,22 @@
+// Provenance: legacy ICP ledger canister ryjl3-tyaaa-aaaaa-aaaba-cai;
+// shape is pinned from the production call sites and existing ledger Candid fixtures.
+type Tokens = record { e8s : nat64 };
+type AccountBalanceArgs = record { account : blob };
+type TransferArgs = record {
+  to : blob;
+  fee : Tokens;
+  memo : nat64;
+  amount : Tokens;
+};
+type TransferError = variant {
+  BadFee : record { expected_fee : Tokens };
+  InsufficientFunds : record { balance : Tokens };
+  TxTooOld : record { allowed_window_nanos : nat64 };
+  TxCreatedInFuture;
+  TxDuplicate : record { duplicate_of : nat64 };
+};
+type TransferResult = variant { Ok : nat64; Err : TransferError };
+service : {
+  account_balance : (AccountBalanceArgs) -> (Tokens) query;
+  transfer : (TransferArgs) -> (TransferResult);
+};
