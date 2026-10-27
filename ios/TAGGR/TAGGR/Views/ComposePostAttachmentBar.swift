@@ -8,6 +8,7 @@ struct ComposePostAttachmentBar: View {
     @EnvironmentObject private var editingController: ComposeEditingController
     @Binding var text: String
     @Binding var selectedPhotos: [PhotosPickerItem]
+    var imageImportProgress: ImageImportProgress? = nil
     let youtubeTarget: YouTubeDraftTarget?
     let insertYouTubeURL: (URL) -> Void
     let isSubmitting: Bool
@@ -24,76 +25,99 @@ struct ComposePostAttachmentBar: View {
     @State private var youtubeSheetPresented = false
 
     var body: some View {
-        HStack {
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: itemSpacing) {
-                    Button {
-                        guard let snapshot = editingController.capture(suspend: true) else { return }
-                        editingController.imageSnapshot = snapshot
-                        photoPickerPresented = true
-                    } label: {
-                        ComposeMarkdownButtonLabel(kind: .image)
+        VStack(alignment: .leading, spacing: 8) {
+            if let progress = imageImportProgress {
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack(spacing: 8) {
+                        ProgressView()
+                            .controlSize(.small)
+                            .tint(TaggrTheme.clickable)
+                        Text("Reading and compressing images…")
+                        Spacer(minLength: 0)
+                        Text("\(progress.completed)/\(progress.total)")
+                            .monospacedDigit()
                     }
-                    .photosPicker(isPresented: $photoPickerPresented, selection: $selectedPhotos, selectionBehavior: .ordered, matching: .images)
-                    .onChange(of: photoPickerPresented) { _, presented in
-                        if !presented, selectedPhotos.isEmpty, let snapshot = editingController.imageSnapshot {
-                            editingController.restore(snapshot)
-                            editingController.imageSnapshot = nil
-                        }
-                    }
-                    .disabled(isImagePickerDisabled)
-                    .accessibilityLabel("Attach image")
-                    if state.youtubeUpload.auth.isEnabled {
+                    .font(.footnote)
+                    .foregroundStyle(TaggrTheme.secondaryText)
+                    ProgressView(value: Double(progress.completed), total: Double(max(1, progress.total)))
+                        .tint(TaggrTheme.clickable)
+                        .accessibilityLabel("Images prepared")
+                        .accessibilityValue("\(progress.completed) of \(progress.total)")
+                }
+                .accessibilityIdentifier("image-import-progress")
+            }
+            HStack {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: itemSpacing) {
                         Button {
-                            youtubeSheetPresented = true
+                            guard let snapshot = editingController.capture(suspend: true) else { return }
+                            editingController.imageSnapshot = snapshot
+                            photoPickerPresented = true
                         } label: {
-                            ComposeMarkdownButtonLabel(kind: .video)
-                                .overlay(alignment: .bottomTrailing) {
-                                    if state.youtubeUpload.isRunning && state.youtubeUpload.job?.target == youtubeTarget {
-                                        Circle()
-                                            .trim(from: 0, to: state.youtubeUpload.progress)
-                                            .stroke(TaggrTheme.accent, style: StrokeStyle(lineWidth: 3, lineCap: .round))
-                                            .rotationEffect(.degrees(-90))
-                                            .frame(width: 14, height: 14)
-                                            .padding(4)
+                            ComposeMarkdownButtonLabel(kind: .image)
+                        }
+                        .photosPicker(isPresented: $photoPickerPresented, selection: $selectedPhotos, selectionBehavior: .ordered, matching: .images, preferredItemEncoding: .current)
+                        .onChange(of: photoPickerPresented) { _, presented in
+                            if !presented, selectedPhotos.isEmpty, let snapshot = editingController.imageSnapshot {
+                                editingController.restore(snapshot)
+                                editingController.imageSnapshot = nil
+                            }
+                        }
+                        .disabled(isImagePickerDisabled)
+                        .accessibilityLabel("Attach images")
+                        .accessibilityHint("Select multiple photos to attach them together")
+                        if state.youtubeUpload.auth.isEnabled {
+                            Button {
+                                youtubeSheetPresented = true
+                            } label: {
+                                ComposeMarkdownButtonLabel(kind: .video)
+                                    .overlay(alignment: .bottomTrailing) {
+                                        if state.youtubeUpload.isRunning && state.youtubeUpload.job?.target == youtubeTarget {
+                                            Circle()
+                                                .trim(from: 0, to: state.youtubeUpload.progress)
+                                                .stroke(TaggrTheme.accent, style: StrokeStyle(lineWidth: 3, lineCap: .round))
+                                                .rotationEffect(.degrees(-90))
+                                                .frame(width: 14, height: 14)
+                                                .padding(4)
+                                        }
                                     }
-                                }
+                            }
+                            .buttonStyle(.plain)
+                            .disabled(
+                                isSubmitting || youtubeTarget == nil
+                                    || (state.youtubeUpload.job != nil && state.youtubeUpload.job?.target != youtubeTarget)
+                            )
+                            .accessibilityLabel("Upload video to YouTube")
                         }
-                        .buttonStyle(.plain)
-                        .disabled(
-                            isSubmitting || youtubeTarget == nil
-                                || (state.youtubeUpload.job != nil && state.youtubeUpload.job?.target != youtubeTarget)
-                        )
-                        .accessibilityLabel("Upload video to YouTube")
-                    }
-                    ForEach(ComposeMarkdownAction.inlineActions) { action in
-                        Button {
-                            perform(action)
-                        } label: {
-                            ComposeMarkdownButtonLabel(kind: action.kind)
+                        ForEach(ComposeMarkdownAction.inlineActions) { action in
+                            Button {
+                                perform(action)
+                            } label: {
+                                ComposeMarkdownButtonLabel(kind: action.kind)
+                            }
+                            .buttonStyle(.plain)
+                            .disabled(isSubmitting || isImagePickerDisabled)
+                            .accessibilityLabel(action.accessibilityLabel)
                         }
-                        .buttonStyle(.plain)
-                        .disabled(isSubmitting || isImagePickerDisabled)
-                        .accessibilityLabel(action.accessibilityLabel)
-                    }
-                    if let addPoll {
-                        Button(action: addPoll) {
+                        if let addPoll {
+                            Button(action: addPoll) {
+                                ComposeMarkdownButtonLabel(kind: .poll)
+                            }
+                            .buttonStyle(.plain)
+                            .disabled(isSubmitting || isImagePickerDisabled)
+                            .accessibilityLabel("Attach poll")
+                            .accessibilityIdentifier("attach-poll")
+                        } else if hasPoll {
                             ComposeMarkdownButtonLabel(kind: .poll)
+                                .accessibilityLabel("Poll attached")
                         }
-                        .buttonStyle(.plain)
-                        .disabled(isSubmitting || isImagePickerDisabled)
-                        .accessibilityLabel("Attach poll")
-                        .accessibilityIdentifier("attach-poll")
-                    } else if hasPoll {
-                        ComposeMarkdownButtonLabel(kind: .poll)
-                            .accessibilityLabel("Poll attached")
                     }
                 }
-            }
-            Spacer()
-            if isSubmitting {
-                ProgressView()
-                    .tint(.white)
+                Spacer()
+                if isSubmitting && imageImportProgress == nil {
+                    ProgressView()
+                        .tint(.white)
+                }
             }
         }
         .padding(.horizontal, horizontalPadding)

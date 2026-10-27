@@ -28,6 +28,9 @@ ios/**/*.xcuserstate
 ios/**/Logs/
 ios/**/SourcePackages/
 
+# Local benchmark reports and raw measurements
+/ios/docs/benchmarks/
+
 # local work preservation and exported signing artifacts
 /archive/
 *.mobileprovision

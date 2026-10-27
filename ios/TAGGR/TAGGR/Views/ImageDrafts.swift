@@ -50,24 +50,36 @@ struct ImageImportBatchResult: Equatable, Sendable {
     }
 }
 
+struct ImageImportProgress: Equatable, Sendable {
+    let completed: Int
+    let total: Int
+}
+
+typealias ImageImportProgressHandler = @Sendable (ImageImportProgress) async -> Void
+
 @MainActor
 final class ImageImportCoordinator: ObservableObject {
     @Published private(set) var isImporting = false
+    @Published private(set) var progress = ImageImportProgress(completed: 0, total: 0)
 
     private var generation = 0
     private var task: Task<Void, Never>?
 
     @discardableResult
     func start(
-        operation: @escaping @Sendable () async -> ImageImportBatchResult,
+        count: Int = 0,
+        operation: @escaping @Sendable (@escaping ImageImportProgressHandler) async -> ImageImportBatchResult,
         completion: @escaping @MainActor (ImageImportBatchResult) async -> Void
     ) -> Task<Void, Never> {
         cancel()
         generation += 1
         let currentGeneration = generation
+        progress = ImageImportProgress(completed: 0, total: count)
         isImporting = true
         let operationTask = Task { [weak self] in
-            let result = await operation()
+            let result = await operation { [weak self] progress in
+                await self?.updateProgress(progress, generation: currentGeneration)
+            }
             guard let self,
                   !Task.isCancelled,
                   self.generation == currentGeneration else {
@@ -85,11 +97,17 @@ final class ImageImportCoordinator: ObservableObject {
         return operationTask
     }
 
+    private func updateProgress(_ progress: ImageImportProgress, generation: Int) {
+        guard isImporting, self.generation == generation else { return }
+        self.progress = progress
+    }
+
     func cancel() {
         generation += 1
         task?.cancel()
         task = nil
         isImporting = false
+        progress = ImageImportProgress(completed: 0, total: 0)
     }
 }
 
@@ -117,6 +135,18 @@ enum ImageDrafts {
     static let maxPostImagePixels = 3_000_000
     static let maxPostImageBytes = 150 * 1_024
     static let postImageWebPQuality = 50
+    // Method 2 reduces encoding time while keeping size close to the default method 4.
+    static let postImageWebPMethod: Int32 = 2
+
+    static var defaultImportConcurrency: Int {
+        let process = ProcessInfo.processInfo
+        guard !process.isLowPowerModeEnabled,
+              process.thermalState == .nominal,
+              process.physicalMemory >= 4 * 1_024 * 1_024 * 1_024 else {
+            return 2
+        }
+        return 3
+    }
 
     static func postImageMaximumBytes(serverLimit: Int?) -> Int {
         guard let serverLimit, serverLimit > 0 else {
@@ -141,9 +171,10 @@ enum ImageDrafts {
     static func importPhotos(
         _ items: [PhotosPickerItem],
         maxBytes: Int = maxPostImageBytes,
-        maxConcurrent: Int = 2
+        maxConcurrent: Int = defaultImportConcurrency,
+        onProgress: @escaping ImageImportProgressHandler = { _ in }
     ) async -> ImageImportBatchResult {
-        await importImages(count: items.count, maxBytes: maxBytes, maxConcurrent: maxConcurrent) { index in
+        await importImages(count: items.count, maxBytes: maxBytes, maxConcurrent: maxConcurrent, onProgress: onProgress) { index in
             try await items[index].loadTransferable(type: Data.self)
         }
     }
@@ -151,11 +182,11 @@ enum ImageDrafts {
     @MainActor
     static func itemProviderImportOperation(
         _ itemProviders: [NSItemProvider],
-        maxConcurrent: Int = 2
-    ) -> @Sendable (Int) async -> ImageImportBatchResult {
+        maxConcurrent: Int = defaultImportConcurrency
+    ) -> @Sendable (Int, @escaping ImageImportProgressHandler) async -> ImageImportBatchResult {
         let providers = itemProviders.map(ImageItemProvider.init)
-        return { maxBytes in
-            await importImages(count: providers.count, maxBytes: maxBytes, maxConcurrent: maxConcurrent) { index in
+        return { maxBytes, onProgress in
+            await importImages(count: providers.count, maxBytes: maxBytes, maxConcurrent: maxConcurrent, onProgress: onProgress) { index in
                 try await providers[index]?.loadData()
             }
         }
@@ -164,9 +195,11 @@ enum ImageDrafts {
     static func importImages(
         count: Int,
         maxBytes: Int = maxPostImageBytes,
-        maxConcurrent: Int = 2,
+        maxConcurrent: Int = defaultImportConcurrency,
+        onProgress: @escaping ImageImportProgressHandler = { _ in },
         loadData: @escaping @Sendable (Int) async throws -> Data?
     ) async -> ImageImportBatchResult {
+        await onProgress(ImageImportProgress(completed: 0, total: count))
         guard count > 0 else {
             return ImageImportBatchResult(images: [], failures: [])
         }
@@ -213,6 +246,7 @@ enum ImageDrafts {
                     submit(nextIndex)
                     nextIndex += 1
                 }
+                await onProgress(ImageImportProgress(completed: results.count, total: count))
             }
             return results
         }
@@ -285,6 +319,7 @@ enum ImageDrafts {
         var targetMaxDimension = sourcePixels.partialValue > maxPixels
             ? maxDimension(width: width, height: height, maxPixels: maxPixels)
             : sourceMaxDimension
+        var webPMethod: Int32?
 
         while targetMaxDimension > 0 {
             guard let image = thumbnail(from: source, targetMaxDimension: targetMaxDimension)?.cgImage else {
@@ -301,13 +336,31 @@ enum ImageDrafts {
             guard let rgba = rgbaData(from: image) else {
                 return .failure(.webPEncodingFailed)
             }
+            let method = webPMethod ?? preferredWebPMethod(
+                rgba: rgba, width: image.width, height: image.height, maxBytes: maxBytes
+            )
+            webPMethod = method
 
-            switch bestWebP(
+            var encoded = bestWebP(
                 rgba: rgba,
                 width: image.width,
                 height: image.height,
-                maxBytes: maxBytes
-            ) {
+                maxBytes: maxBytes,
+                method: method
+            )
+            // Use the original compression efficiency before reducing resolution.
+            // Keep it for subsequent retries so detailed photos retain their previous dimensions.
+            if case .tooLarge = encoded, method != 4 {
+                webPMethod = 4
+                encoded = bestWebP(
+                    rgba: rgba,
+                    width: image.width,
+                    height: image.height,
+                    maxBytes: maxBytes,
+                    method: 4
+                )
+            }
+            switch encoded {
             case .fit(let encoded):
                 return .success(
                     NormalizedPostImage(
@@ -375,14 +428,43 @@ enum ImageDrafts {
         return rendered ? rgba : nil
     }
 
+    private static func preferredWebPMethod(rgba: Data, width: Int, height: Int, maxBytes: Int) -> Int32 {
+        let sampleWidth = min(128, width)
+        let sampleHeight = min(128, height)
+        guard sampleWidth < width || sampleHeight < height else { return postImageWebPMethod }
+        let startX = (width - sampleWidth) / 2
+        let startY = (height - sampleHeight) / 2
+        var sample = Data(count: sampleWidth * sampleHeight * 4)
+        rgba.withUnsafeBytes { source in
+            sample.withUnsafeMutableBytes { target in
+                for row in 0..<sampleHeight {
+                    target.baseAddress!.advanced(by: row * sampleWidth * 4).copyMemory(
+                        from: source.baseAddress!.advanced(by: ((startY + row) * width + startX) * 4),
+                        byteCount: sampleWidth * 4
+                    )
+                }
+            }
+        }
+        // A small compression trial avoids paying for a full fast encode on dense images.
+        // This estimate only selects a method; the full result still enforces the byte limit.
+        guard let encoded = encodeWebP(
+            rgba: sample, width: sampleWidth, height: sampleHeight,
+            quality: postImageWebPQuality, method: postImageWebPMethod
+        ) else { return 4 }
+        let estimatedBytes = Double(encoded.count) * Double(width) * Double(height)
+            / Double(sampleWidth * sampleHeight)
+        return estimatedBytes <= Double(maxBytes) ? postImageWebPMethod : 4
+    }
+
     private static func bestWebP(
         rgba: Data,
         width: Int,
         height: Int,
-        maxBytes: Int
+        maxBytes: Int,
+        method: Int32
     ) -> WebPEncodingAttempt {
         postWebP(maxBytes: maxBytes) { quality in
-            encodeWebP(rgba: rgba, width: width, height: height, quality: quality)
+            encodeWebP(rgba: rgba, width: width, height: height, quality: quality, method: method)
         }
     }
 
@@ -401,7 +483,8 @@ enum ImageDrafts {
         rgba: Data,
         width: Int,
         height: Int,
-        quality: Int
+        quality: Int,
+        method: Int32
     ) -> Data? {
         let bytesPerRow = width.multipliedReportingOverflow(by: 4)
         guard !bytesPerRow.overflow,
@@ -415,18 +498,28 @@ enum ImageDrafts {
             guard let baseAddress = buffer.baseAddress?.assumingMemoryBound(to: UInt8.self) else {
                 return nil
             }
-            var output: UnsafeMutablePointer<UInt8>?
-            let size = WebPEncodeRGBA(
-                baseAddress,
-                Int32(width),
-                Int32(height),
-                Int32(bytesPerRow.partialValue),
-                Float(quality),
-                &output
-            )
-            guard size > 0, let output else { return nil }
-            defer { WebPFree(output) }
-            return Data(bytes: output, count: Int(size))
+            var config = WebPConfig()
+            guard WebPConfigPreset(&config, WEBP_PRESET_DEFAULT, Float(quality)) != 0 else { return nil }
+            config.method = method
+            var picture = WebPPicture()
+            guard WebPPictureInit(&picture) != 0 else { return nil }
+            defer { WebPPictureFree(&picture) }
+            picture.width = Int32(width)
+            picture.height = Int32(height)
+            picture.writer = WebPMemoryWrite
+            var writer = WebPMemoryWriter()
+            WebPMemoryWriterInit(&writer)
+            defer { WebPMemoryWriterClear(&writer) }
+            return withUnsafeMutablePointer(to: &writer) { writerPointer in
+                picture.custom_ptr = UnsafeMutableRawPointer(writerPointer)
+                guard WebPPictureImportRGBA(&picture, baseAddress, Int32(bytesPerRow.partialValue)) != 0,
+                      WebPEncode(&config, &picture) != 0,
+                      let output = writerPointer.pointee.mem,
+                      writerPointer.pointee.size > 0 else {
+                    return nil
+                }
+                return Data(bytes: output, count: writerPointer.pointee.size)
+            }
         }
     }
 

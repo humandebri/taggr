@@ -134,6 +134,7 @@ struct ComposePostView: View {
                 ComposePostAttachmentBar(
                     text: $draft.text,
                     selectedPhotos: $selectedPhotos,
+                    imageImportProgress: imageImport.isImporting ? imageImport.progress : nil,
                     youtubeTarget: youtubeDraftTarget,
                     insertYouTubeURL: insertYouTubeURL,
                     isSubmitting: state.isBusy || isSubmitting || imageImport.isImporting,
@@ -407,8 +408,8 @@ struct ComposePostView: View {
     private func loadPhotos(_ items: [PhotosPickerItem]) {
         guard !items.isEmpty, !imageImport.isImporting else { return }
         guard let snapshot = editingController.imageSnapshot ?? editingController.capture(suspend: true) else { return }
-        importImages(snapshot: snapshot) {
-            await ImageDrafts.importPhotos(items, maxBytes: $0)
+        importImages(count: items.count, snapshot: snapshot) { maxBytes, onProgress in
+            await ImageDrafts.importPhotos(items, maxBytes: maxBytes, onProgress: onProgress)
         }
     }
 
@@ -416,12 +417,13 @@ struct ComposePostView: View {
         guard !itemProviders.isEmpty, !imageImport.isImporting,
               let snapshot = editingController.capture(suspend: true) else { return }
         let operation = ImageDrafts.itemProviderImportOperation(itemProviders)
-        importImages(snapshot: snapshot, operation: operation)
+        importImages(count: itemProviders.count, snapshot: snapshot, operation: operation)
     }
 
     private func importImages(
+        count: Int,
         snapshot: ComposeEditingController.Snapshot,
-        operation: @escaping @Sendable (Int) async -> ImageImportBatchResult
+        operation: @escaping @Sendable (Int, @escaping ImageImportProgressHandler) async -> ImageImportBatchResult
     ) {
         editingController.imageSnapshot = snapshot
         focusedTextSegmentID = nil
@@ -431,8 +433,9 @@ struct ComposePostView: View {
             serverLimit: state.cache?.config?.maxBlobSizeBytes
         )
         imageImport.start(
-            operation: {
-                await operation(maxBytes)
+            count: count,
+            operation: { onProgress in
+                await operation(maxBytes, onProgress)
             },
             completion: { result in
                 editingController.imageSnapshot = nil
