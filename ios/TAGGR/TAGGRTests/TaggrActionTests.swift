@@ -61,6 +61,8 @@ extension XCTestCase {
                 ICIdentityStore(configuration: config.icClientConfiguration, service: suite, account: "session", keychain: TaggrTestKeychain())
             }, identityAuthenticatorFactory: identityAuthenticatorFactory
         )
+        // Most tests supply an already prepared session instead of launching the app.
+        state.isBootstrapping = false
         addTeardownBlock { @MainActor in
             state.postSubmissionNoticeDismissTask?.cancel()
             let submissions = Array(state.postSubmissionTasks.values)

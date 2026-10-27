@@ -7,6 +7,71 @@ import XCTest
 @testable import TAGGR
 
 extension TaggrTests {
+    func testBootstrapLoadsFeedOnceAfterRestoringAccount() async throws {
+        let userStarted = expectation(description: "Restoring account")
+        let feedLoaded = expectation(description: "Initial personal feed")
+        feedLoaded.assertForOverFulfill = true
+        let releaseUser = DispatchSemaphore(value: 0)
+        let methods = LockedTestValue<[String]>([])
+        let api = makeStubbedAPI { request in
+            let method = self.requestMethodAndArg(from: request)?.method ?? ""
+            let firstUserRequest = methods.read { !$0.contains("user") }
+            methods.mutate { $0.append(method) }
+            let data: Data
+            switch method {
+            case "user":
+                if firstUserRequest {
+                    userStarted.fulfill()
+                    _ = releaseUser.wait(timeout: .now() + 10)
+                }
+                data = Self.currentUserFixture()
+            case "config": data = Data(#"{"feed_page_size":30}"#.utf8)
+            case "stats": data = Data("{}".utf8)
+            case "personal_feed", "hot_posts", "last_posts":
+                feedLoaded.fulfill()
+                data = Data("[]".utf8)
+            default: data = Data("{}".utf8)
+            }
+            return (HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!, Self.queryReply(data))
+        }
+        let config = TaggrRuntimeConfig.current
+        let store = ICIdentityStore(configuration: config.icClientConfiguration,
+            service: "bootstrap-feed-test", account: "session", keychain: TaggrTestKeychain())
+        let state = makeCoordinator(api: api, identityStore: store)
+        let session = makeAuthSession(privateKey: Curve25519.Signing.PrivateKey())
+        try state.identityStore.save(session)
+        state.authSession = session
+        state.safety.accept(scope: state.safetyScope)
+        state.isBootstrapping = true
+        let revision = state.routeLoadRevision
+        let scene = try XCTUnwrap(UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first)
+        let previous = scene.windows.first { $0.isKeyWindow }
+        let window = UIWindow(windowScene: scene)
+        window.rootViewController = UIHostingController(rootView: RootView().environment(state))
+        window.makeKeyAndVisible()
+        defer {
+            releaseUser.signal()
+            window.isHidden = true
+            window.rootViewController = nil
+            previous?.makeKeyAndVisible()
+        }
+
+        let bootstrap = Task { await state.bootstrap() }
+        await fulfillment(of: [userStarted], timeout: 5)
+        XCTAssertTrue(state.isBootstrapping)
+        XCTAssertFalse(methods.read { $0.contains("hot_posts") || $0.contains("personal_feed") })
+        releaseUser.signal()
+        await bootstrap.value
+        await fulfillment(of: [feedLoaded], timeout: 5)
+        // Allow any task caused by rebuilding the tabs or changing the load key to run.
+        try await Task.sleep(for: .milliseconds(300))
+        XCTAssertFalse(state.isBootstrapping)
+        XCTAssertEqual(state.currentUser?.id, 7)
+        XCTAssertEqual(state.route, .feed(.personal))
+        XCTAssertEqual(state.routeLoadRevision, revision)
+        XCTAssertEqual(methods.read { $0.filter { ["personal_feed", "hot_posts", "last_posts"].contains($0) } }, ["personal_feed"])
+    }
+
     func testSeedPhraseMatchesWebIdentity() throws {
         // Generated with Web's SHA-256 loop and @dfinity/identity, not CryptoKit.
         let fixtures = [

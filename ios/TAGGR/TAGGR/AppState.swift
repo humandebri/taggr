@@ -279,6 +279,7 @@ final class TaggrAppCoordinator {
     @ObservationIgnored var userRefreshTask: Task<TaggrUser?, Error>?
     @ObservationIgnored var userRefreshKey: String?
     @ObservationIgnored var userRefreshID: UUID?
+    var isBootstrapping = true
     var runtimeGeneration = 0 {
         didSet {
             featurePosts.reset()
@@ -390,6 +391,7 @@ final class TaggrAppCoordinator {
     }
 
     func bootstrap() async {
+        isBootstrapping = true
         youtubeUpload.auth.bootstrap()
         var loadError: Error?
         authSession = nil
@@ -412,14 +414,16 @@ final class TaggrAppCoordinator {
         }
         await reloadCache()
         await refreshCurrentUser()
-        await youtubeUpload.bootstrap()
         if navigationStore.lastHomeFeedMode == .personal, authSession == nil {
             route = .feed(.hot)
         } else if !navigationStore.hasStoredHomeFeedMode, authSession != nil {
             route = .feed(.personal)
             navigationStore.rememberHomeFeedMode(.personal)
         }
-        routeLoadRevision += 1
+        // Mount the tabs only after identity and the initial route are settled.
+        // Their route task owns the first feed load.
+        isBootstrapping = false
+        await youtubeUpload.bootstrap()
     }
 
     func open(_ url: URL) {

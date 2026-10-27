@@ -9,7 +9,11 @@ struct RootView: View {
 
     var body: some View {
         Group {
-            if state.accountRetired {
+            if state.isBootstrapping {
+                TaggrBusyIndicator()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(TaggrTheme.background)
+            } else if state.accountRetired {
                 NavigationStack { RetiredAccountView() }
             } else if !state.acceptedSafetyTerms {
                 SafetyGateView()
@@ -17,8 +21,8 @@ struct RootView: View {
                 tabs.id("\(state.safetyScope):\(state.runtimeGeneration):\(state.currentUser?.id.description ?? "guest")")
             }
         }
-        .task(id: "\(state.safetyScope):\(state.runtimeGeneration):\(scenePhase)") {
-            guard scenePhase == .active else { return }
+        .task(id: "\(state.safetyScope):\(state.runtimeGeneration):\(scenePhase):\(state.isBootstrapping)") {
+            guard !state.isBootstrapping, scenePhase == .active else { return }
             await state.pollNotifications()
         }
         .task(id: "\(state.runtimeConfig.canisterId):\(scenePhase)") {
